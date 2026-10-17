@@ -83,15 +83,17 @@ test('buildFeedbackMail: answers capped at 500 chars, whole link ≤ 1800 chars 
 });
 
 // ==== route ====
-test('staminaHint: under 5 warns at 90 min, 5–8 up to 60–90, older neutral', () => {
+test('staminaHint: under 5 gets one warning for anything over 45 min, 5–8 up to 60–90, older neutral', () => {
   assert.deepEqual(L.staminaHint('u5', 30), { key: 'staminaU5', warn: false });
+  assert.deepEqual(L.staminaHint('u5', 45), { key: 'staminaU5', warn: false });          // 45 min is still OK
+  assert.deepEqual(L.staminaHint('u5', 46), { key: 'staminaU5Warn', warn: true });
+  assert.deepEqual(L.staminaHint('u5', 60), { key: 'staminaU5Warn', warn: true });       // same single warning at 60 and 90
   assert.deepEqual(L.staminaHint('u5', 90), { key: 'staminaU5Warn', warn: true });
-  assert.equal(L.staminaHint('u5', 60).warn, true);                                  // still longer than 30–45 min
   assert.deepEqual(L.staminaHint('5-8', 90), { key: 'stamina58', warn: false });
   assert.deepEqual(L.staminaHint('9-12', 90), { key: 'staminaOlder', warn: false });
   assert.deepEqual(L.staminaHint('teen', 30), { key: 'staminaOlder', warn: false });
-  assert.equal(I18N.en.staminaU5Warn, 'Little ones usually tire after 30–45 min');
-  assert.equal(I18N.zh.staminaU5Warn, '小小孩一般 30–45 分钟就累了');
+  assert.equal(I18N.en.staminaU5Warn, 'Over 45 min is long for under-5s. Little ones usually tire after 30–45 min, so pick 30 min.');
+  assert.equal(I18N.zh.staminaU5Warn, '超过 45 分钟对 5 岁以下太长了。小小孩一般 30–45 分钟就累了，建议选 30 分钟。');
 });
 
 test('start-time hint: little kids 5:30 PM, older 6–8:30 PM', () => {
@@ -251,5 +253,5 @@ test('app version matches every ?v= in index.html', () => {
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css))\?([^"]+)"/g)];
   assert.ok(own.length >= 9);
   own.forEach((m) => assert.equal(m[2], L.APP_VERSION, m[1]));
-  assert.match(html, /src="tour\.js\?v=6"/);
+  assert.match(html, /src="tour\.js\?v=7"/);
 });

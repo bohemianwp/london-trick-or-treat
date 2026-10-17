@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=6';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=7';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -394,7 +394,7 @@
   }
 
   // ==== route helpers ====
-  var STAMINA = { 'u5': [30, 45], '5-8': [60, 90] };
+  var STAMINA = { 'u5': [30, 45], '5-8': [60, 90] };   // under 5: one warning for any route longer than 45 min
   // -> { key, warn }: i18n key of the hint and whether the chosen walk is longer than little legs usually manage.
   function staminaHint(age, minutes) {
     if (age === 'u5') return { key: minutes > STAMINA.u5[1] ? 'staminaU5Warn' : 'staminaU5', warn: minutes > STAMINA.u5[1] };

@@ -93,5 +93,5 @@
     if (timer) return;
     timer = setInterval(function () { if (root.document && root.document.visibilityState === 'visible') tick(local, grid); }, 4000);
   }
-  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES };
+  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES, SUGGEST: SUGGEST };
 })(typeof self !== 'undefined' ? self : this);

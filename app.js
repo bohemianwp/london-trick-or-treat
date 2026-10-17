@@ -122,7 +122,7 @@
     applyStaticText();
     return;
   }
-  var map = L.map('map', { zoomControl: true, attributionControl: false, tap: true }).setView(LONDON, 12);
+  var map = L.map('map', { zoomControl: true, attributionControl: false, tap: true, zoomSnap: 0.25 }).setView(LONDON, 12);
   L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'tiles-dark',
@@ -1296,6 +1296,18 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHints(null); closeMarkCard(); } });
 
+  // ?demo=1: frame every visible demo zone (3+ marks) and suggestion so no hexagon or badge sits under the chips, legend or Mark button.
+  function fitDemoZones() {
+    var D = window.TOT_DEMO; if (!D || !D.ZONES) return;
+    var pts = D.ZONES.filter(function (z) { return z[3] >= 3; }).map(function (z) { return grid.center(grid.cell(z[1], z[2])); });
+    (D.SUGGEST || []).forEach(function (s) { pts.push(grid.center(grid.cell(s[0], s[1]))); });
+    if (!pts.length) return;
+    var wrap = map.getContainer().getBoundingClientRect();
+    var top = $('layerbar').getBoundingClientRect().bottom - wrap.top + 45;      // badge sits above its hexagon
+    var bottom = wrap.bottom - Math.min($('legend').getBoundingClientRect().top, $('markBtn').getBoundingClientRect().top) + 30;
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [64, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
+  }
+
   // ==== boot ====
   applyLayers();
   renderAll();
@@ -1314,6 +1326,7 @@
     if (DEMO && window.TOT_DEMO) window.TOT_DEMO.seed(backend.local, grid);
     return refreshAll();
   }).then(function () {
+    if (DEMO && !FLAGS.near && !FLAGS.tour) fitDemoZones();
     if (FLAGS.near) openNear();
     if (FLAGS.tour) startTour(FLAGS.tourStep ? FLAGS.tourStep - 1 : 0, !!FLAGS.tourStep);
   });

@@ -67,6 +67,20 @@
     }
   });
 
+  // Badges are added hottest first. If a cooler zone's badge would overlap one already placed, flip it below its hexagon
+  // (still pointing at it) so every count stays readable when zones are close together at city-wide zoom.
+  function declutter(group) {
+    var placed = [];
+    function hits(r) { return placed.some(function (q) { return r.left < q.right + 2 && r.right > q.left - 2 && r.top < q.bottom + 2 && r.bottom > q.top - 2; }); }
+    group.eachLayer(function (m) {
+      var host = m.getElement && m.getElement(), b = host && host.querySelector('.zbadge');
+      if (!b || !b.getBoundingClientRect) return;
+      var r = b.getBoundingClientRect();
+      if (hits(r)) { b.classList.add('zb-below'); var r2 = b.getBoundingClientRect(); if (hits(r2)) b.classList.remove('zb-below'); else r = r2; }
+      placed.push(r);
+    });
+  }
+
   // ---- live zones (SVG + CSS animation) with count badges
   var ZoneLayer = L.Layer.extend({
     initialize: function (grid, opts) {
@@ -108,6 +122,7 @@
         }
       });
       this.drawn = vis.length; this.badges = nb;
+      declutter(this._badgeGroup);
       this.lastDrawMs = Math.round(((root.performance || Date).now() - t0) * 10) / 10;
     }
   });
