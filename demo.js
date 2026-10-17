@@ -25,6 +25,14 @@
     ['Lambeth', 42.9050, -81.3000, 7, 'crowded', true],      // no researched area nearby
     ['Pond Mills (only 2: stays hidden)', 42.9440, -81.2070, 2, null, false]
   ];
+  // v11 decor demo: [name, lat, lng, decor marks, main tag]
+  var DECOR = [
+    ['Askin St haunted garages', 42.9712, -81.2398, 14, 'spooky'],
+    ['Woodfield lights', 42.9935, -81.2405, 9, 'lights'],
+    ['Byron front yards', 42.9615, -81.3290, 6, 'funny'],
+    ['Westmount must-see', 42.9465, -81.2930, 4, 'mustsee'],
+    ['Huron Heights (only 2: stays hidden)', 43.0180, -81.2150, 2, 'lights']
+  ];
   var SUGGEST = [
     [43.0262, -81.2765, 'Lots of porch lights on our crescent'],
     [43.0262, -81.2765, '很多人家装饰，街道安静'],
@@ -57,6 +65,17 @@
       }
     });
     local._set('marks', marks);
+    // Decor marks spread over the last 13 days (counted over 14 days), ~60% with the zone's main tag.
+    var decor = local._get('decor', []).filter(function (m) { return String(m.id).indexOf('demo-') !== 0; });
+    DECOR.forEach(function (z) {
+      var cell = grid.cell(z[1], z[2]);
+      for (var i = 0; i < z[3]; i++) {
+        var p = near(grid, cell), b = LIB.blurPoint(p[0], p[1], rnd), tags = rnd() < 0.6 ? [z[4]] : rnd() < 0.3 ? ['mustsee'] : [];
+        decor.push({ id: 'demo-decor-' + cell + '-' + i, dayHash: 'demo' + i, lat: LIB.round(b[0], 4), lng: LIB.round(b[1], 4), cell: cell,
+                     tags: tags, createdAt: now - Math.round((0.05 + rnd() * 12.9) * 864e5) });
+      }
+    });
+    local._set('decor', decor);
     if (!local._get('demoSeeded', false)) {
       var sug = local._get('suggestions', []);
       SUGGEST.forEach(function (s, i) {
@@ -93,5 +112,5 @@
     if (timer) return;
     timer = setInterval(function () { if (root.document && root.document.visibilityState === 'visible') tick(local, grid); }, 4000);
   }
-  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES, SUGGEST: SUGGEST };
+  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES, SUGGEST: SUGGEST, DECOR: DECOR };
 })(typeof self !== 'undefined' ? self : this);

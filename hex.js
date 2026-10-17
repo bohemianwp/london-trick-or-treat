@@ -79,8 +79,8 @@
     }, 0);
   }
   function setSpot(b, i) { b.classList.remove('zb-below', 'zb-side'); if (SPOTS[i][0]) b.classList.add(SPOTS[i][0]); b.style.transform = SPOTS[i][1]; }
-  function declutter(group) {
-    var placed = [];
+  function declutter(group, avoid) {
+    var placed = (avoid || []).slice(), mine = [];
     group.eachLayer(function (m) {
       var host = m.getElement && m.getElement(), b = host && host.querySelector('.zbadge');
       if (!b || !b.getBoundingClientRect) return;
@@ -92,21 +92,23 @@
         if (cost === 0) break;
       }
       setSpot(b, best); r = b.getBoundingClientRect();
-      placed.push(r);
+      placed.push(r); mine.push(r);
     });
+    return mine;
   }
 
   // ---- live zones (SVG + CSS animation) with count badges
   var ZoneLayer = L.Layer.extend({
     initialize: function (grid, opts) {
-      this.grid = grid; this.opts = opts || {}; this.zones = []; this.drawn = 0; this.badges = 0;
+      this.grid = grid; this.opts = opts || {}; this.zones = []; this.drawn = 0; this.badges = 0; this.rects = [];
       this._group = L.layerGroup(); this._badgeGroup = L.layerGroup();
     },
     onAdd: function (map) {
       this._map = map;
-      ensurePane(map, 'zonePane', 430);
+      if (this.opts.pane) ensurePane(map, this.opts.pane, this.opts.paneZ || 420);    // v11 decor zones: just under the live zones
+      else ensurePane(map, 'zonePane', 430);
       ensurePane(map, 'badgePane', 660);          // above area labels (tooltipPane 650): nothing covers a live zone
-      this._renderer = this._renderer || L.svg({ pane: 'zonePane', padding: 0.3 });
+      this._renderer = this._renderer || L.svg({ pane: this.opts.pane || 'zonePane', padding: 0.3 });
       this._group.addTo(map); this._badgeGroup.addTo(map);
       map.on('moveend', this._render, this);
       this._render();
@@ -116,6 +118,8 @@
     onRemove: function (map) {
       map.off('moveend', this._render, this);
       map.removeLayer(this._group); map.removeLayer(this._badgeGroup);
+      this.rects = [];
+      if (this.opts.onLayout) this.opts.onLayout();
     },
     // zones: output of LIB.aggregateZones / decorateZones (already 3+ only, hottest first)
     setData: function (zones) { this.zones = zones || []; if (this._map) this._render(); },
@@ -126,7 +130,7 @@
       var vis = LIB.clipToBounds(this.zones, grid, viewBounds(map, 0.25), MAX_ZONES);
       var zoom = map.getZoom(), showBadges = zoom >= 11, compact = zoom < 14, nb = 0;
       vis.forEach(function (z) {
-        var cls = 'zone zone-' + z.bucket + (z.isNew ? ' zone-new' : '');
+        var cls = o.kind === 'decor' ? 'zone zone-decor' : 'zone zone-' + z.bucket + (z.isNew ? ' zone-new' : '');
         var poly = L.polygon(grid.boundary(z.cell), { renderer: self._renderer, className: cls, weight: 2, interactive: true, bubblingMouseEvents: false });
         poly.on('click', function (e) { if (o.onTap) o.onTap(z, e.latlng); });
         poly.addTo(self._group);
@@ -139,7 +143,9 @@
         }
       });
       this.drawn = vis.length; this.badges = nb;
-      declutter(this._badgeGroup);
+      // v11: two layers share the badge pane; each lays its badges out around the other layer's badges.
+      this.rects = declutter(this._badgeGroup, o.avoid ? o.avoid() : null);
+      if (o.onLayout) o.onLayout();
       this.lastDrawMs = Math.round(((root.performance || Date).now() - t0) * 10) / 10;
     }
   });
@@ -148,6 +154,7 @@
     MAX_ZONES: MAX_ZONES, MAX_BADGES: MAX_BADGES,
     makeGrid: function () { return LIB.makeGrid(root.h3); },
     createBaseLayer: function (grid) { return new BaseLayer(grid); },
-    createZoneLayer: function (grid, opts) { return new ZoneLayer(grid, opts); }
+    createZoneLayer: function (grid, opts) { return new ZoneLayer(grid, opts); },
+    declutter: declutter
   };
 })(typeof self !== 'undefined' ? self : this);

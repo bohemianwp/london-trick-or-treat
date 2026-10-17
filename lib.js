@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=10';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=11';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -147,6 +147,62 @@
   function shouldNudge(mode, lastMarkAt, lastNudgeAt, nowMs) {
     if (mode !== 'live' && mode !== 'test' && mode !== 'demo') return false;
     return nowMs - (lastMarkAt || 0) >= NUDGE_MS && nowMs - (lastNudgeAt || 0) >= NUDGE_MS;
+  }
+  // ==== v11: "Best decorations / 最佳装饰" layer (pre-Halloween) ====
+  // A separate mark type: zone level only (same hex grid, 50 m blur), visible at 3+ marks, counted over 14 days.
+  // Shared Oct 17 00:00 until Nov 1 00:00 Toronto; every decor mark is deleted from Nov 2 00:00 Toronto.
+  var DECOR_TAGS = ['spooky', 'funny', 'lights', 'mustsee'];
+  var DECOR_ICON = { spooky: '👻', funny: '😄', lights: '✨', mustsee: '🏆' };
+  var DECOR_OPEN = { start: zonedToUtcMs('2026-10-17', '00:00', TZ), end: zonedToUtcMs('2026-11-01', '00:00', TZ) };
+  var DECOR_PURGE_MS = zonedToUtcMs('2026-11-02', '00:00', TZ);
+  var DECOR_KEEP_MS = 14 * 864e5, DECOR_MAX_DAY = 10;
+  var DECOR_PRIMARY_FROM = zonedToUtcMs('2026-10-31', '15:00', TZ);   // from here the big button is the fun-street button
+  function isDecorOpen(nowMs, demo) { return !!demo || (nowMs >= DECOR_OPEN.start && nowMs < DECOR_OPEN.end); }
+  function decorVisible(nowMs, demo) { return !!demo || nowMs < DECOR_PURGE_MS; }        // layer stays visible until the purge
+  function decorPrimary(nowMs, demo) { return isDecorOpen(nowMs, demo) && (demo || nowMs < DECOR_PRIMARY_FROM); }
+  // Toronto calendar day 'YYYY-MM-DD' (the server uses the same day for its per-day limits).
+  function torontoDay(ms) { return new Date(ms + tzOffsetMin(ms, TZ) * 60000).toISOString().slice(0, 10); }
+  function cleanDecorTags(tags) {
+    return (Array.isArray(tags) ? tags : []).filter(function (t, i, a) { return DECOR_TAGS.indexOf(t) >= 0 && a.indexOf(t) === i; });
+  }
+  function decorTagsValid(tags) { return (tags || []).every(function (t) { return DECOR_TAGS.indexOf(t) >= 0; }); }
+  // history: [{t, cell}] from this device. Same hex once per Toronto day, max 10 per day.
+  function decorRate(history, cell, nowMs) {
+    var day = torontoDay(nowMs), today = (history || []).filter(function (h) { return h.t <= nowMs && torontoDay(h.t) === day; });
+    if (today.some(function (h) { return h.cell === cell; })) return { ok: false, reason: 'zone' };
+    if (today.length >= DECOR_MAX_DAY) return { ok: false, reason: 'day' };
+    return { ok: true };
+  }
+  // Most common tag (ties: DECOR_TAGS order), shown only when 2+ marks carry it.
+  function decorTopTag(tagCounts) {
+    var best = null, bestN = 0;
+    DECOR_TAGS.forEach(function (t) { if ((tagCounts[t] || 0) > bestN) { best = t; bestN = tagCounts[t]; } });
+    return bestN >= 2 ? best : null;
+  }
+  // marks: [{cell?, lat, lng, tags, createdAt}] -> decor zones with 3+ marks in the last 14 days, most marked first.
+  // After the Nov 2 purge nothing is shown (demo excepted).
+  function aggregateDecor(marks, cellFn, nowMs, max, demo) {
+    var cells = {};
+    if (!decorVisible(nowMs, demo)) return [];
+    (marks || []).forEach(function (m) {
+      if (m.createdAt > nowMs || nowMs - m.createdAt > DECOR_KEEP_MS) return;
+      var c = m.cell || (cellFn ? cellFn(m.lat, m.lng) : null);
+      if (!c) return;
+      var z = cells[c] || (cells[c] = { cell: c, count: 0, tags: {} });
+      z.count++;
+      cleanDecorTags(m.tags).forEach(function (t) { z.tags[t] = (z.tags[t] || 0) + 1; });
+    });
+    return decorateDecor(Object.keys(cells).map(function (k) {
+      var z = cells[k], t = decorTopTag(z.tags);
+      return { cell: z.cell, count: z.count, tags: z.tags, topTag: t, topTagN: t ? z.tags[t] : 0 };
+    }), max);
+  }
+  // Server rows ({cell, count, topTag, topTagN}) -> sorted decor zones, re-checking the 3+ rule and the tag list.
+  function decorateDecor(rows, max) {
+    return (rows || []).filter(function (r) { return r && r.count >= MIN_ZONE; }).map(function (r) {
+      var ok = DECOR_TAGS.indexOf(r.topTag) >= 0 && (r.topTagN == null || r.topTagN >= 2);
+      return { cell: r.cell, count: r.count, tags: r.tags || {}, topTag: ok ? r.topTag : null, topTagN: ok ? (r.topTagN || null) : 0, kind: 'decor' };
+    }).sort(function (a, b) { return (b.count - a.count) || (a.cell < b.cell ? -1 : 1); }).slice(0, max || 400);
   }
   function cleanTags(tags) {
     return (Array.isArray(tags) ? tags : []).filter(function (t, i, a) { return MARK_TAGS.indexOf(t) >= 0 && a.indexOf(t) === i; });
@@ -513,7 +569,7 @@
     function on(v) { return v === '1' || v === 'true' || v === 'yes'; }
     var l = (q.lang || '').split(/[-_]/)[0];
     var step = parseInt(q.tourstep, 10);
-    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near), nudge: on(q.nudge),
+    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near), nudge: on(q.nudge), decor: on(q.decor),
              feedback: on(q.feedback), tour: on(q.tour), tourStep: step >= 1 ? step : null };
   }
   function guideSeen(storage) { try { return !!(storage && storage.getItem(GUIDE_KEY)); } catch (e) { return false; } }
@@ -590,6 +646,10 @@
     msToNextSecond: msToNextSecond, parseNowParam: parseNowParam,
     staminaHint: staminaHint, startTimeHintKey: startTimeHintKey, estimateHouses: estimateHouses, bearingDeg: bearingDeg, loopWaypoints: loopWaypoints,
     FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
-    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, markProgress: markProgress, BADGES: BADGES, badgeFor: badgeFor, newBadge: newBadge, shouldNudge: shouldNudge, NUDGE_MS: NUDGE_MS, initialLang: initialLang
+    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, markProgress: markProgress, BADGES: BADGES, badgeFor: badgeFor, newBadge: newBadge, shouldNudge: shouldNudge, NUDGE_MS: NUDGE_MS,
+    DECOR_TAGS: DECOR_TAGS, DECOR_ICON: DECOR_ICON, DECOR_OPEN: DECOR_OPEN, DECOR_PURGE_MS: DECOR_PURGE_MS, DECOR_KEEP_MS: DECOR_KEEP_MS,
+    DECOR_MAX_DAY: DECOR_MAX_DAY, DECOR_PRIMARY_FROM: DECOR_PRIMARY_FROM, isDecorOpen: isDecorOpen, decorVisible: decorVisible, decorPrimary: decorPrimary,
+    torontoDay: torontoDay, cleanDecorTags: cleanDecorTags, decorTagsValid: decorTagsValid, decorRate: decorRate, decorTopTag: decorTopTag,
+    aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang
   };
 });

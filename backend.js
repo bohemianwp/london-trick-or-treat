@@ -17,7 +17,8 @@
   var SB_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
   var SB_SRI = 'sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK';
   var METHODS = ['listPosts', 'createPost', 'vote', 'report', 'deletePost',
-                 'sendMark', 'tagMark', 'liveZoneCounts', 'suggestArea', 'communitySuggested'];
+                 'sendMark', 'tagMark', 'liveZoneCounts', 'suggestArea', 'communitySuggested', 'sendDecor', 'decorCounts'];
+  var DECOR_METHODS = { sendDecor: 1, decorCounts: 1 };   // v11: if the server has no decor RPCs yet, these stay on this phone
   var LIVE_METHODS = { sendMark: 1, tagMark: 1, liveZoneCounts: 1 };   // outside the live window these stay local (practice)
   var HOUR = 3600000;
 
@@ -166,7 +167,39 @@
       this._set('suggestions', all);
       return ok({ id: rec.id });
     },
-    communitySuggested: function () { return ok(LIB.communitySuggested(this._get('suggestions', []))); }
+    communitySuggested: function () { return ok(LIB.communitySuggested(this._get('suggestions', []))); },
+
+    // ---------------- v11 decor marks (already blurred by createBackend().sendDecor)
+    // d: { device, lat, lng, cell, tags }. Only a per-day device hash is kept (cannot be linked across days).
+    sendDecor: function (d) {
+      var now = this.now();
+      if (!d || !d.device || String(d.device).length < 8 || !d.cell) return fail('invalid');
+      if (!LIB.inLondonBox(+d.lat, +d.lng)) return fail('outside');
+      if (!LIB.decorTagsValid(d.tags)) return fail('invalid');
+      if (!LIB.isDecorOpen(now, this.demo)) return fail('closed');
+      var day = LIB.torontoDay(now), dh = LIB.sha256Hex('decor:' + d.device + ':' + day), all = this._pruneDecor();
+      var hist = all.filter(function (x) { return x.dayHash === dh; }).map(function (x) { return { t: x.createdAt, cell: x.cell }; });
+      if (!LIB.decorRate(hist, d.cell, now).ok) return fail('rate');
+      var rec = { id: LIB.uuid(), dayHash: dh, lat: LIB.round(+d.lat, 4), lng: LIB.round(+d.lng, 4), cell: String(d.cell).slice(0, 20),
+                  tags: LIB.cleanDecorTags(d.tags), createdAt: now };
+      all.push(rec);
+      this._set('decor', all);
+      return ok({ id: rec.id });
+    },
+    // 14-day retention; nothing at all after Nov 2 00:00 Toronto (demo excepted).
+    _pruneDecor: function () {
+      var now = this.now(), demo = this.demo, all = this._get('decor', []);
+      var keep = all.filter(function (x) { return now - x.createdAt < LIB.DECOR_KEEP_MS && (demo || now < LIB.DECOR_PURGE_MS); });
+      if (keep.length !== all.length) this._set('decor', keep);
+      return keep;
+    },
+    // Same contract as the decor_counts RPC: only cells with 3+ decor marks.
+    decorCounts: function (cellFn) {
+      return ok(LIB.aggregateDecor(this._pruneDecor(), cellFn, this.now(), 400, this.demo).map(function (z) {
+        return { cell: z.cell, count: z.count, topTag: z.topTag, topTagN: z.topTagN };
+      }));
+    },
+    decorCountIn: function (cell) { return this._pruneDecor().filter(function (x) { return x.cell === cell; }).length; }
   };
   // ==== SupabaseAdapter ====
   function loadScript(src, sri) {
@@ -191,6 +224,9 @@
   // Our RPCs raise exceptions whose message starts with one of these codes; anything else is a network/server problem.
   var CODE_RE = /^(invalid|forbidden|rate|closed|outside|text:[a-zA-Z]+)\b/;
   function unwrap(res) {
+    if (res.error && (res.error.code === 'PGRST202' || /Could not find the function/i.test(res.error.message || ''))) {
+      var me = new Error('missing'); me.code = 'missing'; throw me;          // RPC not installed yet (SQL not run)
+    }
     if (res.error) {
       var msg = String(res.error.message || ''), m = CODE_RE.exec(msg);
       var e = new Error(m ? m[1] : msg || 'server');
@@ -246,6 +282,15 @@
       return this.rpc('community_suggested', {}).then(function (rows) {
         return rows.map(function (r) { return { cell: r.h3_r8, n: r.n, lat: r.lat, lng: r.lng, reasons: r.reasons || [] }; });
       });
+    },
+    sendDecor: function (d) {
+      return this.rpc('send_decor', { p_device: d.device, p_lat: d.lat, p_lng: d.lng, p_h3: d.cell, p_tags: d.tags || [] })
+        .then(function (id) { return { id: id }; });
+    },
+    decorCounts: function () {
+      return this.rpc('decor_counts', {}).then(function (rows) {
+        return rows.map(function (r) { return { cell: r.h3_r8, count: r.n, topTag: r.top_tag, topTagN: r.top_tag_n }; });
+      });
     }
   };
 
@@ -292,13 +337,15 @@
     METHODS.forEach(function (name) {
       api[name] = function () {
         var args = arguments;
-        if (api.mode !== 'supabase' || (LIVE_METHODS[name] && !api.isLive())) return viaLocal(name, args);
+        if (api.mode !== 'supabase' || (LIVE_METHODS[name] && !api.isLive()) || (DECOR_METHODS[name] && api.decorMissing)) return viaLocal(name, args);
         return withTimeout(remote[name].apply(remote, args), timeoutMs).then(function (res) {
           if (name === 'listPosts') cache('posts.' + (args[0] || ''), res);
           return res;
         }, function (err) {
           // Test days, but the server still has the Oct 31-only window (v7_update.sql not run yet): keep it local.
           if (err && err.code === 'closed' && LIVE_METHODS[name] && LIB.isTestOpen(now(), cfg)) return viaLocal(name, args);
+          // v11: decor RPCs not installed yet → decor stays on this phone ("sharing turns on soon"), everything else stays shared.
+          if (err && err.code === 'missing' && DECOR_METHODS[name]) { api.decorMissing = true; return viaLocal(name, args); }
           if (err && err.validation) throw err;
           goOffline(err);
           return viaLocal(name, args);
@@ -313,11 +360,21 @@
       if (!LIB.inLondonBox(b[0], b[1])) return fail('outside');
       return rawSend({ session: m.session, lat: b[0], lng: b[1], cell: cellFn ? cellFn(b[0], b[1]) : m.cell, tags: m.tags || [] }, token);
     };
+    var rawDecor = api.sendDecor;
+    api.sendDecor = function (d, cellFn, rnd) {
+      if (!d || !LIB.inLondonBox(+d.lat, +d.lng)) return fail('outside');
+      var b = LIB.blurPoint(+d.lat, +d.lng, rnd);
+      if (!LIB.inLondonBox(b[0], b[1])) return fail('outside');
+      return rawDecor({ device: d.device, lat: b[0], lng: b[1], cell: cellFn ? cellFn(b[0], b[1]) : d.cell, tags: d.tags || [] });
+    };
+    // Is decor sharing really reaching other families? false while the server SQL is missing, offline or local-only.
+    api.decorShared = function () { return api.mode === 'supabase' && !api.decorMissing; };
+    api.listDecor = function (cellFn) { return api.decorCounts(cellFn).then(function (rows) { return LIB.decorateDecor(rows); }); };
     api.listZones = function (windowMin, cellFn) {
       return api.liveZoneCounts(windowMin, cellFn).then(function (rows) { return LIB.decorateZones(rows, now()); });
     };
     return api;
   }
 
-  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS, LIVE_METHODS: LIVE_METHODS };
+  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS, LIVE_METHODS: LIVE_METHODS, DECOR_METHODS: DECOR_METHODS };
 });

@@ -11,7 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
   <header class="topbar">
@@ -39,6 +39,7 @@
       <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
       <span><i class="lg lg-lively"></i><span data-i18n="legendLively">Lively</span></span>
       <span><i class="lg lg-hot"></i><span data-i18n="legendHot">Super hot</span></span>
+      <span id="legendDecor" hidden><i class="lg lg-decor"></i><span data-i18n="legendDecor">Decor</span></span>
       <button class="ibtn" type="button" aria-expanded="false" aria-controls="hintLegend" aria-label="What is this?">i</button>
       <p id="hintLegend" class="hint-pop legend-pop" role="note" data-i18n="hintLegend" hidden></p>
     </div>
@@ -46,6 +47,7 @@
     <button id="locateBtn" class="fab" type="button">
       <span class="fab-icon">📍</span><span id="locateLabel" data-i18n="showMyLocation">Show my location</span>
     </button>
+    <button id="decorBtn" class="fab fab-decor" type="button" hidden><span data-i18n="decorBtn">Cool decorations here! 🎃</span></button>
 
     <div class="markwrap">
       <button id="markBtn" class="markbtn" type="button">
@@ -86,6 +88,7 @@
         <div class="row">
           <button id="openNear" class="btn btn-primary" type="button" data-i18n="nearBtn">📍 Near me</button>
           <button id="suggestBtn" class="btn" type="button" data-i18n="suggestBtn">📌 Suggest an area</button>
+          <button id="openDecor" class="btn btn-decor" type="button" data-i18n="decorListBtn">🎃 Best decorations</button>
         </div>
         <p class="hint" data-i18n="notOnMap"></p>
         <h2 data-i18n="areasTitle">Good areas to start</h2>
@@ -107,6 +110,20 @@
         <p id="nearFrom" class="hint"></p>
         <ul id="nearList" class="near-list"></ul>
         <p class="hint" data-i18n="nearRule"></p>
+      </div>
+
+      <!-- BEST DECORATIONS (v11) -->
+      <div class="panel" id="panel-decor" hidden>
+        <h2 data-i18n="decorTitle">🎃 Best decorations</h2>
+        <button id="decorPanelBtn" class="btn btn-decor btn-block decor-big" type="button"><span data-i18n="decorBtn">Cool decorations here! 🎃</span></button>
+        <p class="hint" data-i18n="decorWhen"></p>
+        <p id="decorStatus" class="info" hidden></p>
+        <h3 data-i18n="decorNearH">Near me</h3>
+        <ul id="decorNearList" class="near-list"></ul>
+        <h3 data-i18n="decorCityH">Top in London</h3>
+        <ul id="decorCityList" class="near-list"></ul>
+        <p class="hint" data-i18n="decorIntro"></p>
+        <p class="hint" data-i18n="decorFunNote"></p>
       </div>
 
       <!-- ROUTE -->
@@ -314,13 +331,13 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
           integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
-  <script defer src="config.js?v=10"></script>
-  <script defer src="lib.js?v=10"></script>
-  <script defer src="i18n.js?v=10"></script>
-  <script defer src="data/areas.js?v=10"></script>
-  <script defer src="backend.js?v=10"></script>
-  <script defer src="hex.js?v=10"></script>
-  <script defer src="tour.js?v=10"></script>
-  <script defer src="app.js?v=10"></script>
+  <script defer src="config.js?v=11"></script>
+  <script defer src="lib.js?v=11"></script>
+  <script defer src="i18n.js?v=11"></script>
+  <script defer src="data/areas.js?v=11"></script>
+  <script defer src="backend.js?v=11"></script>
+  <script defer src="hex.js?v=11"></script>
+  <script defer src="tour.js?v=11"></script>
+  <script defer src="app.js?v=11"></script>
 </body>
 </html>

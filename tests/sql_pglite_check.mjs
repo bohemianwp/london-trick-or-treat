@@ -29,8 +29,8 @@ const oldGone = await one(`select to_regclass('public.markers') is null and to_r
 ok('v2 tables markers/live_dots do not exist', oldGone.gone);
 const anonFns = (await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') order by 1`)).rows.map(r => r.proname);
-const wantFns = ['community_suggested', 'create_post', 'delete_post', 'report_post', 'send_mark', 'suggest_area', 'tag_mark', 'vote_post', 'zone_counts'];
-ok('anon may execute exactly the 9 public RPCs', JSON.stringify(anonFns) === JSON.stringify(wantFns), anonFns.join(','));
+const wantFns = ['community_suggested', 'create_post', 'decor_counts', 'delete_post', 'report_post', 'send_decor', 'send_mark', 'suggest_area', 'tag_mark', 'vote_post', 'zone_counts'];
+ok('anon may execute exactly the 11 public RPCs (v11: + send_decor, decor_counts)', JSON.stringify(anonFns) === JSON.stringify(wantFns), anonFns.join(','));
 
 await db.exec('set role anon');
 const V = 'device-aaaa-1111', T = 'token-'.padEnd(40, 'x');
@@ -188,14 +188,55 @@ ok('community_suggested shows it at 3 with n=3 and reasons (newest first)', cs.l
 ok('community_suggested: averaged centre, no device hash', Math.abs(csA?.lat - 42.9813) < 1e-9 && csA?.lng === -81.2512 && JSON.stringify(Object.keys(csA || {}).sort()) === '["h3_r8","lat","lng","n","reasons"]', JSON.stringify(csA));
 await db.exec('reset role');
 
+// ---------------------------------------------------------------- v11 decor marks ("Best decorations / 最佳装饰")
+await db.exec('set role anon');
+ok('anon cannot select decor_marks', /permission denied/.test(await err('select * from decor_marks')));
+ok('anon cannot insert decor_marks', /permission denied/.test(await err(`insert into decor_marks(day_hash,day,lat,lng,h3_r8) values ('a',current_date,42.98,-81.24,'882b1ad4a3fffff')`)));
+ok('anon cannot call _ltot_cleanup_decor / _ltot_decor_open', /permission denied/.test(await err('select _ltot_cleanup_decor()')) && /permission denied/.test(await err('select _ltot_decor_open()')));
+const decorOpen = nowMs >= Date.parse('2026-10-17T04:00:00Z') && nowMs < Date.parse('2026-11-01T04:00:00Z');
+const dOpen = (await asRoot('select public._ltot_decor_open() as v')).rows[0].v;
+ok(`_ltot_decor_open() is ${decorOpen} right now (Oct 17 – Oct 31 Toronto)`, dOpen === decorOpen, String(dOpen));
+const DA = { h: '882b1ad4b3fffff', lat: 42.971234, lng: -81.239876 }, DB = { h: '882b1ad4b7fffff', lat: 42.9935, lng: -81.2405 };
+const dev = (i) => `decor-device-${i}`.padEnd(20, 'q');
+const decor = (i, z, tags = null) => err(`select send_decor($1,$2,$3,$4,$5)`, [dev(i), z.lat, z.lng, z.h, tags]);
+const dcounts = async () => (await db.query('select * from decor_counts()')).rows;
+if (!decorOpen) ok('send_decor closed outside Oct 17 – Oct 31', /closed/.test(await decor(1, DA)));
+else {
+  ok('send_decor rejects outside London', /outside/.test(await err(`select send_decor($1,43.65,-79.38,$2,null)`, [dev(1), DA.h])));
+  ok('send_decor rejects bad h3 / short device id', /invalid/.test(await err(`select send_decor($1,42.98,-81.24,'garbage',null)`, [dev(1)])) && /invalid/.test(await err(`select send_decor('short',42.98,-81.24,$1,null)`, [DA.h])));
+  ok("send_decor rejects unknown tag 'candy' (decor tags only)", /invalid/.test(await decor(1, DA, ['spooky', 'candy'])));
+  ok('send_decor accepts a decor mark', (await decor(1, DA, ['lights', 'lights'])) === null);
+  ok('same phone, same hex, same day → rate', /rate/.test(await decor(1, DA)));
+  ok('same phone, another hex → ok', (await decor(1, DB)) === null);
+  const st = (await asRoot('select day_hash, lat, lng, tags::text as tags, day from decor_marks where h3_r8=$1', [DA.h])).rows[0];
+  ok('stored: only a per-day hash (no device id), 4-decimal location, de-duplicated tags, Toronto day',
+     st && !st.day_hash.includes('decor-device') && st.day_hash.length === 64 && st.lat === 42.9712 && st.lng === -81.2399 && st.tags === '{lights}', JSON.stringify(st));
+  await decor(2, DA, ['spooky']);
+  ok('decor_counts hides a hex with 2 decor marks', !(await dcounts()).some(r => r.h3_r8 === DA.h));
+  await decor(3, DA, ['lights', 'spooky']);
+  const dc = (await dcounts()).find(r => r.h3_r8 === DA.h);
+  ok('decor_counts shows it at 3 with the top tag (lights 2 vs spooky 2 → alphabetical tie-break)', dc?.n === 3 && dc?.top_tag === 'lights' && dc?.top_tag_n === 2, JSON.stringify(dc));
+  ok('decor_counts returns only h3_r8, n, top_tag, top_tag_n', JSON.stringify(Object.keys(dc || {}).sort()) === '["h3_r8","n","top_tag","top_tag_n"]');
+  for (let k = 0; k < 10; k++) await err(`select send_decor($1,42.98,-81.24,$2,null)`, [dev(9), `882b1ad4c${k}fffff`.slice(0, 15)]);
+  const eleventh = await err(`select send_decor($1,42.98,-81.24,'882b1ad4dffffff',null)`, [dev(9)]);
+  const n9 = (await asRoot(`select count(*)::int as n from decor_marks where day_hash = encode(extensions.digest('decor:' || $1 || ':' || (now() at time zone 'America/Toronto')::date::text, 'sha256'), 'hex')`, [dev(9)])).rows[0].n;
+  ok('10 decor marks per phone per day, the 11th → rate', n9 === 10 && /rate/.test(eleventh || ''), `${n9} stored, 11th=${eleventh}`);
+  await asRoot(`update decor_marks set created_at = now() - interval '15 days' where h3_r8 = $1`, [DB.h]);
+  await dcounts();
+  ok('decor marks older than 14 days are deleted on the next decor_counts call', (await asRoot('select count(*)::int as n from decor_marks where h3_r8=$1', [DB.h])).rows[0].n === 0);
+}
+const purgeSrc = (await asRoot(`select prosrc from pg_proc where proname = '_ltot_cleanup_decor'`)).rows[0]?.prosrc || '';
+ok('_ltot_cleanup_decor deletes everything from Nov 2, 2026 00:00 Toronto', /2026-11-02 00:00:00 America\/Toronto/.test(purgeSrc) && /14 days/.test(purgeSrc));
+await db.exec('reset role');
+
 // cleanup.sql runs
 const cleanup = readFileSync(process.argv[3], 'utf8');
 await db.exec(cleanup);
-ok('cleanup.sql empties every table', (await one(`select (select count(*) from marks)+(select count(*) from suggestions)+(select count(*) from posts)+(select count(*) from votes)+(select count(*) from reports) as n`)).n == 0);
+ok('cleanup.sql empties every table', (await one(`select (select count(*) from marks)+(select count(*) from decor_marks)+(select count(*) from suggestions)+(select count(*) from posts)+(select count(*) from votes)+(select count(*) from reports) as n`)).n == 0);
 // The optional "drop everything" part (Step B) must name the right signatures.
 const stepB = cleanup.split('-- Step B')[1].split('\n').filter(l => /^-- (drop|  )/.test(l)).map(l => l.slice(3)).join('\n');
 const dropErr = await errx(stepB);
 const left = (await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`)).n;
-ok('cleanup.sql Step B (uncommented) removes every function and table', dropErr === null && left === 0 && (await one(`select to_regclass('public.marks') as t`)).t === null, dropErr || `${left} functions left`);
+ok('cleanup.sql Step B (uncommented) removes every function and table', dropErr === null && left === 0 && (await one(`select to_regclass('public.marks') as t`)).t === null && (await one(`select to_regclass('public.decor_marks') as t`)).t === null, dropErr || `${left} functions left`);
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -21,7 +21,7 @@ test('guide / How-to / hint strings exist in both languages', () => {
   for (const k of keys) for (const l of ['en', 'zh']) assert.ok(I18N[l][k], `${l}.${k} missing`);
   for (const l of ['en', 'zh']) {
     assert.equal(I18N[l].guideCards.length, 3, l + ': exactly 3 welcome cards');
-    assert.equal(I18N[l].howtoSections.length, 13, l + ': 13 How-to sections');
+    assert.equal(I18N[l].howtoSections.length, 14, l + ': 14 How-to sections');
     for (const c of I18N[l].guideCards) assert.ok(typeof c[0] === 'string' && c[1].length >= 2, l + ' card ' + c[0]);
   }
 });
@@ -63,12 +63,12 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=10$/, u));
+  own.forEach((u) => assert.match(u, /\?v=11$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 
 test('URL params: ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1', () => {
-  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null, nudge: false };
+  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null, nudge: false, decor: false };
   assert.deepEqual(L.parseUrlFlags(''), none);
   assert.deepEqual(L.parseUrlFlags('?guide=1'), { ...none, guide: true });
   assert.deepEqual(L.parseUrlFlags('?howto=1&lang=zh'), { ...none, howto: true, lang: 'zh' });

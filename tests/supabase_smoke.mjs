@@ -3,7 +3,8 @@
 // Uses only the public anon key and plain fetch (no packages).
 // Checks: RPC input validation, RLS (anon cannot read votes/reports/marks/suggestions/secrets or write tables
 //         directly, cannot call internal helpers), one vote per device, 3 reports hide a post, send_mark
-//         window/box/tag checks, zone privacy floor (n ≥ 3, no hashes or points), suggestion rules.
+//         window/box/tag checks, zone privacy floor (n ≥ 3, no hashes or points), suggestion rules,
+//         v11 decor RPCs (skipped with a note until supabase/v11_decor.sql is run; creates no decor rows).
 // Rows it leaves behind: the test post is deleted again (its votes/reports go with it). ONE suggestion row
 // remains (device 'smoke-test-<random>', a random non-H3 hex id, so it can never light up a real zone) —
 // anon cannot delete suggestions; supabase/cleanup.sql removes it. No marks are created (send_mark is only
@@ -72,7 +73,7 @@ check('delete_post with the right token', (await rpc('delete_post', { p_id: post
 const HEX = '882b1ad4a3fffff';
 const sendMark = (lat, lng, tags) => rpc('send_mark', { p_session: rand(16), p_lat: lat, p_lng: lng, p_h3: HEX, p_tags: tags, p_token: rand(20) });
 const now = Date.now(), open = (now >= Date.parse('2026-10-31T19:00:00Z') && now < Date.parse('2026-11-01T03:00:00Z')) ||
-  (process.env.TEST_DAYS_SQL === '1' && now >= Date.parse('2026-10-17T04:00:00Z') && now < Date.parse('2026-10-21T04:00:00Z'));   // after v7_update.sql
+  (process.env.TEST_DAYS_SQL !== '0' && now >= Date.parse('2026-10-17T04:00:00Z') && now < Date.parse('2026-10-21T04:00:00Z'));   // v7_update.sql is live (TEST_DAYS_SQL=0 for an old server)
 if (open) {
   console.log('(live/test window is open: checking send_mark validation instead of "closed")');
   check('send_mark rejects Toronto (outside)', /outside/.test(errMsg(await sendMark(43.65, -79.38, null))));
@@ -85,6 +86,26 @@ const zc = await rpc('zone_counts', { p_window_min: 45 });
 const zrows = Array.isArray(zc.data) ? zc.data : null;
 check('zone_counts(45) only returns zones with n ≥ 3', zc.status === 200 && zrows && zrows.every((r) => r.n >= 3), `HTTP ${zc.status}, ${zrows ? zrows.length : '?'} rows`);
 check('zone_counts never exposes session_hash / lat / lng', zrows && zrows.every((r) => !('session_hash' in r) && !('lat' in r) && !('lng' in r)));
+
+// ---- v11 decor marks (only after supabase/v11_decor.sql was run; skipped with a note otherwise).
+// send_decor is only called with inputs it must reject, so no decor rows are created.
+const missingFn = (r) => r.status === 404 || /PGRST202|Could not find the function/.test(JSON.stringify(r.data || ''));
+const dc0 = await rpc('decor_counts');
+if (missingFn(dc0)) console.log('(decor: send_decor / decor_counts not installed yet. Run supabase/v11_decor.sql, then run this again. Decor checks skipped.)');
+else {
+  const dr = await rest('GET', 'decor_marks?select=*&limit=1');
+  check('anon cannot read decor_marks', dr.status === 401 || dr.status === 403, 'HTTP ' + dr.status);
+  check('anon cannot insert into decor_marks directly', (await rest('POST', 'decor_marks',
+    { day_hash: 'a', day: '2026-10-20', lat: 42.98, lng: -81.24, h3_r8: HEX })).status >= 400);
+  check('anon cannot call _ltot_cleanup_decor', (await rpc('_ltot_cleanup_decor')).status >= 400);
+  const sendDecor = (lat, lng, h3, tags) => rpc('send_decor', { p_device: DEV, p_lat: lat, p_lng: lng, p_h3: h3, p_tags: tags });
+  check('send_decor rejects Toronto (outside)', /outside/.test(errMsg(await sendDecor(43.65, -79.38, HEX, null))));
+  check('send_decor rejects a bad hex id (invalid)', /invalid/.test(errMsg(await sendDecor(42.98, -81.24, 'garbage', null))));
+  check("send_decor rejects tag 'candy' (decor tags only)", /invalid/.test(errMsg(await sendDecor(42.98, -81.24, HEX, ['lights', 'candy']))));
+  const drows = Array.isArray(dc0.data) ? dc0.data : null;
+  check('decor_counts only returns hexes with n ≥ 3', dc0.status === 200 && drows && drows.every((r) => r.n >= 3), `HTTP ${dc0.status}, ${drows ? drows.length : '?'} rows`);
+  check('decor_counts returns only h3_r8, n, top_tag, top_tag_n', drows && drows.every((r) => JSON.stringify(Object.keys(r).sort()) === '["h3_r8","n","top_tag","top_tag_n"]'));
+}
 
 // ---- neighbourhood suggestions
 const SHEX = rand(8).slice(0, 15);                // random 15-hex id, not a real H3 cell

@@ -18,7 +18,7 @@
   var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
   var STORE = { shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
                 session: P + 'session', markHist: P + 'mine.marks', suggestHist: P + 'mine.suggest',
-                postTokens: P + 'mine.posts', votes: P + 'mine.votes', reports: P + 'mine.reports' };
+                postTokens: P + 'mine.posts', decorHist: P + 'mine.decor', votes: P + 'mine.votes', reports: P + 'mine.reports' };
   var PACE = { 'u5': 1.5, '5-8': 2.0, '9-12': 2.5, 'teen': 3.0 };   // km/h including door stops
   var MAX_WALK_TO_AREA_KM = 1.5;
   var LOCAL_RECOUNT_MS = 12000;                       // local/demo mode: re-aggregate every 12 s
@@ -134,23 +134,27 @@
   var HEX = window.TOT_HEX;
   var grid = HEX ? HEX.makeGrid() : LIB.makeGrid(null);
   var baseLayer = HEX ? HEX.createBaseLayer(grid) : null;
-  var zoneLayer = HEX ? HEX.createZoneLayer(grid, { onTap: zonePopup, badgeHtml: badgeHtml }) : null;
+  var decorLayer = HEX ? HEX.createZoneLayer(grid, { kind: 'decor', pane: 'decorPane', paneZ: 420, onTap: decorPopup, badgeHtml: decorBadgeHtml,
+    avoid: function () { return zoneLayer && map.hasLayer(zoneLayer) ? zoneLayer.rects : []; } }) : null;
+  var zoneLayer = HEX ? HEX.createZoneLayer(grid, { onTap: zonePopup, badgeHtml: badgeHtml,
+    onLayout: function () { if (decorLayer && map.hasLayer(decorLayer)) decorLayer.setData(decorLayer.zones); } }) : null;
   var layers = {
     zones: zoneLayer || L.layerGroup(),
+    decor: decorLayer || L.layerGroup(),
     areas: L.layerGroup(),
     events: L.layerGroup()
   };
   if (baseLayer) baseLayer.addTo(layers.areas);         // faint planning score lives with the "Suggested" base layer
   var mineLayer = L.layerGroup().addTo(map);            // sparkles where *I* marked (this phone only)
   var routeLayer = L.layerGroup().addTo(map);
-  var layerOn = Object.assign({ zones: true, areas: true, events: true }, lsGet(STORE.layers, {}));
+  var layerOn = Object.assign({ zones: true, decor: true, areas: true, events: true }, lsGet(STORE.layers, {}));
 
   function sheetHeight() { var s = $('sheet'); return s.dataset.open === 'true' && narrow() ? s.offsetHeight : 0; }
   function focusBounds(b) { map.fitBounds(b, { paddingTopLeft: [20, 110], paddingBottomRight: [20, sheetHeight() + 20], maxZoom: 16 }); }
 
   // ==== backend ====
   var backend = window.TOT_BACKEND.createBackend(CFG, { demo: DEMO });
-  var data = { zones: [], suggested: [], posts: { fun: [], decor: [] }, zonesAt: 0 };
+  var data = { zones: [], decorZones: [], suggested: [], posts: { fun: [], decor: [] }, zonesAt: 0 };
   function markMode() { return LIB.markMode(Date.now(), CFG, DEMO); }
   function renderChips() {
     $('offlineChip').hidden = backend.mode !== 'offline';
@@ -168,15 +172,17 @@
   $('testBanner').addEventListener('click', function () { toast(t('testWhy'), 8000); });
 
   // ==== layer chips ====
-  var LAYER_ICONS = { zones: '🔥', areas: '🧭', events: '📅' };
-  var LAYER_KEYS = { zones: 'layerZones', areas: 'layerAreas', events: 'layerEvents' };
+  var LAYER_ICONS = { zones: '🔥', decor: '🎃', areas: '🧭', events: '📅' };
+  var LAYER_KEYS = { zones: 'layerZones', decor: 'layerDecor', areas: 'layerAreas', events: 'layerEvents' };
+  function decorLayerShown() { return LIB.decorVisible(Date.now(), DEMO); }
   function applyLayers() {
     Object.keys(layers).forEach(function (k) {
-      var on = !!layerOn[k];
+      var on = !!layerOn[k] && (k !== 'decor' || decorLayerShown());
       if (on && !map.hasLayer(layers[k])) layers[k].addTo(map);
       if (!on && map.hasLayer(layers[k])) map.removeLayer(layers[k]);
     });
-    $('legend').hidden = !layerOn.zones;
+    $('legend').hidden = !layerOn.zones && !(layerOn.decor && decorLayerShown());
+    $('legendDecor').hidden = !(layerOn.decor && decorLayerShown());
     renderLayerBar();
   }
   function renderLayerBar() {
@@ -184,6 +190,7 @@
     bar.querySelectorAll('[data-layer]').forEach(function (b) { b.remove(); });
     bar.setAttribute('aria-label', t('layers'));
     Object.keys(LAYER_ICONS).forEach(function (k) {
+      if (k === 'decor' && !decorLayerShown()) return;
       bar.insertBefore(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
         onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]), nearChip);
     });
@@ -416,7 +423,7 @@
 
   // ==== map tap modes ====
   var mode = null; // 'start' | 'mark' | 'suggest' | null
-  var MODE_TEXT = { start: 'tapForStart', mark: 'tapForMark', suggest: 'tapForSuggest' };
+  var MODE_TEXT = { start: 'tapForStart', mark: 'tapForMark', suggest: 'tapForSuggest', decor: 'decorTapMap' };
   function setMode(m) {
     mode = m;
     $('modeBanner').hidden = !m;
@@ -431,6 +438,7 @@
     if (m === 'start') { setStart([ll.lat, ll.lng], 'map'); openTab('route'); }
     if (m === 'mark') doMark([ll.lat, ll.lng]);
     if (m === 'suggest') openSuggest([ll.lat, ll.lng]);
+    if (m === 'decor') pendDecor([ll.lat, ll.lng]);
     return true;
   }
   map.on('click', function (e) { handleMapTap(e.latlng); });
@@ -522,12 +530,13 @@
     try { var ua = navigator.userActivation; if (navigator.vibrate && !REDUCED && (!ua || ua.hasBeenActive)) navigator.vibrate([30, 40, 60]); } catch (e) { /* not supported */ }
   }
   var CARD_MS = 4000;
-  function armCardTimer() {
+  function armCardTimer(onEnd, ms) {
+    ms = ms || CARD_MS;
     clearTimeout(openMarkCard.timer);
     var bar = $('markCardBar');
     bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
-    bar.style.transition = 'width ' + CARD_MS + 'ms linear'; bar.style.width = '0%';
-    openMarkCard.timer = setTimeout(closeMarkCard, CARD_MS);
+    bar.style.transition = 'width ' + ms + 'ms linear'; bar.style.width = '0%';
+    openMarkCard.timer = setTimeout(onEnd || closeMarkCard, ms);
   }
   function holdCard() { clearTimeout(openMarkCard.timer); var bar = $('markCardBar'); bar.style.transition = 'none'; bar.style.width = '0%'; }
   function openMarkCard(o) {
@@ -540,6 +549,7 @@
     b.hidden = !o.badge;
     if (o.badge) b.textContent = t('badgeNew', { icon: o.badge.icon, name: t(o.badge.key) });
     $('markCardTags').hidden = false;
+    $('markCardDone').textContent = t('done');
     renderTagRow();
     card.hidden = false;
     armCardTimer();                                  // closes by itself after ~4 s so the family can keep walking
@@ -550,12 +560,16 @@
     $('markCardTitle').textContent = t('rateTitle');
     $('markCardText').textContent = reason === 'zone' ? t('rateZoneFriendly') : t('rateDeviceFriendly', { m: waitText(waitMs) });
     $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
+    $('markCardDone').textContent = t('done');
     card.hidden = false;
     armCardTimer();
   }
-  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); }
-  // Touching the card (e.g. to add a tag) keeps it open until Done / ✕.
-  $('markCard').addEventListener('pointerdown', function (e) { if (!e.target.closest('#markCardDone, #markCardClose')) holdCard(); });
+  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); pendingDecor = null; }
+  // Touching the card (e.g. to add a tag) keeps it open until Done / ✕. (Decor before sending: a tag tap restarts the countdown.)
+  $('markCard').addEventListener('pointerdown', function (e) {
+    if ($('markCard').dataset.kind === 'decorPending') return;
+    if (!e.target.closest('#markCardDone, #markCardClose')) holdCard();
+  });
 
   // ---- personal badges (this phone only; demo keeps its own count)
   function sharedKey() { return STORE.shared + (DEMO ? '.demo' : ''); }
@@ -590,8 +604,11 @@
   function hideNudge() { $('nudge').hidden = true; $('markBtn').classList.remove('nudging'); }
   setInterval(function () { checkNudge(false); }, 60000);
   function renderTagRow() {
-    var row = $('tagRow');
+    var row = $('tagRow'), kind = $('markCard').dataset.kind;
     row.textContent = '';
+    document.querySelector('#markCardTags .mc-label').textContent = t(kind === 'decorPending' ? 'decorTagsAsk' : 'tagsAsk');
+    row.classList.toggle('tagrow-4', kind === 'decorPending');
+    if (kind === 'decorPending') { renderDecorTags(row); return; }
     LIB.MARK_TAGS.forEach(function (tag) {
       var on = !!(lastMark && lastMark.tags.indexOf(tag) >= 0);
       row.appendChild(el('button', { type: 'button', class: 'tagbtn', 'aria-pressed': String(on), 'data-tag': tag, onclick: function () { addTag(tag); } },
@@ -605,7 +622,7 @@
     backend.tagMark(lastMark.id, lastMark.token, tag).then(function () { refreshZones(); },
       function (e) { lastMark.tags = lastMark.tags.filter(function (x) { return x !== tag; }); renderTagRow(); toast(errText(e)); });
   }
-  $('markCardDone').addEventListener('click', closeMarkCard);
+  $('markCardDone').addEventListener('click', function () { if ($('markCard').dataset.kind === 'decorPending') sendPendingDecor(); else closeMarkCard(); });
   $('markCardClose').addEventListener('click', closeMarkCard);
   $('markBtn').addEventListener('click', startMark);
   // Small celebration: CSS particles (none with prefers-reduced-motion).
@@ -638,6 +655,179 @@
         icon: L.divIcon({ className: '', html: '<div class="mine-spark">✨</div>', iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(mineLayer);
     });
   }
+
+  // ==== v11: Best decorations / 最佳装饰 (pre-Halloween layer) ====
+  // One tap on "Cool decorations here! 🎃" opens a short card: optional tags, then it shares by itself after ~4 s
+  // (or at once with "Share now"; ✕ cancels). Zone level only: blurred ~50 m, the hexagon shows at 3+ marks.
+  var DECOR_PEND_MS = 4000;
+  var decorHist = (lsGet(STORE.decorHist, []) || []).filter(function (h) { return Date.now() - h.t < LIB.DECOR_KEEP_MS; });
+  var pendingDecor = null;   // { pos, cell, tags }
+  function renderDecorBtn() {
+    var open = LIB.isDecorOpen(Date.now(), DEMO);
+    $('decorBtn').hidden = !open || !!tourZones;
+    $('decorPanelBtn').disabled = !open;
+  }
+  function startDecor() {
+    map.closePopup();
+    if (!LIB.isDecorOpen(Date.now(), DEMO)) { toast(t('decorClosed'), 6000); return; }
+    if (narrow()) setSheetOpen(false);
+    var btn = $('decorBtn');
+    btn.classList.add('busy');
+    oneShot(function (pos) {
+      btn.classList.remove('busy');
+      if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); setMode('decor'); return; }
+      pendDecor(pos);
+    }, function () {
+      btn.classList.remove('busy');
+      toast(t('decorTapMap'), 4000);
+      setMode('decor');
+    });
+  }
+  function openDecorRate(reason) {
+    var card = $('markCard');
+    card.dataset.kind = 'rate';
+    $('markCardTitle').textContent = t('rateTitle');
+    $('markCardText').textContent = t(reason === 'day' ? 'decorRateDay' : 'decorRateZone');
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
+    $('markCardDone').textContent = t('done');
+    card.hidden = false;
+    armCardTimer();
+  }
+  function pendDecor(pos) {
+    if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); return; }
+    var now = Date.now(), cell = grid.cell(pos[0], pos[1]), r = LIB.decorRate(decorHist, cell, now);
+    if (!r.ok) { openDecorRate(r.reason); return; }
+    pendingDecor = { pos: pos, cell: cell, tags: [] };
+    var card = $('markCard');
+    card.dataset.kind = 'decorPending';
+    $('markCardTitle').textContent = t('decorPendTitle');
+    $('markCardText').textContent = t('decorPending');
+    $('markCardProg').textContent = ''; $('markCardProg').className = 'mc-prog'; $('markCardBadge').hidden = true;
+    $('markCardTags').hidden = false;
+    $('markCardDone').textContent = t('decorShareNow');
+    renderTagRow();
+    card.hidden = false;
+    armCardTimer(sendPendingDecor, DECOR_PEND_MS);
+  }
+  function renderDecorTags(row) {
+    LIB.DECOR_TAGS.forEach(function (tag) {
+      var on = !!(pendingDecor && pendingDecor.tags.indexOf(tag) >= 0);
+      row.appendChild(el('button', { type: 'button', class: 'tagbtn tagbtn-decor', 'aria-pressed': String(on), 'data-tag': tag, onclick: function () {
+        if (!pendingDecor) return;
+        var i = pendingDecor.tags.indexOf(tag);
+        if (i >= 0) pendingDecor.tags.splice(i, 1); else pendingDecor.tags.push(tag);
+        renderTagRow();
+        armCardTimer(sendPendingDecor, 3000);              // a tag tap gives a little more time, then it shares by itself
+      } }, [el('span', { class: 'tg-i', text: LIB.DECOR_ICON[tag] }), t('dtag_' + tag)]));
+    });
+  }
+  function decorCount(cell) { var z = data.decorZones.filter(function (x) { return x.cell === cell; })[0]; return z ? z.count : null; }
+  function sendPendingDecor() {
+    var d = pendingDecor;
+    if (!d || $('markCard').dataset.kind !== 'decorPending') return;
+    pendingDecor = null;
+    clearTimeout(openMarkCard.timer);
+    var now = Date.now(), before = decorCount(d.cell);
+    $('markCardDone').disabled = true;
+    backend.sendDecor({ device: DEVICE, lat: d.pos[0], lng: d.pos[1], tags: d.tags }, grid.cell).then(function () {
+      $('markCardDone').disabled = false;
+      decorHist = decorHist.concat({ t: now, cell: d.cell }).filter(function (h) { return now - h.t < LIB.DECOR_KEEP_MS; }).slice(-60);
+      lsSet(STORE.decorHist, decorHist);
+      var card = $('markCard');
+      card.dataset.kind = 'decor';
+      $('markCardTitle').textContent = t('markedTitle');
+      $('markCardText').textContent = t('decorThanks');
+      $('markCardProg').textContent = '…';
+      $('markCardTags').hidden = true;
+      $('markCardDone').textContent = t('done');
+      celebrate(); buzz();
+      armCardTimer();
+      refreshDecor().then(function () { showDecorProgress(d.cell, before); });
+    }, function (e) {
+      $('markCardDone').disabled = false;
+      if (e && e.code === 'rate') { openDecorRate('zone'); return; }
+      closeMarkCard();
+      toast(e && e.code === 'closed' ? t('decorClosed') : errText(e), 6000);
+    });
+  }
+  function showDecorProgress(cell, before) {
+    if ($('markCard').hidden || $('markCard').dataset.kind !== 'decor') return;
+    var p = $('markCardProg');
+    if (!backend.decorShared() && !DEMO) { p.textContent = t('decorLocal'); p.dataset.kind = 'local'; return; }
+    var exact = backend.mode !== 'supabase', after = decorCount(cell);
+    if (after == null && exact) after = backend.local.decorCountIn(cell);
+    var pr = LIB.markProgress(before, after, exact), txt;
+    if (pr.kind === 'lit') {
+      txt = t('decorProgLit', { k: pr.k });
+      var crossed = pr.k === LIB.MIN_ZONE && (before == null || before < LIB.MIN_ZONE);
+      if (crossed) { txt += (lang === 'zh' ? '' : ' ') + t('decorCrossed'); celebrate(); }
+      p.classList.toggle('mc-crossed', crossed);
+      p.dataset.kind = 'lit' + (crossed ? '-crossed' : '');
+    } else {
+      txt = pr.kind === 'need' ? (pr.n === 1 ? t('decorProgNeed1') : t('decorProgNeed', { n: pr.n })) : t('decorProgNeedSome');
+      p.dataset.kind = pr.kind;
+    }
+    p.textContent = txt;
+  }
+  function refreshDecor() {
+    if (!decorLayerShown()) { data.decorZones = []; if (decorLayer) decorLayer.setData([]); return Promise.resolve(); }
+    return backend.listDecor(grid.cell).then(function (zones) {
+      data.decorZones = zones.filter(function (z) { return isCell(z.cell); });
+      if (decorLayer && !tourZones) decorLayer.setData(data.decorZones);
+      if (currentTab === 'decor' && $('sheet').dataset.open === 'true') renderDecorList();
+    }, function () { /* keep last */ });
+  }
+  function decorBadgeHtml(z, compact) {
+    // Only numbers and our own strings (no user text).
+    return '<div class="zbadge zb-decor' + (compact ? ' zb-compact' : '') + '"><span class="mono-num">' +
+      (compact ? '🎃 ' + z.count : t('decorBadge', { n: z.count })) + '</span>' + (z.topTag ? '<i>' + LIB.DECOR_ICON[z.topTag] + '</i>' : '') + '</div>';
+  }
+  function decorPopup(z, ll) {
+    if (mode) { handleMapTap(ll); return; }
+    var c = grid.center(z.cell);
+    L.popup({ maxWidth: 260 }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
+      el('div', { class: 'pop-title', text: t('decorZoneTitle') }),
+      el('div', { class: 'mono-num', text: t('decorInfo', { n: z.count }) }),
+      z.topTag ? el('div', { text: LIB.DECOR_ICON[z.topTag] + ' ' + t('dtag_' + z.topTag) }) : null,
+      el('div', { class: 'row row-tight' }, [
+        el('button', { class: 'btn btn-primary btn-small', type: 'button', text: t('routeThere'), onclick: function () { map.closePopup(); routeToZone(z, c); } }),
+        el('button', { class: 'btn btn-small', type: 'button', text: t('decorListBtn'), onclick: function () { map.closePopup(); openTab('decor'); } })
+      ])
+    ])).openOn(map);
+  }
+  function decorRow(z, nc) {
+    var c = z.center || grid.center(z.cell);
+    return el('li', { class: 'near-row' }, [
+      el('button', { type: 'button', class: 'near-main', onclick: function () {
+        if (narrow()) setSheetOpen(false);
+        map.flyTo(c, Math.max(map.getZoom(), 15), { duration: REDUCED ? 0 : 0.8 });
+      } }, [
+        el('i', { class: 'lg lg-decor' }),
+        z.distM != null ? el('b', { class: 'mono-num', text: fmtDist(z.distM / 1000) }) : null,
+        el('span', { class: 'decor-n', text: t('decorRow', { n: z.count }) + (z.topTag ? ' · ' + LIB.DECOR_ICON[z.topTag] + ' ' + t('dtag_' + z.topTag) : '') })
+      ]),
+      el('button', { type: 'button', class: 'btn btn-small', text: t('routeBtn'), onclick: function () { routeToZone(z, c, nc); } })
+    ]);
+  }
+  function renderDecorList() {
+    var zs = data.decorZones, nc = nearCenter(), nearL = $('decorNearList'), city = $('decorCityList');
+    nearL.textContent = ''; city.textContent = '';
+    var st = $('decorStatus');
+    st.hidden = backend.decorShared() || DEMO;
+    st.textContent = backend.decorMissing ? t('decorSoon') + ': ' + t('decorLocal') : t('decorLocal');
+    if (nc.from === 'map') nearL.appendChild(el('li', { class: 'hint', text: t('decorNearNoLoc') }));
+    else {
+      var near2 = LIB.nearZones(zs, nc.c, 2, grid.center).slice(0, 5);
+      if (!near2.length) nearL.appendChild(el('li', { class: 'hint', text: t('decorNearNone') }));
+      near2.forEach(function (z) { nearL.appendChild(decorRow(z, nc)); });
+    }
+    if (!zs.length) city.appendChild(el('li', { class: 'hint', text: t('decorNone') }));
+    zs.slice(0, 10).forEach(function (z) { city.appendChild(decorRow(z, nc.from === 'map' ? null : nc)); });
+    city.dataset.count = String(zs.length);
+  }
+  $('decorBtn').addEventListener('click', startDecor);
+  $('decorPanelBtn').addEventListener('click', startDecor);
+  $('openDecor').addEventListener('click', function () { openTab('decor'); });
 
   // ==== zones ====
   var BUCKET_KEY = { quiet: 'legendQuiet', lively: 'legendLively', hot: 'legendHot' };
@@ -1002,7 +1192,7 @@
   var refreshing = null;
   function refreshAll() {
     if (refreshing) return refreshing;
-    refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested()]).then(function () { refreshing = null; }, function () { refreshing = null; });
+    refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested(), refreshDecor()]).then(function () { refreshing = null; }, function () { refreshing = null; });
     return refreshing;
   }
   // Shared server: poll every 30–60 s. Local/demo: re-count every 12 s (and at once when another tab marks).
@@ -1010,6 +1200,7 @@
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
     if (!zonesShared()) refreshZones();
+    if (!backend.decorShared()) refreshDecor();
   }, LOCAL_RECOUNT_MS);
   setInterval(function () {
     if (document.visibilityState === 'visible') refreshAll();
@@ -1080,8 +1271,8 @@
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
-  var PANELS = ['map', 'near', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
-  var TAB_OF = { near: 'map', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
+  var PANELS = ['map', 'near', 'decor', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
+  var TAB_OF = { decor: 'mark', near: 'map', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
   function markCurrent() {
     var open = $('sheet').dataset.open === 'true', tab = TAB_OF[currentTab] || currentTab;
     document.querySelectorAll('.tabbar button').forEach(function (b) {
@@ -1100,12 +1291,14 @@
     setSheetOpen(true);
     $('sheet').scrollTop = 0;
     if (name === 'near') renderNear();
+    if (name === 'decor') renderDecorList();
     if (name === 'feedback') updateFeedback();
   }
   document.querySelector('.tabbar').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.tab === 'mark') { startMark(); return; }      // centre tab = the same flow as the big button
+    // centre tab = the same flow as the big button; before Oct 31 3 PM it opens Best decorations
+    if (b.dataset.tab === 'mark') { if (LIB.decorPrimary(Date.now(), DEMO)) toggleTab('decor'); else startMark(); return; }
     if ((TAB_OF[currentTab] || currentTab) === b.dataset.tab && $('sheet').dataset.open === 'true') setSheetOpen(false);
     else openTab(b.dataset.tab);
   });
@@ -1154,6 +1347,9 @@
     renderStartStatus(); renderRouteResult(); renderRouteHints();
     renderPosts(); renderTips(); renderCountdown(); renderPrivacy(); renderHowto();
     if (zoneLayer) zoneLayer.setData(tourZones || data.zones);
+    if (decorLayer) decorLayer.setData(tourZones ? [] : data.decorZones);
+    renderDecorBtn();
+    if (currentTab === 'decor') renderDecorList();
     if (!$('guide').hidden) renderGuide();
     if (!$('markCard').hidden) { renderTagRow(); }
     if (currentTab === 'near') renderNear();
@@ -1234,6 +1430,8 @@
     tourZones = TOUR_BG.map(function (z) { return tourZone(z, z[2], z[3], false, now); });
     if (n >= LIB.MIN_ZONE) tourZones.push(tourZone(TOUR_SPOT, n, null, true, now));   // 3+ rule applies to the demo too
     if (zoneLayer) zoneLayer.setData(tourZones);
+    if (decorLayer) decorLayer.setData([]);
+    $('decorBtn').hidden = true;
   }
   function tourReset() {
     tourStore = { marks: [TOUR_SPOT.slice(), TOUR_SPOT.slice()] };   // 2 marks: not shown yet
@@ -1272,6 +1470,8 @@
     applyLayers();
     map.setView(snap.center, snap.zoom, { animate: false });
     if (zoneLayer) zoneLayer.setData(data.zones);
+    if (decorLayer) decorLayer.setData(data.decorZones);
+    renderDecorBtn();
     if (snap.open && snap.tab) openTab(snap.tab); else { currentTab = snap.tab; setSheetOpen(false); }
   }
   function tourRect(step) {                                 // step 4: ring around the demo zone instead of the whole map
@@ -1408,6 +1608,7 @@
     var D = window.TOT_DEMO; if (!D || !D.ZONES) return;
     var pts = D.ZONES.filter(function (z) { return z[3] >= 3; }).map(function (z) { return grid.center(grid.cell(z[1], z[2])); });
     (D.SUGGEST || []).forEach(function (s) { pts.push(grid.center(grid.cell(s[0], s[1]))); });
+    (D.DECOR || []).forEach(function (z) { if (z[3] >= 3) pts.push(grid.center(grid.cell(z[1], z[2]))); });
     if (!pts.length) return;
     var wrap = map.getContainer().getBoundingClientRect();
     var top = $('layerbar').getBoundingClientRect().bottom - wrap.top + 45;      // badge sits above its hexagon
@@ -1452,6 +1653,7 @@
   }).then(function () {
     if (DEMO && !FLAGS.near && !FLAGS.tour) fitDemoZones();
     if (FLAGS.near) openNear();
+    if (FLAGS.decor) openTab('decor');
     return langReady;                                   // the tour waits for the language choice
   }).then(function () {
     if (FLAGS.tour) startTour(FLAGS.tourStep ? FLAGS.tourStep - 1 : 0, !!FLAGS.tourStep);
@@ -1471,11 +1673,13 @@
                                                  base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
     refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
     openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, tour: tour, startTour: startTour, appNow: appNow,
-    feedbackMail: feedbackMail, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
+    feedbackMail: feedbackMail, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
       return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
                  return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };
                }), suggested: data.suggested.length, posts: data.posts.fun.length + data.posts.decor.length,
+               decorZones: data.decorZones.map(function (z) { return { cell: z.cell, count: z.count, topTag: z.topTag }; }),
+               decorShared: backend.decorShared(), decorMissing: !!backend.decorMissing, myDecor: decorHist.length,
                myMarks: markHist.length, celebrations: celebrations, layers: Object.assign({}, layerOn), tab: currentTab };
     }
   };

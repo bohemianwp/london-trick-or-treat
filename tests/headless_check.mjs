@@ -184,8 +184,13 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('1 mark → no zone shown (3+ rule)', (await p.ev('__ltot.state().zones.length')) === 0 && (await p.ev('document.querySelectorAll(".zbadge").length')) === 0);
   await p.click('#markCardDone'); await sleep(200);
   check('ⓘ hint goes away after the first mark', await p.ev(`document.getElementById('markHintBtn').hidden`));
-  await p.click('.tabbar [data-tab="mark"]'); await sleep(800);
-  check('centre “Mark it!” tab runs the same flow → friendly “Already shared” card (5-minute limit)', /share the next one in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
+  await p.click('.tabbar [data-tab="mark"]'); await sleep(500);
+  check('v11: before Oct 31 3 PM the centre “Mark it!” tab opens 🎃 Best decorations (purple button + lists)',
+    await p.ev(`!document.getElementById('panel-decor').hidden && document.getElementById('sheet').dataset.open==='true' && /Cool decorations here!/.test(document.getElementById('decorPanelBtn').textContent)`) &&
+    await p.ev(`!document.getElementById('decorBtn').hidden`));
+  await p.click('.tabbar [data-tab="mark"]'); await sleep(300);
+  await p.click('#markBtn'); await sleep(800);
+  check('big button again → friendly “Already shared” card (5-minute limit)', /share the next one in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
     await p.ev(`document.getElementById('markCardText').textContent`));
 
   // layers
@@ -205,7 +210,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = How-to (13 sections) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 13 && await p.ev(`!!document.getElementById('guideBoard')`));
+  check('Guide tab = How-to (14 sections, v11 + decor) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 14 && await p.ev(`!!document.getElementById('guideBoard')`));
   await p.click('#guideBoard'); await sleep(200);
   check('Board opens from the Guide tab (secondary)', await p.ev(`!document.getElementById('panel-board').hidden`));
 
@@ -247,7 +252,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#safetyBtn'); await sleep(200);
   check('safety panel: 11 tips incl. “go with a grown-up” and Teal Pumpkin', (await p.ev('document.querySelectorAll("#tipList li").length')) === 11 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)) && /Teal Pumpkin/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 12 sections (v7: test days + no tracking) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 12 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh) with 13 sections (v7: test days + no tracking, v11: decoration marks) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 13 && /装饰标记/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
@@ -275,7 +280,13 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const hyde = sa.zones.find((z) => z.isNew && z.bucket === 'hot');
   check('a hot NEW zone outside the researched areas (Hyde Park)', !!hyde && await a.ev(`(function(){var c=__ltot.grid.center(${JSON.stringify(hyde ? hyde.cell : '')}); return __ltot.lib.distM(c,[43.010,-81.335])<600;})()`));
   await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(800);
-  const badges = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
+  const badges = await a.ev(`[...document.querySelectorAll('.zbadge:not(.zb-decor)')].map(b=>b.textContent)`);
+  const dBadges = await a.ev(`[...document.querySelectorAll('.zb-decor')].map(b=>b.textContent)`);
+  check('v11 decor layer: purple zones (3+ only, 2-mark street hidden) with compact “🎃 n” badges + top tag', sa.decorZones.length === 4 && sa.decorZones.every((z) => z.count >= 3) &&
+    (await a.ev(`document.querySelectorAll('path.zone-decor').length`)) >= 4 && dBadges.length >= 4 && dBadges.every((t) => /^🎃 \d+/.test(t)), dBadges.join(' | '));
+  const overlapPx = await a.ev(`(function(){var bs=[...document.querySelectorAll('.zbadge')].map(function(b){return b.getBoundingClientRect();}),o=0;
+    for(var i=0;i<bs.length;i++)for(var j=i+1;j<bs.length;j++){var w=Math.min(bs[i].right,bs[j].right)-Math.max(bs[i].left,bs[j].left),h=Math.min(bs[i].bottom,bs[j].bottom)-Math.max(bs[i].top,bs[j].top);if(w>0&&h>0)o+=w*h;}return Math.round(o);})()`);
+  check('fun and decor badges are laid out around each other (little or no overlap)', overlapPx < 150, overlapPx + ' px²');
   check('zoomed out: compact badges “🔥 n” + NEW + top-tag emoji', badges.length >= 5 && badges.every((t) => /^🔥 \d+/.test(t)) && badges.some((t) => /NEW/.test(t)) && badges.some((t) => /🍬/.test(t)), badges.slice(0, 6).join(' | '));
   await a.shot('v3-demo-zones.png');
   await a.ev(`__ltot.map.setView([42.9655, -81.2440], 14, {animate:false})`); await sleep(800);
@@ -420,7 +431,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D10') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D11') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');
