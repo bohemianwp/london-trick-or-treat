@@ -30,15 +30,15 @@ test('welcome cards and How-to cover the new product (EN + 中文)', () => {
   const cards = I18N.en.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
   assert.match(cards[0], /^See where it’s fun!/); assert.match(cards[0], /Glowing hexagons/); assert.match(cards[0], /3 or more/); assert.match(cards[0], /NEW/);
   assert.match(cards[0], /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./);
-  assert.match(cards[1], /^Found a great spot\? Tap the big button!/); assert.match(cards[1], /This spot is great!/);
+  assert.match(cards[1], /^Great street\? Share it with one tap!/); assert.match(cards[1], /Great street\? Share it!/); assert.match(cards[1], /While the kids knock on doors/);
   assert.match(cards[1], /Lots of candy, Great decorations, Crowded/); assert.match(cards[1], /skip/);
   assert.match(cards[2], /^Plan your walk & stay safe/); assert.match(cards[2], /Show my location/); assert.match(cards[2], /Route/);
   assert.match(cards[2], /Safety/); assert.match(cards[2], /grown-up/); assert.match(cards[2], /50 m/);
   const zc = I18N.zh.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
   assert.match(zc[0], /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/);
-  assert.match(zc[1], /这里很热闹！/); assert.match(zc[1], /糖很多、装饰超棒、人很多/); assert.match(zc[2], /大人/);
+  assert.match(zc[1], /这条街不错？分享给大家！/); assert.match(zc[1], /孩子们敲门的时候/); assert.match(zc[1], /糖很多、装饰超棒、人很多/); assert.match(zc[2], /大人/);
   const howto = I18N.en.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
-  for (const w of ['big button', 'This spot is great!', 'Tags', 'Teal = Quiet', 'Orange = Lively', 'Hot pink = Super hot', '🔥 23 marked',
+  for (const w of ['big button', 'Great street? Share it!', 'Street Scout', 'Tags', 'Teal = Quiet', 'Orange = Lively', 'Hot pink = Super hot', '🔥 23 marked',
     '3 or more', 'Bottom tabs', 'Mark it!', 'Layer chips', 'Near me', 'Route', 'Suggest an area', 'Board', 'Safety', 'Privacy', '50 m', '2 hours',
     'Your area isn’t on the map? Mark it! Once 3 people mark it, it lights up.']) {
     assert.ok(howto.includes(w), 'How-to mentions ' + w);
@@ -63,12 +63,12 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=9$/, u));
+  own.forEach((u) => assert.match(u, /\?v=10$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 
 test('URL params: ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1', () => {
-  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null };
+  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null, nudge: false };
   assert.deepEqual(L.parseUrlFlags(''), none);
   assert.deepEqual(L.parseUrlFlags('?guide=1'), { ...none, guide: true });
   assert.deepEqual(L.parseUrlFlags('?howto=1&lang=zh'), { ...none, howto: true, lang: 'zh' });

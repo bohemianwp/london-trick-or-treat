@@ -171,8 +171,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await allowLoc(p); await sleep(1500);
   const m1 = await p.ev('__ltot.state()');
   check('big button → a mark is stored (practice, local)', m1.marks === 1 && m1.myMarks === 1, JSON.stringify({ marks: m1.marks, mine: m1.myMarks }));
-  check('“Marked! 🎉” card with 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3`) &&
-    /Practice mark/.test(await p.ev(`document.getElementById('markCardText').textContent`)));
+  await sleep(300);
+  check('v10 “Shared! 🎉” card: thanks + practice line (not shared) + 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3`) &&
+    /helped other families/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && /Practice: this mark stays on your phone/.test(await p.ev(`document.getElementById('markCardProg').textContent`)));
   check('celebration (particles + pulse) played once', (await p.ev('__ltot.state().celebrations')) === 1 && await p.ev(`document.getElementById('markBtn').classList.contains('pop')`));
   await p.shot('v3-marked.png');
   await p.click('#tagRow [data-tag="candy"]'); await sleep(400);
@@ -184,8 +185,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#markCardDone'); await sleep(200);
   check('ⓘ hint goes away after the first mark', await p.ev(`document.getElementById('markHintBtn').hidden`));
   await p.click('.tabbar [data-tab="mark"]'); await sleep(800);
-  check('centre “Mark it!” tab runs the same flow → kind 5-minute limit message', /mark again in \d+ min/.test(await p.ev(`document.getElementById('toast').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
-    await p.ev(`document.getElementById('toast').textContent`));
+  check('centre “Mark it!” tab runs the same flow → friendly “Already shared” card (5-minute limit)', /share the next one in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
+    await p.ev(`document.getElementById('markCardText').textContent`));
 
   // layers
   let layerOk = true;
@@ -238,7 +239,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const zh = await p.ev(`({ title: document.title, lang: document.documentElement.lang, tabs: [...document.querySelectorAll('.tabbar button')].map(b=>b.textContent).join('|'),
      btn: document.getElementById('markBtn').textContent, legend: document.getElementById('legend').textContent,
      leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n) })`);
-  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这里很热闹！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
+  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这条街不错？分享给大家！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
   check('no untranslated i18n keys on screen', zh.leftovers.length === 0, zh.leftovers.join(','));
   await p.click('.tabbar [data-tab="map"]'); await sleep(200);
   check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
@@ -295,7 +296,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const bMarks0 = await b.ev('__ltot.state().marks');
   await a.click('#markBtn'); await sleep(2000); await allowLoc(a); await sleep(1500);
   const myId = await a.ev(`(JSON.parse(localStorage.getItem('ltot.demo.mine.marks'))||[]).slice(-1).map(h=>h.id)[0]`);
-  check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /next 45 minutes/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
+  check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /helped other families find a great street/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
   await sleep(1200);
   check('the mark from tab A shows in tab B (BroadcastChannel + localStorage)', await b.ev(`__ltot.backend.local._get('marks',[]).some(m=>m.id===${JSON.stringify(myId)})`) && (await b.ev('__ltot.state().marks')) > bMarks0,
     `B marks ${bMarks0} → ${await b.ev('__ltot.state().marks')}`);
@@ -419,7 +420,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D9') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D10') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');

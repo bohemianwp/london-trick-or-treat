@@ -11,7 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <header class="topbar">
@@ -50,18 +50,25 @@
     <div class="markwrap">
       <button id="markBtn" class="markbtn" type="button">
         <span class="mb-glow" aria-hidden="true"></span>
-        <span class="mb-face"><span class="mb-icon" aria-hidden="true">✨</span><span data-i18n="markBtn">This spot is great!</span></span>
+        <span class="mb-face"><span class="mb-icon" aria-hidden="true">✨</span><span class="mb-text"><span class="mb-main" data-i18n="markBtn">Great street? Share it! 🎁</span><span class="mb-sub" data-i18n="markSub">Help other families find the fun</span></span></span>
       </button>
+      <button id="sharedChip" class="sharedchip" type="button" hidden></button>
+      <p id="nudge" class="nudge" role="status" hidden></p>
       <button id="markHintBtn" class="ibtn ibtn-mark" type="button" aria-expanded="false" aria-controls="hintMark" aria-label="What is this?" hidden>i</button>
       <p id="hintMark" class="hint-pop mark-pop" role="note" data-i18n="hintMark" hidden></p>
     </div>
 
     <div id="markCard" class="markcard" role="dialog" aria-labelledby="markCardTitle" hidden>
-      <div class="mc-top"><b id="markCardTitle" data-i18n="markedTitle">Marked! 🎉</b>
+      <div class="mc-top"><b id="markCardTitle">Shared! 🎉</b>
         <button id="markCardClose" class="mc-x" type="button" aria-label="Close">✕</button></div>
       <p id="markCardText" class="mc-text"></p>
-      <div class="mc-label" data-i18n="tagsAsk">Anything special? (optional)</div>
-      <div id="tagRow" class="tagrow"></div>
+      <p id="markCardProg" class="mc-prog" aria-live="polite"></p>
+      <p id="markCardBadge" class="mc-badge" hidden></p>
+      <div id="markCardTags">
+        <div class="mc-label" data-i18n="tagsAsk">Optional: anything special?</div>
+        <div id="tagRow" class="tagrow"></div>
+      </div>
+      <div class="mc-timer" aria-hidden="true"><i id="markCardBar"></i></div>
       <button id="markCardDone" class="btn btn-primary btn-block" type="button" data-i18n="done">Done</button>
     </div>
     <div id="burst" class="burst" aria-hidden="true"></div>
@@ -307,13 +314,13 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
           integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
-  <script defer src="config.js?v=9"></script>
-  <script defer src="lib.js?v=9"></script>
-  <script defer src="i18n.js?v=9"></script>
-  <script defer src="data/areas.js?v=9"></script>
-  <script defer src="backend.js?v=9"></script>
-  <script defer src="hex.js?v=9"></script>
-  <script defer src="tour.js?v=9"></script>
-  <script defer src="app.js?v=9"></script>
+  <script defer src="config.js?v=10"></script>
+  <script defer src="lib.js?v=10"></script>
+  <script defer src="i18n.js?v=10"></script>
+  <script defer src="data/areas.js?v=10"></script>
+  <script defer src="backend.js?v=10"></script>
+  <script defer src="hex.js?v=10"></script>
+  <script defer src="tour.js?v=10"></script>
+  <script defer src="app.js?v=10"></script>
 </body>
 </html>

@@ -64,8 +64,8 @@ test('no house / live-dot strings are left over from v2', () => {
 });
 
 test('big kid-friendly wording from the spec, in both languages', () => {
-  assert.equal(I18N.en.markBtn, 'This spot is great!');
-  assert.equal(I18N.zh.markBtn, '这里很热闹！');
+  assert.equal(I18N.en.markBtn, 'Great street? Share it! 🎁');
+  assert.equal(I18N.zh.markBtn, '这条街不错？分享给大家！🎁');
   assert.deepEqual([I18N.en.tag_candy, I18N.en.tag_decor, I18N.en.tag_crowded], ['Lots of candy', 'Great decorations', 'Crowded']);
   assert.deepEqual([I18N.zh.tag_candy, I18N.zh.tag_decor, I18N.zh.tag_crowded], ['糖很多', '装饰超棒', '人很多']);
   assert.deepEqual([I18N.en.tabMap, I18N.en.tabRoute, I18N.en.tabMark, I18N.en.tabGuide], ['Map', 'Route', 'Mark it!', 'Guide']);

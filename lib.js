@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=9';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=10';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -126,6 +126,28 @@
   function clampWindow(w) { w = Number(w) || 45; return Math.min(60, Math.max(30, Math.round(w))); }
   // Zone colour from the number of marks in the window: <3 none, 3–5 teal, 6–14 orange, 15+ hot pink.
   function zoneBucket(n) { return n < MIN_ZONE ? null : n < 6 ? 'quiet' : n < 15 ? 'lively' : 'hot'; }
+  // v10: honest feedback after a mark. before/after = this zone's mark count just before / after the mark
+  // (null = not visible, i.e. below 3). exact = true only when the phone really knows a below-3 count (local, demo,
+  // offline); the server never reveals counts below 3 (privacy floor), so then we say "1–2 more".
+  function markProgress(before, after, exact) {
+    if (after != null && after >= MIN_ZONE) {
+      var b0 = before != null && before >= MIN_ZONE ? zoneBucket(before) : null, b1 = zoneBucket(after);
+      return { kind: 'lit', k: after, bucket: b1, crossed: b0 === b1 ? null : b1 === 'quiet' ? 'lit' : b1 };
+    }
+    if (exact && after != null) return { kind: 'need', n: Math.max(1, MIN_ZONE - after) };
+    return { kind: 'needSome' };
+  }
+  // Personal badges, on this phone only (no names, no leaderboard).
+  var BADGES = [{ at: 1, key: 'badge1', icon: '👻' }, { at: 3, key: 'badge3', icon: '🎃' }, { at: 5, key: 'badge5', icon: '🍬' }];
+  function badgeFor(n) { var b = null; BADGES.forEach(function (x) { if (n >= x.at) b = x; }); return b; }
+  function newBadge(prevN, n) { var a = badgeFor(prevN), b = badgeFor(n); return b && (!a || a.at !== b.at) ? b : null; }
+  // Gentle in-app hint (no push): only while sharing is open (Halloween night / test days), the app is visible,
+  // nothing was shared in the last 20 min, and the last hint was 20+ min ago.
+  var NUDGE_MS = 20 * 60000;
+  function shouldNudge(mode, lastMarkAt, lastNudgeAt, nowMs) {
+    if (mode !== 'live' && mode !== 'test' && mode !== 'demo') return false;
+    return nowMs - (lastMarkAt || 0) >= NUDGE_MS && nowMs - (lastNudgeAt || 0) >= NUDGE_MS;
+  }
   function cleanTags(tags) {
     return (Array.isArray(tags) ? tags : []).filter(function (t, i, a) { return MARK_TAGS.indexOf(t) >= 0 && a.indexOf(t) === i; });
   }
@@ -491,7 +513,7 @@
     function on(v) { return v === '1' || v === 'true' || v === 'yes'; }
     var l = (q.lang || '').split(/[-_]/)[0];
     var step = parseInt(q.tourstep, 10);
-    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near),
+    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near), nudge: on(q.nudge),
              feedback: on(q.feedback), tour: on(q.tour), tourStep: step >= 1 ? step : null };
   }
   function guideSeen(storage) { try { return !!(storage && storage.getItem(GUIDE_KEY)); } catch (e) { return false; } }
@@ -568,6 +590,6 @@
     msToNextSecond: msToNextSecond, parseNowParam: parseNowParam,
     staminaHint: staminaHint, startTimeHintKey: startTimeHintKey, estimateHouses: estimateHouses, bearingDeg: bearingDeg, loopWaypoints: loopWaypoints,
     FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
-    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, initialLang: initialLang
+    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, markProgress: markProgress, BADGES: BADGES, badgeFor: badgeFor, newBadge: newBadge, shouldNudge: shouldNudge, NUDGE_MS: NUDGE_MS, initialLang: initialLang
   };
 });

@@ -187,3 +187,44 @@ test('privacy notice names the privacy contact in both languages', () => {
   const I = require('../i18n.js');
   for (const l of ['en', 'zh']) assert.ok(JSON.stringify(I[l].privacyItems).includes('sisy+halloween@mail.grokbot.com'), l);
 });
+
+// v10: honest value feedback after a mark, personal badges, gentle hint.
+test('markProgress: exact below 3 (phone-local), "1–2 more" when the server hides it, lit / crossed thresholds', () => {
+  assert.deepEqual(L.markProgress(null, 1, true), { kind: 'need', n: 2 });
+  assert.deepEqual(L.markProgress(null, 2, true), { kind: 'need', n: 1 });
+  assert.deepEqual(L.markProgress(null, null, false), { kind: 'needSome' }, 'server never reveals counts below 3');
+  assert.deepEqual(L.markProgress(null, 3, false), { kind: 'lit', k: 3, bucket: 'quiet', crossed: 'lit' });
+  assert.deepEqual(L.markProgress(4, 5, false), { kind: 'lit', k: 5, bucket: 'quiet', crossed: null });
+  assert.deepEqual(L.markProgress(5, 6, false), { kind: 'lit', k: 6, bucket: 'lively', crossed: 'lively' });
+  assert.deepEqual(L.markProgress(14, 15, false), { kind: 'lit', k: 15, bucket: 'hot', crossed: 'hot' });
+  assert.deepEqual(L.markProgress(20, 21, false), { kind: 'lit', k: 21, bucket: 'hot', crossed: null });
+});
+test('badges: 1 Street Scout, 3 Neighbourhood Guide, 5 Halloween Hero; newBadge only when a level is reached', () => {
+  assert.equal(L.badgeFor(0), null);
+  assert.equal(L.badgeFor(1).key, 'badge1'); assert.equal(L.badgeFor(2).key, 'badge1');
+  assert.equal(L.badgeFor(3).key, 'badge3'); assert.equal(L.badgeFor(9).key, 'badge5');
+  assert.equal(L.newBadge(0, 1).key, 'badge1'); assert.equal(L.newBadge(1, 2), null); assert.equal(L.newBadge(2, 3).key, 'badge3');
+  assert.equal(L.newBadge(4, 5).key, 'badge5'); assert.equal(L.newBadge(5, 6), null);
+  const I = require('../i18n.js');
+  assert.deepEqual([I.en.badge1, I.en.badge3, I.en.badge5], ['Street Scout', 'Neighbourhood Guide', 'Halloween Hero']);
+  assert.deepEqual([I.zh.badge1, I.zh.badge3, I.zh.badge5], ['街区侦察员', '社区向导', '万圣节英雄']);
+});
+test('nudge: only on live / test days (or demo), 20 min after the last mark and the last hint', () => {
+  const T = Date.parse('2026-10-31T22:00:00Z'), M = 60000;
+  assert.equal(L.shouldNudge('practice', 0, 0, T), false);
+  assert.equal(L.shouldNudge('live', 0, 0, T), true);
+  assert.equal(L.shouldNudge('test', T - 19 * M, 0, T), false);
+  assert.equal(L.shouldNudge('test', T - 20 * M, 0, T), true);
+  assert.equal(L.shouldNudge('live', 0, T - 5 * M, T), false, 'no repeating hints');
+});
+test('v10 copy: parent-focused button, thank-you card, hint and guide tip (EN + ZH)', () => {
+  const I = require('../i18n.js');
+  assert.equal(I.en.markBtn, 'Great street? Share it! 🎁'); assert.equal(I.zh.markBtn, '这条街不错？分享给大家！🎁');
+  assert.equal(I.en.markSub, 'Help other families find the fun'); assert.equal(I.zh.markSub, '帮其他家庭找到好地方');
+  assert.equal(I.en.markedThanks, 'Thanks! You just helped other families find a great street 🎃');
+  assert.equal(I.zh.markedThanks, '谢谢！你刚帮其他家庭找到一条好街 🎃');
+  assert.equal(I.en.nudge, 'Waiting for the kids? Share this street. It takes 1 second.');
+  assert.ok(JSON.stringify(I.en.guideCards).includes('While the kids knock on doors, tap once to share the street. It takes 1 second.'));
+  assert.ok(JSON.stringify(I.zh.guideCards).includes('孩子们敲门的时候，点一下就能分享这条街，只要 1 秒。'));
+  for (const l of ['en', 'zh']) assert.ok(!JSON.stringify(I[l]).includes(l === 'en' ? 'This spot is great' : '这里很热闹！'), 'old button wording gone: ' + l);
+});

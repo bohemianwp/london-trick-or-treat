@@ -221,6 +221,30 @@ a { color: #d8b4fe; }
 .markbtn.pop { animation: mbpop .45s ease; }
 @keyframes mbpop { 30% { transform: scale(1.12); } 60% { transform: scale(.96); } }
 .ibtn-mark { background: rgba(17,10,29,.9); }
+/* v10: two-line button (value + subline), one-handed reach at the bottom centre */
+.mb-text { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
+.mb-main { font-size: 18px; }
+.mb-sub { font-size: 12.5px; font-weight: 700; opacity: .82; letter-spacing: 0; }
+.markbtn { padding: 8px 16px; }
+.markbtn .mb-face { gap: 6px; }
+/* badge chip: a sticker on the button's top edge (this phone only) */
+.sharedchip { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; cursor: pointer;
+  min-height: 26px; padding: 2px 10px; border-radius: 999px; border: 1.5px solid #c4b5fd; background: #1d0f2e; color: #f5ecff;
+  font: 800 12px/1.2 inherit; font-family: inherit; box-shadow: 0 0 10px rgba(168,85,247,.6); }
+.sharedchip[hidden] { display: none; }
+/* gentle hint while waiting at the curb (no push) */
+.nudge { position: absolute; bottom: calc(100% + 18px); left: 50%; transform: translateX(-50%); width: min(86vw, 330px); margin: 0; z-index: 3;
+  padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--orange); background: rgba(17,10,29,.95); color: #ffe7d1;
+  font-size: 14px; font-weight: 700; text-align: center; pointer-events: none; animation: cardin .3s ease; }
+.nudge[hidden] { display: none; }
+.markbtn.nudging { animation: mbnudge 1.4s ease-in-out 3; }
+@keyframes mbnudge { 50% { transform: scale(1.06); box-shadow: 0 6px 0 #7c2d12, 0 0 34px rgba(255,180,80,1), 0 0 60px rgba(168,85,247,.6); } }
+/* thank-you card extras */
+.mc-prog { margin: 0 0 8px; font-size: 1rem; font-weight: 800; color: #ffe7a8; }
+.mc-prog.mc-crossed { color: #fff; text-shadow: 0 0 10px rgba(255,122,24,.9); }
+.mc-badge { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; background: #2b1645; border: 1px solid #c4b5fd; font-weight: 800; color: #f5ecff; }
+.mc-timer { height: 3px; margin-top: 10px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.mc-timer i { display: block; height: 100%; width: 0; background: var(--orange); }
 .mark-pop { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(86vw, 340px); margin: 0; }
 .burst { position: absolute; width: 0; height: 0; z-index: 1160; pointer-events: none; }
 .bp { position: absolute; left: -10px; top: -12px; font-size: 22px; animation: burst 1.1s cubic-bezier(.2,.7,.3,1) forwards; }
@@ -490,7 +514,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
 @media (prefers-reduced-motion: reduce) {
   .hud { display: none; }
   .me-dot { animation: none; }
-  .zone, .zone-hot, .zbadge em, .mb-glow, .markbtn.pop, .markbtn.busy .mb-icon, .markcard { animation: none; }
+  .zone, .zone-hot, .zbadge em, .mb-glow, .markbtn.pop, .markbtn.busy .mb-icon, .markcard, .markbtn.nudging, .nudge { animation: none; }
+  .mc-timer i { transition: none !important; }
   .zone { opacity: 1; }
   .burst { display: none; }
   .markbtn { transition: none; }

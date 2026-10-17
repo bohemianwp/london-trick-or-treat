@@ -16,7 +16,7 @@
   var DEMO = FLAGS.demo;
   var DEMO_HOME = [42.9628, -81.2390];                // ?demo=1&near=1 centres "Near me" here (Old South, near Wortley Rd)
   var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
-  var STORE = { lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
+  var STORE = { shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
                 session: P + 'session', markHist: P + 'mine.marks', suggestHist: P + 'mine.suggest',
                 postTokens: P + 'mine.posts', votes: P + 'mine.votes', reports: P + 'mine.reports' };
   var PACE = { 'u5': 1.5, '5-8': 2.0, '9-12': 2.5, 'teen': 3.0 };   // km/h including door stops
@@ -443,7 +443,7 @@
     map.closePopup();
     if (narrow()) setSheetOpen(false);
     var pre = LIB.markRate(markHist, null, Date.now());           // device limit can be checked before we know the spot
-    if (!pre.ok) { toast(t('rateDevice', { m: waitText(pre.waitMs) }), 5000); return; }
+    if (!pre.ok) { openRateCard('device', pre.waitMs); return; }
     var btn = $('markBtn');
     btn.classList.add('busy');
     oneShot(function (pos) {
@@ -460,7 +460,8 @@
     if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); return; }
     var now = Date.now(), cell = grid.cell(pos[0], pos[1]);
     var r = LIB.markRate(markHist, cell, now);
-    if (!r.ok) { toast(t(r.reason === 'zone' ? 'rateZone' : 'rateDevice', { m: waitText(r.waitMs) }), 6000); return; }
+    if (!r.ok) { openRateCard(r.reason, r.waitMs); return; }
+    var before = zoneCount(cell);
     var s = LIB.nextSession(lsGet(STORE.session, null), now);
     lsSet(STORE.session, s);
     var token = LIB.randomHex(40);
@@ -470,24 +471,124 @@
       lastMark = { id: res.id, token: token, tags: [], at: now };
       lsSet(STORE.markHint, true);
       $('markHintBtn').hidden = true; $('hintMark').hidden = true;
+      var mm = markMode(), badge = null;
+      if (mm !== 'practice') {                         // badges count shared streets only (practice marks are not shared)
+        var prevN = sharedCount();
+        lsSet(sharedKey(), prevN + 1);
+        badge = LIB.newBadge(prevN, prevN + 1);
+        renderSharedChip();
+      }
       celebrate();
-      openMarkCard();
+      buzz();
+      hideNudge();
+      openMarkCard({ mode: mm, badge: badge });
       renderMine();
-      refreshZones();
+      refreshZones().then(function () { showProgress(mm, cell, before); });
     }, function (e) {
-      if (e && e.code === 'rate') toast(t('rateDevice', { m: 5 }), 6000);
+      if (e && e.code === 'rate') openRateCard('device', 5 * 60000);
       else toast(errText(e), 6000);
     });
   }
-  function openMarkCard() {
-    var mm = markMode();
-    $('markCardText').textContent = mm === 'practice' ? t('markedPractice') : mm === 'test' ? t('markedTest', { m: CFG.markWindowMin }) : t('markedLive', { m: CFG.markWindowMin });
-    renderTagRow();
-    $('markCard').hidden = false;
+  // ---- value feedback (honest: real counts only, never invented viewers)
+  function zoneCount(cell) {
+    var z = data.zones.filter(function (x) { return x.cell === cell; })[0];
+    return z ? z.count : null;
+  }
+  // Below 3 the server never tells anyone the count (privacy floor). Only marks stored on this phone can be counted
+  // exactly: demo, practice, local or offline mode.
+  function exactLocalCount(cell) {
+    var cut = Date.now() - LIB.clampWindow(CFG.markWindowMin) * 60000;
+    return backend.local._prune().filter(function (m) { return m.cell === cell && m.createdAt > cut; }).length;
+  }
+  function showProgress(mm, cell, before) {
+    if ($('markCard').hidden || $('markCard').dataset.kind !== 'shared') return;
+    var p = $('markCardProg');
+    if (mm === 'practice') { p.textContent = t('progPractice'); return; }
+    var exact = backend.mode !== 'supabase', after = zoneCount(cell);
+    if (after == null && exact) after = exactLocalCount(cell);
+    var pr = LIB.markProgress(before, after, exact), txt;
+    if (pr.kind === 'lit') {
+      txt = t('progLit', { k: pr.k, bucket: t(BUCKET_KEY[pr.bucket]) });
+      if (pr.crossed) txt += ' ' + t('crossed_' + pr.crossed);
+      p.classList.toggle('mc-crossed', !!pr.crossed);
+      if (pr.crossed) celebrate();
+    } else if (pr.kind === 'need') txt = pr.n === 1 ? t('progNeed1') : t('progNeed', { n: pr.n });
+    else txt = t('progNeedSome');
+    if (mm === 'test') txt += ' ' + t('progTest');
+    p.textContent = txt;
+    p.dataset.kind = pr.kind + (pr.crossed ? '-' + pr.crossed : '');
+  }
+  function buzz() {                                    // short buzz on Android (iPhone Safari has no vibrate); only after a real tap
+    try { var ua = navigator.userActivation; if (navigator.vibrate && !REDUCED && (!ua || ua.hasBeenActive)) navigator.vibrate([30, 40, 60]); } catch (e) { /* not supported */ }
+  }
+  var CARD_MS = 4000;
+  function armCardTimer() {
     clearTimeout(openMarkCard.timer);
-    openMarkCard.timer = setTimeout(closeMarkCard, 20000);
+    var bar = $('markCardBar');
+    bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
+    bar.style.transition = 'width ' + CARD_MS + 'ms linear'; bar.style.width = '0%';
+    openMarkCard.timer = setTimeout(closeMarkCard, CARD_MS);
+  }
+  function holdCard() { clearTimeout(openMarkCard.timer); var bar = $('markCardBar'); bar.style.transition = 'none'; bar.style.width = '0%'; }
+  function openMarkCard(o) {
+    var card = $('markCard');
+    card.dataset.kind = 'shared';
+    $('markCardTitle').textContent = t('markedTitle');
+    $('markCardText').textContent = t('markedThanks');
+    $('markCardProg').textContent = '…'; $('markCardProg').className = 'mc-prog'; delete $('markCardProg').dataset.kind;
+    var b = $('markCardBadge');
+    b.hidden = !o.badge;
+    if (o.badge) b.textContent = t('badgeNew', { icon: o.badge.icon, name: t(o.badge.key) });
+    $('markCardTags').hidden = false;
+    renderTagRow();
+    card.hidden = false;
+    armCardTimer();                                  // closes by itself after ~4 s so the family can keep walking
+  }
+  function openRateCard(reason, waitMs) {
+    var card = $('markCard');
+    card.dataset.kind = 'rate';
+    $('markCardTitle').textContent = t('rateTitle');
+    $('markCardText').textContent = reason === 'zone' ? t('rateZoneFriendly') : t('rateDeviceFriendly', { m: waitText(waitMs) });
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
+    card.hidden = false;
+    armCardTimer();
   }
   function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); }
+  // Touching the card (e.g. to add a tag) keeps it open until Done / ✕.
+  $('markCard').addEventListener('pointerdown', function (e) { if (!e.target.closest('#markCardDone, #markCardClose')) holdCard(); });
+
+  // ---- personal badges (this phone only; demo keeps its own count)
+  function sharedKey() { return STORE.shared + (DEMO ? '.demo' : ''); }
+  function sharedCount() { var n = Number(lsGet(sharedKey(), 0)); return n > 0 ? Math.floor(n) : 0; }
+  function renderSharedChip() {
+    var n = sharedCount(), c = $('sharedChip'), b = LIB.badgeFor(n);
+    c.hidden = !n;
+    if (!n) return;
+    c.textContent = n === 1 ? t('sharedChip1', { icon: b.icon }) : t('sharedChip', { icon: b.icon, n: n });
+    c.setAttribute('aria-label', t('sharedChipAria') + ': ' + n);
+  }
+  $('sharedChip').addEventListener('click', function () {
+    var n = sharedCount(), b = LIB.badgeFor(n);
+    if (b) toast(t('sharedWhy', { icon: b.icon, name: t(b.key), n: n }), 7000);
+  });
+
+  // ---- gentle hint while waiting at the curb (in-app only, no push, no extra location)
+  var lastNudgeAt = 0;
+  function lastMarkAt() { return markHist.reduce(function (m, h) { return Math.max(m, h.t); }, 0); }
+  function checkNudge(force) {
+    if (document.visibilityState !== 'visible' || tour && tour.state().active) return;
+    if (!$('markCard').hidden || !$('guide').hidden || !$('langPick').hidden) return;
+    var mm = markMode();
+    if (mm === 'demo' && !FLAGS.nudge) return;
+    if (!force && !LIB.shouldNudge(mm, lastMarkAt(), lastNudgeAt, Date.now())) return;
+    lastNudgeAt = Date.now();
+    $('nudge').textContent = t('nudge'); $('nudge').hidden = false;
+    $('markBtn').classList.add('nudging');
+    clearTimeout(checkNudge.timer);
+    checkNudge.timer = setTimeout(hideNudge, 9000);
+  }
+  function hideNudge() { $('nudge').hidden = true; $('markBtn').classList.remove('nudging'); }
+  setInterval(function () { checkNudge(false); }, 60000);
   function renderTagRow() {
     var row = $('tagRow');
     row.textContent = '';
@@ -1057,7 +1158,8 @@
     if (!$('markCard').hidden) { renderTagRow(); }
     if (currentTab === 'near') renderNear();
     if (currentTab === 'feedback') updateFeedback();
-    renderChips();
+    renderChips(); renderSharedChip();
+    if (!$('nudge').hidden) $('nudge').textContent = t('nudge');
     updateCount('postBody', 'postCount');
     updateLocateBtn();
     if (mode) $('modeText').textContent = t(MODE_TEXT[mode]);
@@ -1310,7 +1412,7 @@
     var wrap = map.getContainer().getBoundingClientRect();
     var top = $('layerbar').getBoundingClientRect().bottom - wrap.top + 45;      // badge sits above its hexagon
     var bottom = wrap.bottom - Math.min($('legend').getBoundingClientRect().top, $('markBtn').getBoundingClientRect().top) + 30;
-    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [58, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [lang === 'zh' ? 74 : 58, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
   }
 
   // ==== first-visit language chooser (before the welcome cards and the tour) ====
@@ -1359,6 +1461,7 @@
     if (FLAGS.howto) openTab('guide');
     if (FLAGS.feedback) openTab('feedback');
     if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
+    if (DEMO && FLAGS.nudge) setTimeout(function () { checkNudge(true); }, 1500);   // ?demo=1&nudge=1 previews the hint
   });
 
   // Hook for automated checks (harmless in normal use).
