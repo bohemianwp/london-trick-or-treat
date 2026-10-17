@@ -504,3 +504,19 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
 
 /* dark Halloween look for OSM tiles */
 .leaflet-tile-pane .tiles-dark, .tiles-dark { filter: invert(1) hue-rotate(200deg) brightness(0.85) contrast(0.9) saturate(0.6); }
+
+/* first-visit language chooser (above everything, incl. the welcome cards) */
+.langpick { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 18px;
+  background: radial-gradient(120% 90% at 50% 0%, #2a0f45 0%, #0b0814 60%), #0b0814; }
+.langpick[hidden] { display: none; }
+.langpick-box { width: min(92vw, 420px); text-align: center; display: flex; flex-direction: column; gap: 14px; }
+.langpick-icon { font-size: 44px; letter-spacing: 6px; }
+.langpick-title { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 30px; line-height: 1.15; color: var(--orange);
+  text-shadow: 0 0 14px rgba(255,122,24,.7), 0 0 28px rgba(168,85,247,.45); }
+.langpick-title span + span { font-size: 28px; color: #f5d0fe; }
+.langpick-sub, .langpick-note { margin: 0; display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 15px; }
+.langpick-note { font-size: 13px; }
+.langpick-btn { min-height: 72px; border-radius: 18px; border: 2px solid var(--orange); background: #1d0f1a; color: #fff;
+  font-size: 26px; font-weight: 800; cursor: pointer; box-shadow: var(--glow-o); }
+.langpick-zh { border-color: var(--purple); box-shadow: var(--glow-p); }
+.langpick-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }

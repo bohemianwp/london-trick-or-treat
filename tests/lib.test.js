@@ -164,3 +164,26 @@ test('checkText rejects house numbers + street (no targeting individual homes), 
     assert.equal(L.checkText(s).ok, true, s);
   }
 });
+
+// v9: first-visit language chooser; English fallback, never the browser language.
+test('language chooser: shows only with no saved language, no ?lang= and no ?demo=1; fallback is English', () => {
+  assert.equal(L.shouldShowLangChooser({}, null), true);
+  assert.equal(L.shouldShowLangChooser({}, 'garbage'), true);
+  assert.equal(L.shouldShowLangChooser({}, 'en'), false);
+  assert.equal(L.shouldShowLangChooser({}, 'zh'), false);
+  assert.equal(L.shouldShowLangChooser({ lang: 'zh' }, null), false);
+  assert.equal(L.shouldShowLangChooser({ lang: 'en' }, null), false);
+  assert.equal(L.shouldShowLangChooser({ demo: true }, null), false);
+  assert.equal(L.shouldShowLangChooser({ tour: true }, null), true, 'the tour waits for the chooser');
+  assert.equal(L.initialLang({}, null), 'en');
+  assert.equal(L.initialLang({}, 'zh'), 'zh');
+  assert.equal(L.initialLang({ lang: 'en' }, 'zh'), 'en');
+  assert.equal(L.initialLang({ lang: 'zh' }, null), 'zh');
+  assert.equal(L.initialLang({ demo: true }, null), 'en');
+  assert.equal(L.parseUrlFlags('?lang=fr').lang, null);
+  assert.equal(L.parseUrlFlags('?lang=zh-CN').lang, 'zh');
+});
+test('privacy notice names the privacy contact in both languages', () => {
+  const I = require('../i18n.js');
+  for (const l of ['en', 'zh']) assert.ok(JSON.stringify(I[l].privacyItems).includes('sisy+halloween@mail.grokbot.com'), l);
+});

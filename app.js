@@ -29,7 +29,9 @@
   var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ==== i18n ====
-  var lang = FLAGS.lang || (function () { try { return localStorage.getItem(STORE.lang) === 'zh' ? 'zh' : 'en'; } catch (e) { return 'en'; } })();
+  var SAVED_LANG = (function () { try { return localStorage.getItem(STORE.lang); } catch (e) { return null; } })();
+  var lang = LIB.initialLang(FLAGS, SAVED_LANG);                       // English unless chosen; never the browser language
+  if (FLAGS.lang) { try { localStorage.setItem(STORE.lang, FLAGS.lang); } catch (e) { /* ignore */ } }   // ?lang= link presets it
   // {win} anywhere (also inside the guide/How-to arrays) = the configured mark window, so the text follows config.js.
   function fillWin(x) {
     if (typeof x === 'string') return x.replace(/\{win\}/g, CFG.markWindowMin);
@@ -1311,6 +1313,23 @@
     map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [58, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
   }
 
+  // ==== first-visit language chooser (before the welcome cards and the tour) ====
+  var langReady = new Promise(function (resolve) {
+    if (!LIB.shouldShowLangChooser(FLAGS, SAVED_LANG)) { resolve(); return; }
+    var box = $('langPick');
+    box.hidden = false;
+    box.querySelectorAll('[data-pick]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        lang = b.getAttribute('data-pick') === 'zh' ? 'zh' : 'en';
+        try { localStorage.setItem(STORE.lang, lang); } catch (e) { /* ignore */ }
+        box.hidden = true;
+        renderAll();
+        resolve();
+      });
+    });
+    setTimeout(function () { var f = box.querySelector('[data-pick="en"]'); if (f) f.focus(); }, 0);
+  });
+
   // ==== boot ====
   applyLayers();
   renderAll();
@@ -1331,12 +1350,16 @@
   }).then(function () {
     if (DEMO && !FLAGS.near && !FLAGS.tour) fitDemoZones();
     if (FLAGS.near) openNear();
+    return langReady;                                   // the tour waits for the language choice
+  }).then(function () {
     if (FLAGS.tour) startTour(FLAGS.tourStep ? FLAGS.tourStep - 1 : 0, !!FLAGS.tourStep);
   });
   startTicker();
-  if (FLAGS.howto) openTab('guide');
-  if (FLAGS.feedback) openTab('feedback');
-  if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
+  langReady.then(function () {                          // welcome cards / deep links only after English / 中文 is chosen
+    if (FLAGS.howto) openTab('guide');
+    if (FLAGS.feedback) openTab('feedback');
+    if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
+  });
 
   // Hook for automated checks (harmless in normal use).
   window.__ltot = {

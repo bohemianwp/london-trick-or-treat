@@ -15,7 +15,8 @@ mkdirSync(OUT, { recursive: true });
 rmSync(OUT + '/profile-v3', { recursive: true, force: true });
 
 const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${OUT}/profile-v3`,
-  '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--window-size=390,844'], { stdio: 'ignore' });
+  '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--window-size=390,844',
+  '--lang=zh-CN', '--accept-lang=zh-CN,zh'], { stdio: 'ignore' });   // v9: a Chinese phone must still default to English
 let ver;
 for (let i = 0; i < 60 && !ver; i++) { try { ver = await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); } catch { await sleep(250); } }
 if (!ver) { console.log('SKIP: Chrome did not start'); chrome.kill(); process.exit(0); }
@@ -74,6 +75,8 @@ async function openPage(path, opts = {}) {
   await s('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await s('Emulation.setTouchEmulationEnabled', { enabled: true });
   if (opts.geo) await s('Emulation.setGeolocationOverride', { latitude: opts.geo[0], longitude: opts.geo[1], accuracy: 10 });
+  // v9: ?lang= is saved now. Outside the chooser checks (opts.rawLang), each page starts in English unless its URL says ?lang=.
+  if (!opts.rawLang) await s('Page.addScriptToEvaluateOnNewDocument', { source: `try{if(!/[?&]lang=/.test(location.search))localStorage.setItem('ltot.lang','en')}catch(e){}` });
   fronted = p;
   await s('Page.navigate', { url: BASE + path });
   await sleep(opts.wait || 4000);
@@ -102,6 +105,35 @@ async function allowLoc(p) { if (await p.ev(`document.getElementById('locDialog'
 const realErrors = (p) => p.errors.filter((e) => !/ERR_BLOCKED_BY_CLIENT|ltot-test\.invalid|ERR_NAME_NOT_RESOLVED|Failed to fetch|favicon/.test(e));
 
 await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissions: ['geolocation'] });
+
+// =========================================================== 0. v9: first-visit language chooser (fresh profile, Chinese browser)
+{
+  const p = await openPage('', { wait: 3500, rawLang: true });
+  check('browser language is Chinese (zh-CN) in this run', /^zh/.test(await p.ev('navigator.language')), await p.ev('navigator.language'));
+  check('fresh visit: English / 中文 chooser shows FIRST (welcome cards not yet)', await p.ev(`!document.getElementById('langPick').hidden && document.getElementById('guide').hidden`));
+  check('…and the page underneath is ENGLISH, not the browser language', await p.ev(`document.documentElement.lang==='en' && __ltot.state().lang==='en' && document.getElementById('langBtn').textContent.trim()==='中文'`));
+  check('…two big buttons English and 中文 (≥ 64 px)', await p.ev(`[...document.querySelectorAll('#langPick [data-pick]')].map(b=>b.textContent.trim()+':'+(b.getBoundingClientRect().height>=64)).join()==='English:true,中文:true'`));
+  await p.shot('v9-chooser.png');
+  await p.click('#langPick [data-pick="en"]'); await sleep(400);
+  check('English → chooser closes, saved, English welcome cards appear', await p.ev(`document.getElementById('langPick').hidden && localStorage.getItem('ltot.lang')==='en' && !document.getElementById('guide').hidden`) &&
+    /Glowing hexagons/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+  const p2 = await openPage('', { wait: 3000, rawLang: true });
+  check('second visit: no chooser again', await p2.ev(`document.getElementById('langPick').hidden`));
+  await p2.ev(`localStorage.clear()`);
+  const z = await openPage('?lang=zh', { wait: 3000, rawLang: true });
+  check('?lang=zh skips the chooser, shows Chinese welcome cards, and saves zh', await z.ev(`document.getElementById('langPick').hidden && __ltot.state().lang==='zh' && localStorage.getItem('ltot.lang')==='zh' && !document.getElementById('guide').hidden`));
+  await z.ev(`localStorage.clear()`);
+  const d = await openPage('?demo=1', { wait: 3000, rawLang: true });
+  check('?demo=1 skips the chooser and uses English', await d.ev(`document.getElementById('langPick').hidden && __ltot.state().lang==='en'`));
+  await d.ev(`localStorage.clear(); localStorage.setItem('ltot.lang','en')`);   // the checks below expect a first visit in English
+  const tq = await openPage('?tour=1', { wait: 2500, rawLang: true });
+  await tq.ev(`localStorage.removeItem('ltot.lang')`);
+  const tq2 = await openPage('?tour=1', { wait: 3000, rawLang: true });
+  check('?tour=1 on a first visit: chooser first, tour starts only after choosing', await tq2.ev(`!document.getElementById('langPick').hidden && !__ltot.tour.state().active`) &&
+    (await tq2.click('#langPick [data-pick="en"]'), await sleep(1500), await tq2.ev(`document.getElementById('langPick').hidden && __ltot.tour.state().active`)));
+  await tq2.ev(`localStorage.clear(); localStorage.setItem('ltot.lang','en')`);
+  check('chooser pages: no JS errors', [p, p2, z, d, tq, tq2].every((x) => realErrors(x).length === 0), [p, p2, z, d, tq, tq2].map(realErrors).flat().join(' | '));
+}
 
 // =========================================================== 1. normal page (practice mode today, local backend)
 {
@@ -214,7 +246,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#safetyBtn'); await sleep(200);
   check('safety panel: 11 tips incl. “go with a grown-up” and Teal Pumpkin', (await p.ev('document.querySelectorAll("#tipList li").length')) === 11 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)) && /Teal Pumpkin/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 12 sections (v7: test days + no tracking)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 12 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh) with 12 sections (v7: test days + no tracking) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 12 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
@@ -387,7 +419,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D8') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D9') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');

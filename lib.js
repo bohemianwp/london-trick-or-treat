@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=8';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=9';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -499,6 +499,15 @@
     try { storage.setItem(GUIDE_KEY, how === 'skipped' ? 'skipped' : 'done'); return true; } catch (e) { return false; }
   }
   // First visit shows the cards; ?guide=1 always does; ?howto=1 or ?near=1 alone open their panel instead.
+  // First visit: ask English / 中文 before anything else, unless a language is saved, ?lang= is given, or ?demo=1.
+  // The fallback language is ALWAYS English, never the browser's language.
+  function shouldShowLangChooser(flags, savedLang) {
+    return !(savedLang === 'en' || savedLang === 'zh') && !(flags && (flags.lang || flags.demo));
+  }
+  function initialLang(flags, savedLang) {
+    if (flags && flags.lang) return flags.lang;
+    return savedLang === 'zh' ? 'zh' : 'en';
+  }
   function shouldShowGuide(flags, seen) {
     return !!(flags && flags.guide) || (!seen && !(flags && (flags.howto || flags.near || flags.feedback || flags.tour)));
   }
@@ -559,6 +568,6 @@
     msToNextSecond: msToNextSecond, parseNowParam: parseNowParam,
     staminaHint: staminaHint, startTimeHintKey: startTimeHintKey, estimateHouses: estimateHouses, bearingDeg: bearingDeg, loopWaypoints: loopWaypoints,
     FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
-    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide
+    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, initialLang: initialLang
   };
 });

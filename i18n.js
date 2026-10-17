@@ -216,7 +216,7 @@
       ['No tracking', 'No cookies, no analytics, no ads, no trackers. Settings are kept in this browser’s local storage only.'],
       ['Where data is kept', 'Shared marks, suggestions and posts are stored on the organiser’s Supabase server; everything else stays in this browser. Map pictures come from OpenStreetMap, walking routes from OSRM, and the map code from unpkg/jsDelivr; like any website, they see your device’s internet address.'],
       ['Delete your data', 'Clearing this site’s data in your browser removes everything stored locally. All shared data is deleted after Nov 2, 2026.'],
-      ['Questions and feedback', 'Ask the person who shared this app with you. Feedback you choose to email goes to the organiser’s feedback inbox and is used only to improve the map. No data is sold or used for ads.']
+      ['Privacy contact and feedback', 'Questions, concerns or requests about your data: email sisy+halloween@mail.grokbot.com (the organiser’s feedback inbox). Feedback you choose to email goes there too and is used only to improve the map. No data is sold or used for ads.']
     ]
   },
   zh: {
@@ -431,7 +431,7 @@
       ['不追踪', '没有 Cookie、没有统计分析、没有广告、没有追踪器。设置只存在这个浏览器的本地存储里。'],
       ['数据存在哪里', '共享的标记、推荐和帖子存在组织者的 Supabase 服务器上，其他内容只存在这个浏览器里。地图图片来自 OpenStreetMap，步行路线来自 OSRM，地图程序来自 unpkg/jsDelivr，它们和任何网站一样能看到你设备的网络地址。'],
       ['删除你的数据', '在浏览器里清除这个网站的数据，就能删掉本地存的所有内容。所有共享数据会在 2026 年 11 月 2 日之后删除。'],
-      ['问题和反馈', '问把这个 app 分享给你的人。你主动发邮件的反馈会进入组织者的反馈邮箱，只用来改进地图。数据不会被出售，也不会用来投放广告。']
+      ['隐私联系人和反馈', '对你的数据有疑问、担心或请求，请发邮件到 sisy+halloween@mail.grokbot.com（组织者的反馈邮箱）。你主动发邮件的反馈也会到这里，只用来改进地图。数据不会被出售，也不会用来投放广告。']
     ]
   }
 });
