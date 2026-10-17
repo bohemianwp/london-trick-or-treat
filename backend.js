@@ -297,6 +297,8 @@
           if (name === 'listPosts') cache('posts.' + (args[0] || ''), res);
           return res;
         }, function (err) {
+          // Test days, but the server still has the Oct 31-only window (v7_update.sql not run yet): keep it local.
+          if (err && err.code === 'closed' && LIVE_METHODS[name] && LIB.isTestOpen(now(), cfg)) return viaLocal(name, args);
           if (err && err.validation) throw err;
           goOffline(err);
           return viaLocal(name, args);

@@ -126,7 +126,7 @@
   L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'tiles-dark',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   }).addTo(map);
 
   var HEX = window.TOT_HEX;
@@ -154,6 +154,8 @@
     $('offlineChip').hidden = backend.mode !== 'offline';
     $('demoChip').hidden = !DEMO;
     $('practiceChip').hidden = markMode() !== 'practice';
+    $('testBanner').hidden = markMode() !== 'test';
+    $('testBanner').textContent = t('testBanner');
     document.querySelectorAll('.local-note').forEach(function (n) { n.hidden = backend.mode === 'supabase'; });
   }
   backend.onStatus(renderChips);
@@ -161,6 +163,7 @@
     toast(backend.reason === 'notConfigured' ? t('offlineWhy_notConfigured') : t('offlineWhy'), 7000);
   });
   $('practiceChip').addEventListener('click', function () { toast(t('practiceWhy'), 7000); });
+  $('testBanner').addEventListener('click', function () { toast(t('testWhy'), 8000); });
 
   // ==== layer chips ====
   var LAYER_ICONS = { zones: '🔥', areas: '🧭', events: '📅' };
@@ -476,7 +479,7 @@
   }
   function openMarkCard() {
     var mm = markMode();
-    $('markCardText').textContent = mm === 'practice' ? t('markedPractice') : t('markedLive', { m: CFG.markWindowMin });
+    $('markCardText').textContent = mm === 'practice' ? t('markedPractice') : mm === 'test' ? t('markedTest', { m: CFG.markWindowMin }) : t('markedLive', { m: CFG.markWindowMin });
     renderTagRow();
     $('markCard').hidden = false;
     clearTimeout(openMarkCard.timer);
@@ -1305,7 +1308,7 @@
     var wrap = map.getContainer().getBoundingClientRect();
     var top = $('layerbar').getBoundingClientRect().bottom - wrap.top + 45;      // badge sits above its hexagon
     var bottom = wrap.bottom - Math.min($('legend').getBoundingClientRect().top, $('markBtn').getBoundingClientRect().top) + 30;
-    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [64, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [58, Math.max(60, top)], paddingBottomRight: [40, Math.max(60, bottom)], maxZoom: 14, animate: false });
   }
 
   // ==== boot ====

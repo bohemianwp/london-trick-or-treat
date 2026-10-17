@@ -123,8 +123,10 @@ as $$ select p_lat is not null and p_lng is not null
 
 create or replace function public._ltot_live_open() returns boolean
 language sql stable
-as $$ select now() >= timestamptz '2026-10-31 15:00:00 America/Toronto'
-         and now() <  timestamptz '2026-10-31 23:00:00 America/Toronto' $$;
+as $$ select (now() >= timestamptz '2026-10-31 15:00:00 America/Toronto'
+          and now() <  timestamptz '2026-10-31 23:00:00 America/Toronto')
+          or (now() >= timestamptz '2026-10-17 00:00:00 America/Toronto'      -- test days Oct 17–20 (see v7_update.sql)
+          and now() <  timestamptz '2026-10-21 00:00:00 America/Toronto') $$;
 
 -- Same rules as checkText() in lib.js. Returns the cleaned text (or null for an empty optional note).
 -- p_max: maximum length (posts 140, suggestion reasons 80).
@@ -144,6 +146,10 @@ begin
   end if;
   if s ~ '(\+?1[\s.-]?)?\(?\m\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\M|\m\d{3}[\s.-]\d{4}\M|\d{7,}' then
     raise exception 'text:phone';
+  end if;
+  if s ~* '\m\d{1,5}[a-z]?\s+[a-z][a-z.''-]*(\s+[a-z][a-z.''-]*)?\s+(st|street|rd|road|ave|avenue|cres|crescent|dr|drive|blvd|boulevard|ct|court|pl|place|way|lane|ln|terr|terrace|cir|circle|gate|grove|pkwy|parkway|row|sq|square|trail|trl)\M'
+     or s ~ '\d{1,5}\s*号' then
+    raise exception 'text:address';            -- no house numbers / addresses: zones, never individual homes
   end if;
   if s ~* '\m(fuck|shit|bitch|cunt|asshole|dickhead|bastard|slut|whore|retard|nigger|faggot)(s|es|ing|ed)?\M'
      or s ~ '(傻逼|操你|他妈的|去死)' then

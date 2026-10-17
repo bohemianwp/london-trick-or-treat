@@ -90,7 +90,13 @@ const mark = (i, z, tags = null) => db.query(`select send_mark($1,$2,$3,$4,$5,$6
 const zones = async (w) => (await db.query(`select * from zone_counts(${w === undefined ? '' : w})`)).rows;
 const asRoot = async (sql, params) => { await db.exec('reset role'); try { return await db.query(sql, params); } finally { await db.exec('set role anon'); } };
 
-ok('send_mark closed outside Oct 31 3–11 PM (today)', /closed/.test(await err(`select send_mark($1,42.98,-81.24,$2,null,$3)`, [sess(1), HP.h, tok(1)])));
+// v7: the server window is Oct 31 3–11 PM Toronto OR the test days Oct 17 00:00 – Oct 21 00:00 Toronto.
+const nowMs = Date.now();
+const windowOpen = (nowMs >= Date.parse('2026-10-31T19:00:00Z') && nowMs < Date.parse('2026-11-01T03:00:00Z')) ||
+                   (nowMs >= Date.parse('2026-10-17T04:00:00Z') && nowMs < Date.parse('2026-10-21T04:00:00Z'));
+const liveNow = (await asRoot('select public._ltot_live_open() as v')).rows[0].v;
+ok(`_ltot_live_open() is ${windowOpen} right now (Oct 31 night or test days Oct 17–20)`, liveNow === windowOpen, String(liveNow));
+if (!windowOpen) ok('send_mark closed outside the windows (today)', /closed/.test(await err(`select send_mark($1,42.98,-81.24,$2,null,$3)`, [sess(99), HP.h, tok(99)])));
 await db.exec('reset role');
 await db.exec(`create or replace function public._ltot_live_open() returns boolean language sql as 'select true'`);   // pretend it is Halloween night
 await db.exec('set role anon');

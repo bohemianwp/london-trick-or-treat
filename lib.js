@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=7';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=8';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -43,11 +43,21 @@
     var w = (cfg && cfg.liveWindow) || DEFAULT_WINDOW;
     return { start: zonedToUtcMs(w.date, w.start, w.tz), end: zonedToUtcMs(w.date, w.end, w.tz) };
   }
-  // Live (shared) marking is open only inside the window (inclusive start, exclusive end), or always in demo mode.
+  // Optional shared test window before Halloween (config.testWindow: { from, to, tz }, dates inclusive, local days).
+  // Example: { from: '2026-10-17', to: '2026-10-20' } = Oct 17 00:00 until Oct 21 00:00 Toronto.
+  function nextDay(d) { var x = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + 1)); return x.toISOString().slice(0, 10); }
+  function testWindow(cfg) {
+    var w = cfg && cfg.testWindow;
+    if (!w || !/^\d{4}-\d{2}-\d{2}$/.test(w.from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(w.to || '')) return null;
+    return { start: zonedToUtcMs(w.from, '00:00', w.tz || TZ), end: zonedToUtcMs(nextDay(w.to), '00:00', w.tz || TZ) };
+  }
+  function isTestOpen(nowMs, cfg) { var w = testWindow(cfg); return !!w && nowMs >= w.start && nowMs < w.end; }
+  // Live (shared) marking is open inside the Halloween window (inclusive start, exclusive end), during the test window,
+  // or always in demo mode.
   function isLiveOpen(nowMs, cfg, demo) {
     if (demo) return true;
     var w = liveWindow(cfg);
-    return nowMs >= w.start && nowMs < w.end;
+    return (nowMs >= w.start && nowMs < w.end) || isTestOpen(nowMs, cfg);
   }
   // Nov 1, 2026 06:00 in Toronto. DST ends at 2 AM that morning, so this is 06:00 EST (UTC-5) = 11:00 UTC.
   // After this, suggestions close (the night is over).
@@ -192,7 +202,12 @@
       .sort(function (a, b) { return (a.distM - b.distM) || (b.count - a.count); });
   }
   // Practice outside the live window, live inside it, demo always.
-  function markMode(nowMs, cfg, demo) { return demo ? 'demo' : isLiveOpen(nowMs, cfg, false) ? 'live' : 'practice'; }
+  function markMode(nowMs, cfg, demo) {
+    if (demo) return 'demo';
+    var w = liveWindow(cfg);
+    if (nowMs >= w.start && nowMs < w.end) return 'live';
+    return isTestOpen(nowMs, cfg) ? 'test' : 'practice';     // 'test' = shared like live, labelled "Test days"
+  }
 
   // ==== community suggestions ("Suggest an area") ====
   var SUGGEST_MAX_DAY = 3, SUGGEST_MIN = 3;
@@ -325,6 +340,8 @@
   // ==== text checks (board posts & suggestion reasons) ====
   var RE_URL = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|ca|net|org|io|ly|co|me|app|info|biz|xyz|link|site|gg|tv|to)\b)/i;
   var RE_EMAIL = /[^\s@]+@[^\s@]+\.[a-z]{2,}/i;
+  // House numbers + street ("123 Askin St", "45号"): the map is about zones, never individual homes.
+  var RE_ADDRESS = /\b\d{1,5}[a-z]?\s+[a-z][a-z.'-]*(\s+[a-z][a-z.'-]*)?\s+(st|street|rd|road|ave|avenue|cres|crescent|dr|drive|blvd|boulevard|ct|court|pl|place|way|lane|ln|terr|terrace|cir|circle|gate|grove|pkwy|parkway|row|sq|square|trail|trl)\b\.?|\d{1,5}\s*号/i;
   var RE_PHONE = /(\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b|\b\d{3}[\s.-]\d{4}\b|\d{7,}/;
   var BAD = ['fuck', 'shit', 'bitch', 'cunt', 'asshole', 'dickhead', 'bastard', 'slut', 'whore', 'retard', 'nigger', 'faggot',
              '傻逼', '操你', '他妈的', '去死'];
@@ -345,6 +362,7 @@
     if (RE_EMAIL.test(s)) return { ok: false, error: 'email' };
     if (RE_URL.test(s)) return { ok: false, error: 'url' };
     if (RE_PHONE.test(s)) return { ok: false, error: 'phone' };
+    if (RE_ADDRESS.test(s)) return { ok: false, error: 'address' };
     if (hasBadWord(s)) return { ok: false, error: 'profanity' };
     return { ok: true, text: s };
   }
@@ -524,7 +542,7 @@
     TZ: TZ, LONDON_BOX: LONDON_BOX, BOARDS: BOARDS, SEASON_END_MS: SEASON_END_MS, SESSION_MS: SESSION_MS,
     MARK_TAGS: MARK_TAGS, TAG_ICON: TAG_ICON, MIN_ZONE: MIN_ZONE, NEW_MS: NEW_MS, MARK_KEEP_MS: MARK_KEEP_MS,
     RATE_DEVICE_MS: RATE_DEVICE_MS, RATE_ZONE_MS: RATE_ZONE_MS, SUGGEST_MAX_DAY: SUGGEST_MAX_DAY, SUGGEST_MIN: SUGGEST_MIN,
-    tzOffsetMin: tzOffsetMin, zonedToUtcMs: zonedToUtcMs, liveWindow: liveWindow, isLiveOpen: isLiveOpen, markMode: markMode,
+    tzOffsetMin: tzOffsetMin, zonedToUtcMs: zonedToUtcMs, liveWindow: liveWindow, testWindow: testWindow, isTestOpen: isTestOpen, isLiveOpen: isLiveOpen, markMode: markMode,
     distM: distM, inLondonBox: inLondonBox, round: round, coarsen: coarsen, blurPoint: blurPoint,
     randomHex: randomHex, uuid: uuid, nextSession: nextSession,
     clampWindow: clampWindow, zoneBucket: zoneBucket, cleanTags: cleanTags, tagsValid: tagsValid, marksInWindow: marksInWindow,

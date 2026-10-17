@@ -17,6 +17,9 @@
 
     // Mark it!
     markBtn: 'This spot is great!', tapForMark: 'Tap the map to mark a spot',
+    testBanner: '🧪 Test days Oct 17–20 / 试用期 10月17–20日 · marks are shared, then wiped',
+    testWhy: 'Test days (Oct 17–20): your marks are shared with other testers so we can try the map together. Each mark is deleted after 2 hours, and all test data is wiped before Halloween. From Oct 21 it is practice mode again until Oct 31.',
+    markedTest: 'Test mark shared with other testers for the next {m} minutes. Test marks are wiped before Halloween.',
     markedTitle: 'Marked! 🎉', markedLive: 'Thanks! Your mark helps other kids find the fun for the next {m} minutes.',
     markedPractice: 'Practice mark saved on this phone. On Halloween night, marks are shared with everyone.',
     tagsAsk: 'Anything special? Tap one (or skip):',
@@ -87,12 +90,13 @@
     alreadyReported: 'You already reported this one.', noPosts: 'No posts yet. Be the first!', mine: 'Your post',
     del: 'Delete', confirmDel: 'Delete this?', noNames: "⚠️ Don't write names or addresses.",
     justNow: 'just now', agoMin: '{n} min ago', agoH: '{n} h ago', agoD: '{n} d ago',
-    boardRules: 'Be kind. No names, links or phone numbers. 3 reports hide a post.',
+    boardRules: 'Grown-ups only. Be kind. No names, house numbers, links or phone numbers. Posts are public; there are no replies or private messages. 3 reports hide a post.',
     localModeNote: 'Local mode: everything is saved in this browser only. Open a second tab with ?demo=1 to see sharing work.',
 
     // Errors
     err_empty: 'Please write something first.', err_tooLong: 'Too long. 140 characters max.', err_tooLong80: 'Too long. 80 characters max.',
     err_url: 'Links are not allowed.', err_email: 'Email addresses are not allowed.', err_phone: 'Phone numbers are not allowed.',
+    err_address: 'No house numbers or addresses, please. Name the street or neighbourhood instead.',
     err_profanity: 'Please keep it family-friendly.', err_rate: 'Slow down a little and try again later.',
     err_forbidden: 'Only the phone that created this can change it.', err_invalid: 'Something in that is not valid.',
     err_closed: 'That is closed right now.', err_outside: 'That spot is outside London, Ontario.',
@@ -109,6 +113,7 @@
       '🎭 Face paint instead of masks so kids can see; costumes short enough not to trip.',
       '🏠 Visit only homes with lights on, and respect private property. Never go inside a home or a car.',
       '🍬 Check candy at home before eating: toss anything unwrapped, torn, or homemade by strangers. Watch allergens and choking hazards.',
+      '🩵 Food allergies? Look for a teal pumpkin: those homes offer non-food treats. You can put one out too.',
       '🧥 Late-October evenings in London are often 5–10 °C and wet. Layers under costumes, rain cover for bags.',
       '📞 Emergency: 911. London Police non-emergency: 519-661-5670.'
     ],
@@ -192,7 +197,7 @@
       ['🏆 Board', ['Vote for the most fun neighbourhood and the best decorations.', 'Open it from 🏆 at the top or from this Guide.']],
       ['🦺 Safety', ['Go with a grown-up, wear something bright, and use sidewalks.', 'Grown-ups tap the button when everyone is stopped.']],
       ['🔒 Privacy', ['No login, no names.', 'Marks are blurred by about 50 m before they leave your phone, and deleted after 2 hours.',
-        'Before Oct 31 at 3 PM, marks are just practice and stay on your phone.']]
+        'Test days Oct 17–20: marks are shared with testers, then wiped. After that, until Oct 31 at 3 PM, marks are just practice and stay on your phone.']]
     ],
     infoAria: 'What is this?',
 
@@ -203,13 +208,15 @@
       ['No accounts', 'No sign-up, no names, emails, phone numbers or photos. Your phone gets a random ID (stored in this browser) so it can vote once per post and keep to the limits.'],
       ['Marks', 'Only when you tap the big button. Your spot is rounded to about 50 m and moved randomly up to 25 m before it leaves your phone or is saved. A mark has a random ID that changes every 30 minutes, optional tags, and the time. Marks are deleted after 2 hours.'],
       ['Zones', 'A zone (hexagon) shows only when 3 or more people marked it. Nobody can see single marks.'],
-      ['Practice mode', 'Before Oct 31 at 3 PM, and after 11 PM, marks stay on this phone only.'],
+      ['Test days (Oct 17–20)', 'Marks are shared with other testers so we can try the map together. Each mark is deleted after 2 hours, and all test data (marks, suggestions, posts) is wiped after the test.'],
+      ['Practice mode', 'From Oct 21 until Oct 31 at 3 PM, and after 11 PM on Oct 31, marks stay on this phone only.'],
       ['Suggestions', 'Only if you suggest an area: the hexagon (about 800 m wide) and an optional reason (80 characters, no links or phone numbers). Deleted after Halloween.'],
       ['Board posts', 'Only if you post: the text (140 characters max), the board, an optional neighbourhood, and an optional rough location (about 100 m). 3 reports hide a post.'],
-      ['Your location', 'The blue dot and route planning use your location on your phone only.'],
-      ['Where data is kept', 'In local mode (the default) everything stays in this browser. If the organiser turns on the shared server (Supabase, Canada region), marks, suggestions and posts are stored there. Map pictures come from OpenStreetMap and walking routes from OSRM, which see your device’s internet address like any website.'],
+      ['Your location', 'Only after you tap a location button and allow it. The blue dot and route planning use it on your phone only. Everything works without location: you can tap the map instead.'],
+      ['No tracking', 'No cookies, no analytics, no ads, no trackers. Settings are kept in this browser’s local storage only.'],
+      ['Where data is kept', 'Shared marks, suggestions and posts are stored on the organiser’s Supabase server; everything else stays in this browser. Map pictures come from OpenStreetMap, walking routes from OSRM, and the map code from unpkg/jsDelivr; like any website, they see your device’s internet address.'],
       ['Delete your data', 'Clearing this site’s data in your browser removes everything stored locally. All shared data is deleted after Nov 2, 2026.'],
-      ['Questions', 'Ask the person who shared this app with you. No data is sold or used for ads.']
+      ['Questions and feedback', 'Ask the person who shared this app with you. Feedback you choose to email goes to the organiser’s feedback inbox and is used only to improve the map. No data is sold or used for ads.']
     ]
   },
   zh: {
@@ -226,6 +233,9 @@
 
     // Mark it!
     markBtn: '这里很热闹！', tapForMark: '点一下地图，标记一个地方',
+    testBanner: '🧪 试用期 10月17–20日 / Test days Oct 17–20 · 标记会共享，之后清除',
+    testWhy: '试用期（10 月 17–20 日）：你的标记会和其他试用的人共享，方便大家一起试。每个标记 2 小时后自动删除，万圣节前会清空所有试用数据。10 月 21 日起恢复练习模式，直到 10 月 31 日。',
+    markedTest: '试用标记已和其他试用者共享，接下来 {m} 分钟有效。万圣节前会清空试用数据。',
     markedTitle: '标记好了！🎉', markedLive: '谢谢！接下来 {m} 分钟，你的标记会帮其他小朋友找到好玩的地方。',
     markedPractice: '练习标记已存在这台手机上。万圣节当晚，标记会和大家共享。',
     tagsAsk: '有什么特别的？点一个（也可以跳过）：',
@@ -296,12 +306,13 @@
     alreadyReported: '你已经举报过这条了。', noPosts: '还没有帖子，来发第一条吧！', mine: '你的帖子',
     del: '删除', confirmDel: '确定删除吗？', noNames: '⚠️ 不要写名字或地址。',
     justNow: '刚刚', agoMin: '{n} 分钟前', agoH: '{n} 小时前', agoD: '{n} 天前',
-    boardRules: '请友善。不写名字、链接或电话。被举报 3 次会被隐藏。',
+    boardRules: '仅限大人使用。请友善。不写名字、门牌号、链接或电话。帖子是公开的，没有回复和私信功能。被举报 3 次会被隐藏。',
     localModeNote: '本地模式：所有内容只存在这个浏览器里。用 ?demo=1 再开一个标签页，就能看到共享效果。',
 
     // Errors
     err_empty: '请先写点内容。', err_tooLong: '太长了，最多 140 个字。', err_tooLong80: '太长了，最多 80 个字。',
     err_url: '不能放链接。', err_email: '不能写电子邮箱。', err_phone: '不能写电话号码。',
+    err_address: '请不要写门牌号或具体地址，写街道名或社区名就好。',
     err_profanity: '请用适合全家看的文字。', err_rate: '慢一点，稍后再试。',
     err_forbidden: '只有创建它的那台手机才能修改。', err_invalid: '内容有不对的地方。',
     err_closed: '现在还没开放。', err_outside: '这个地方在安省伦敦市外面。',
@@ -318,6 +329,7 @@
       '🎭 用脸部彩绘代替面具，让孩子看得清；服装别太长，免得绊倒。',
       '🏠 只去开着灯的人家，尊重别人的私人地方。绝对不要进别人家里或车里。',
       '🍬 糖果回家检查后再吃：没包装、包装破了、陌生人自制的都扔掉。注意过敏原和容易噎住的东西。',
+      '🩵 孩子食物过敏？找门口放蓝绿色南瓜（Teal Pumpkin）的人家，他们准备了非食品小礼物。你家也可以放一个。',
       '🧥 伦敦十月底的晚上常常只有 5–10 °C，还会下雨。服装里面多穿几层，糖袋准备防雨罩。',
       '📞 紧急情况打 911。伦敦警察局非紧急电话：519-661-5670。'
     ],
@@ -400,7 +412,7 @@
       ['🏆 投票板', ['给最好玩的社区和最棒的装饰投票。', '从顶部的 🏆 或这个指南页打开。']],
       ['🦺 安全', ['跟大人一起、穿亮色衣服、走人行道。', '大家都停下来时，再由大人点按钮。']],
       ['🔒 隐私', ['不用登录，不用名字。', '标记在离开手机前会模糊大约 50 米，2 小时后删除。',
-        '10 月 31 日下午 3 点之前，标记只是练习，只存在你的手机上。']]
+        '试用期 10 月 17–20 日：标记会和试用者共享，之后清除。之后到 10 月 31 日下午 3 点之前，标记只是练习，只存在你的手机上。']]
     ],
     infoAria: '这是什么？',
 
@@ -411,13 +423,15 @@
       ['不用账号', '不注册，不收集名字、邮箱、电话或照片。你的手机会有一个随机编号（存在这个浏览器里），用来保证每条帖子只能投一票、遵守次数限制。'],
       ['标记', '只有你点大按钮时才会产生。你的位置在离开手机或被保存之前，会先取整到大约 50 米，再随机偏移最多 25 米。每个标记带一个每 30 分钟就换的随机编号、可选的标签和时间。标记 2 小时后删除。'],
       ['热区', '一个热区（六边形）要有 3 个或更多人标记才会显示。没有人能看到单个标记。'],
-      ['练习模式', '10 月 31 日下午 3 点之前和晚上 11 点之后，标记只存在这台手机上。'],
+      ['试用期（10 月 17–20 日）', '标记会和其他试用者共享，方便大家一起试。每个标记 2 小时后删除，试用结束后清空所有试用数据（标记、推荐、帖子）。'],
+      ['练习模式', '10 月 21 日到 10 月 31 日下午 3 点之前，以及 10 月 31 日晚上 11 点之后，标记只存在这台手机上。'],
       ['推荐区域', '只有你推荐时才会保存：那个六边形（大约 800 米宽）和一句可选的理由（80 字以内，不能有链接或电话）。万圣节后删除。'],
       ['投票板帖子', '只有你发帖时才会保存：内容（最多 140 字）、哪个投票板、可选的社区，以及可选的大概位置（约 100 米）。被举报 3 次会被隐藏。'],
-      ['你的位置', '蓝点和路线规划只在你的手机上使用你的位置。'],
-      ['数据存在哪里', '本地模式（默认）下，所有内容只存在这个浏览器里。如果组织者开启了共享服务器（Supabase，加拿大机房），标记、推荐和帖子会存在那里。地图图片来自 OpenStreetMap，步行路线来自 OSRM，它们和任何网站一样能看到你设备的网络地址。'],
+      ['你的位置', '只有你点定位按钮并允许后才会用。蓝点和路线规划只在你的手机上使用。不开定位也能用：直接点地图就行。'],
+      ['不追踪', '没有 Cookie、没有统计分析、没有广告、没有追踪器。设置只存在这个浏览器的本地存储里。'],
+      ['数据存在哪里', '共享的标记、推荐和帖子存在组织者的 Supabase 服务器上，其他内容只存在这个浏览器里。地图图片来自 OpenStreetMap，步行路线来自 OSRM，地图程序来自 unpkg/jsDelivr，它们和任何网站一样能看到你设备的网络地址。'],
       ['删除你的数据', '在浏览器里清除这个网站的数据，就能删掉本地存的所有内容。所有共享数据会在 2026 年 11 月 2 日之后删除。'],
-      ['有问题？', '问把这个 app 分享给你的人。数据不会被出售，也不会用来投放广告。']
+      ['问题和反馈', '问把这个 app 分享给你的人。你主动发邮件的反馈会进入组织者的反馈邮箱，只用来改进地图。数据不会被出售，也不会用来投放广告。']
     ]
   }
 });

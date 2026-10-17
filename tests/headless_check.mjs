@@ -46,7 +46,11 @@ function check(name, ok, detail = '') {
 let fronted = null;
 async function front(p) { if (fronted !== p) { fronted = p; await p.s('Page.bringToFront'); await sleep(200); } }
 
+// v7: config.js now points at Peng's real Supabase project. Every page here gets a LOCAL config instead
+// (no test days, so the "practice" expectations hold), unless a test passes its own config.
+const LOCAL_CFG = `window.TOT_CONFIG={backend:'local',supabaseUrl:'',supabaseAnonKey:'',liveWindow:{date:'2026-10-31',start:'15:00',end:'23:00',tz:'America/Toronto'},markWindowMin:45,pollSec:45};`;
 async function openPage(path, opts = {}) {
+  opts = Object.assign({ config: LOCAL_CFG }, opts);
   const { targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result;
   const { sessionId } = (await send('Target.attachToTarget', { targetId, flatten: true })).result;
   const p = { sessionId, targetId, errors: [], requests: [] };
@@ -208,9 +212,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
   await p.shot('v3-map-panel-zh.png');
   await p.click('#safetyBtn'); await sleep(200);
-  check('safety panel: 10 tips incl. “go with a grown-up”', (await p.ev('document.querySelectorAll("#tipList li").length')) === 10 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)));
+  check('safety panel: 11 tips incl. “go with a grown-up” and Teal Pumpkin', (await p.ev('document.querySelectorAll("#tipList li").length')) === 11 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)) && /Teal Pumpkin/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 10 sections', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 10 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh) with 12 sections (v7: test days + no tracking)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 12 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
@@ -383,7 +387,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D7') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D8') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');

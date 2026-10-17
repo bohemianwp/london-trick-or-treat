@@ -139,3 +139,28 @@ test('local hex grid fallback: consistent cells, 6 corners, ~H3 r8 size', () => 
   const fake = { latLngToCell: () => '882b1ad4a3fffff', cellToLatLng: () => [1, 2], cellToBoundary: () => [], gridDisk: () => [] };
   assert.equal(L.makeGrid(fake).kind, 'h3', 'uses h3-js when it loaded');
 });
+
+// v=7: shared test days Oct 17–20 (whole local days, inclusive), then practice again until Oct 31 3 PM.
+test('testWindow: Oct 17 00:00 – Oct 21 00:00 Toronto is shared ("test"), outside it practice, Oct 31 night live', () => {
+  const C = Object.assign({}, CFG, { testWindow: { from: '2026-10-17', to: '2026-10-20', tz: 'America/Toronto' } });
+  const Z = (iso) => Date.parse(iso);
+  assert.equal(L.markMode(Z('2026-10-17T03:59:00Z'), C, false), 'practice');      // Oct 16 23:59 EDT
+  assert.equal(L.markMode(Z('2026-10-17T04:00:00Z'), C, false), 'test');          // Oct 17 00:00 EDT
+  assert.equal(L.markMode(Z('2026-10-17T22:00:00Z'), C, false), 'test');
+  assert.equal(L.markMode(Z('2026-10-21T03:59:00Z'), C, false), 'test');          // Oct 20 23:59 EDT
+  assert.equal(L.markMode(Z('2026-10-21T04:00:00Z'), C, false), 'practice');      // Oct 21 00:00 EDT
+  assert.equal(L.markMode(Z('2026-10-31T20:00:00Z'), C, false), 'live');
+  assert.equal(L.isLiveOpen(Z('2026-10-18T16:00:00Z'), C, false), true, 'test days share marks');
+  assert.equal(L.isLiveOpen(Z('2026-10-25T16:00:00Z'), C, false), false);
+  assert.equal(L.markMode(Z('2026-10-18T16:00:00Z'), CFG, false), 'practice', 'no testWindow in config = no test days');
+  assert.equal(L.markMode(Z('2026-10-18T16:00:00Z'), C, true), 'demo');
+});
+
+test('checkText rejects house numbers + street (no targeting individual homes), allows street names', () => {
+  for (const s of ['Great display at 123 Askin St', '45 Elmwood Avenue has fog', '12b Baker St.', '7 Old Wortley Rd', '湖边路 45号 很好']) {
+    assert.equal(L.checkText(s).error, 'address', s);
+  }
+  for (const s of ['Baker St is the place!', 'Haunted garage on Askin St, not too scary for 5-year-olds.', '3 kids loved Old North', 'Go before 6 PM']) {
+    assert.equal(L.checkText(s).ok, true, s);
+  }
+});

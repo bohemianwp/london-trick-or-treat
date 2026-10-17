@@ -71,9 +71,10 @@ check('delete_post with the right token', (await rpc('delete_post', { p_id: post
 // ---- marks → zones (send_mark is only called with inputs that must be rejected: no rows are created)
 const HEX = '882b1ad4a3fffff';
 const sendMark = (lat, lng, tags) => rpc('send_mark', { p_session: rand(16), p_lat: lat, p_lng: lng, p_h3: HEX, p_tags: tags, p_token: rand(20) });
-const now = Date.now(), open = now >= Date.parse('2026-10-31T19:00:00Z') && now < Date.parse('2026-11-01T03:00:00Z');
+const now = Date.now(), open = (now >= Date.parse('2026-10-31T19:00:00Z') && now < Date.parse('2026-11-01T03:00:00Z')) ||
+  (process.env.TEST_DAYS_SQL === '1' && now >= Date.parse('2026-10-17T04:00:00Z') && now < Date.parse('2026-10-21T04:00:00Z'));   // after v7_update.sql
 if (open) {
-  console.log('(Oct 31 live window is open: checking send_mark validation instead of "closed")');
+  console.log('(live/test window is open: checking send_mark validation instead of "closed")');
   check('send_mark rejects Toronto (outside)', /outside/.test(errMsg(await sendMark(43.65, -79.38, null))));
   check("send_mark rejects tag 'pizza' (invalid)", /invalid/.test(errMsg(await sendMark(42.98, -81.24, ['candy', 'pizza']))));
 } else {
@@ -93,9 +94,14 @@ check('suggest_area rejects links (text:url)', /text:url/.test(await sErr('see w
 check('suggest_area rejects phone numbers (text:phone)', /text:phone/.test(await sErr('call 519-555-1234')));
 check('suggest_area rejects > 80 chars (text:tooLong)', /text:tooLong/.test(await sErr('x'.repeat(81))));
 check('suggest_area rejects Toronto (outside)', /outside/.test(await sErr(null, 43.65, -79.38)));
-const s1 = await suggest(DEV, 42.98, -81.24, 'Smoke test');
-check('suggest_area accepts a valid suggestion', s1.status === 200 && typeof s1.data === 'string', 'HTTP ' + s1.status + ' ' + errMsg(s1));
-check('same device + same hex again → rate', /rate/.test(errMsg(await suggest(DEV, 42.98, -81.24, null))));
+// SMOKE_NO_ROWS=1 skips the one valid suggestion (anon cannot delete it), so the run leaves nothing behind.
+const NO_ROWS = process.env.SMOKE_NO_ROWS === '1';
+const s1 = NO_ROWS ? { status: 0 } : await suggest(DEV, 42.98, -81.24, 'Smoke test');
+if (NO_ROWS) console.log('(SMOKE_NO_ROWS=1: skipped the valid-suggestion write and the duplicate check)');
+else {
+  check('suggest_area accepts a valid suggestion', s1.status === 200 && typeof s1.data === 'string', 'HTTP ' + s1.status + ' ' + errMsg(s1));
+  check('same device + same hex again → rate', /rate/.test(errMsg(await suggest(DEV, 42.98, -81.24, null))));
+}
 const cs = await rpc('community_suggested');
 const crows = Array.isArray(cs.data) ? cs.data : null;
 check('community_suggested only returns hexes with n ≥ 3', cs.status === 200 && crows && crows.every((r) => r.n >= 3), `HTTP ${cs.status}, ${crows ? crows.length : '?'} rows`);

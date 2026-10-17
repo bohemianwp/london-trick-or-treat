@@ -67,16 +67,31 @@
     }
   });
 
-  // Badges are added hottest first. If a cooler zone's badge would overlap one already placed, flip it below its hexagon
-  // (still pointing at it) so every count stays readable when zones are close together at city-wide zoom.
+  // Badges are added hottest first. If a cooler zone's badge would overlap one already placed, try other spots around
+  // its hexagon (below, right, left, higher) and keep the first free one, else the one with the least overlap,
+  // so every count stays readable when zones are close together at city-wide zoom.
+  var SPOTS = [['', ''], ['zb-below', 'translate(-50%, 10px)'], ['zb-side', 'translate(10px, -50%)'],
+               ['zb-side', 'translate(calc(-100% - 10px), -50%)'], ['zb-side', 'translate(-50%, calc(-200% - 16px))']];
+  function overlap(r, placed) {
+    return placed.reduce(function (sum, q) {
+      var w = Math.min(r.right, q.right + 3) - Math.max(r.left, q.left - 3), h = Math.min(r.bottom, q.bottom + 3) - Math.max(r.top, q.top - 3);
+      return sum + (w > 0 && h > 0 ? w * h : 0);
+    }, 0);
+  }
+  function setSpot(b, i) { b.classList.remove('zb-below', 'zb-side'); if (SPOTS[i][0]) b.classList.add(SPOTS[i][0]); b.style.transform = SPOTS[i][1]; }
   function declutter(group) {
     var placed = [];
-    function hits(r) { return placed.some(function (q) { return r.left < q.right + 2 && r.right > q.left - 2 && r.top < q.bottom + 2 && r.bottom > q.top - 2; }); }
     group.eachLayer(function (m) {
       var host = m.getElement && m.getElement(), b = host && host.querySelector('.zbadge');
       if (!b || !b.getBoundingClientRect) return;
-      var r = b.getBoundingClientRect();
-      if (hits(r)) { b.classList.add('zb-below'); var r2 = b.getBoundingClientRect(); if (hits(r2)) b.classList.remove('zb-below'); else r = r2; }
+      var best = 0, bestCost = Infinity, r;
+      for (var i = 0; i < SPOTS.length; i++) {
+        setSpot(b, i);
+        var cost = overlap(b.getBoundingClientRect(), placed);
+        if (cost < bestCost) { best = i; bestCost = cost; }
+        if (cost === 0) break;
+      }
+      setSpot(b, best); r = b.getBoundingClientRect();
       placed.push(r);
     });
   }
@@ -95,6 +110,8 @@
       this._group.addTo(map); this._badgeGroup.addTo(map);
       map.on('moveend', this._render, this);
       this._render();
+      var self = this;   // badge widths change once web fonts arrive: lay the badges out again
+      if (root.document && root.document.fonts && root.document.fonts.ready) root.document.fonts.ready.then(function () { if (self._map) self._render(); });
     },
     onRemove: function (map) {
       map.off('moveend', this._render, this);

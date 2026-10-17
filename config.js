@@ -16,6 +16,11 @@
                    Outside it, marks stay on this phone as practice ("Practice mode").
                    标记实时共享的时间段（按 tz 时区的当地时间），服务器端也会再检查。其他时间标记只存在本机，算「练习模式」。
 
+   testWindow      Optional shared TEST days before Halloween: { from, to } local dates, both days included.
+                   Marks are shared like Halloween night and the app shows "Test days" so testers know they get wiped.
+                   The server must allow the same days: run supabase/v7_update.sql once.
+                   可选的「试用期」：这几天标记也会共享，app 顶部会显示「试用期」。服务器端要先运行一次 supabase/v7_update.sql。
+
    markWindowMin   Zones count marks from the last N minutes (30–60, default 45).   热区统计最近 N 分钟的标记（30–60，默认 45）。
    pollSec         How often the app asks the server for zones, in seconds (30–60). 多少秒向服务器刷新一次热区（30–60）。
                    Local/demo mode re-counts every 12 s and instantly when another tab marks.
@@ -30,10 +35,11 @@
    显示「离线模式」小标签，并每 2 分钟重试一次。
    ========================================================================== */
 window.TOT_CONFIG = {
-  backend: 'local',            // 'local' | 'supabase'
-  supabaseUrl: '',             // e.g. https://xxxx.supabase.co  (Peng fills in)
-  supabaseAnonKey: '',         // public anon key only, never the service_role key
+  backend: 'supabase',         // 'local' | 'supabase'
+  supabaseUrl: 'https://iufivsqvfngvvmnxihnt.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1Zml2c3F2Zm5ndnZtbnhpaG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyNDg4MjcsImV4cCI6MjEwNzgyNDgyN30.DX2h7WUvrZkw-1KRtYOx2p1Qhf75uxcJ03rfhxFKpcQ',   // PUBLIC anon key (safe to publish; RLS + RPC checks protect the data)
   liveWindow: { date: '2026-10-31', start: '15:00', end: '23:00', tz: 'America/Toronto' },
+  testWindow: { from: '2026-10-17', to: '2026-10-20', tz: 'America/Toronto' },   // shared test days (whole days, inclusive); remove after the test
   markWindowMin: 45,           // 30–60
   pollSec: 45                  // 30–60
 };
