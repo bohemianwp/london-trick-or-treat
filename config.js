@@ -2,9 +2,9 @@
    config.js — backend settings / 后端设置
    --------------------------------------------------------------------------
    backend         'local'    = everything stays in this browser (localStorage). Default. No account needed.
-                   'supabase' = share markers, board posts and live dots with everyone through your Supabase project.
+                   'supabase' = share marks, suggestions and board posts with everyone through your Supabase project.
                    'local'    = 所有数据只存在这个浏览器里（localStorage），默认值，不需要任何账号。
-                   'supabase' = 通过你自己的 Supabase 项目，和所有人共享房屋标记、投票板和实时圆点。
+                   'supabase' = 通过你自己的 Supabase 项目，和所有人共享标记、推荐区域和投票板。
 
    supabaseUrl     Your project's URL, e.g. https://xxxx.supabase.co (Project Settings → API → Project URL).
                    你的项目网址，例如 https://xxxx.supabase.co（Project Settings → API → Project URL）。
@@ -12,13 +12,17 @@
    supabaseAnonKey The PUBLIC "anon" key only. NEVER paste the service_role key here — this file is public.
                    只填公开的 anon 密钥。绝对不要填 service_role 密钥——这个文件所有人都能看到。
 
-   liveWindow      When live dots and live hexes are allowed (wall-clock time in tz). The server checks this too.
-                   允许实时圆点和实时热区的时间段（按 tz 时区的当地时间）。服务器端也会再检查一遍。
+   liveWindow      When marks are live and shared (wall-clock time in tz). The server checks this too.
+                   Outside it, marks stay on this phone as practice ("Practice mode").
+                   标记实时共享的时间段（按 tz 时区的当地时间），服务器端也会再检查。其他时间标记只存在本机，算「练习模式」。
 
-   dotTtlMin       A live dot disappears this many minutes after its last update.   实时圆点最后一次更新后多少分钟消失。
-   hexWindowMin    Live hexes count dots from the last N minutes (15–30).            实时热区统计最近 N 分钟的圆点（15–30）。
-   hexMinCount     Privacy floor: a hex is drawn only with at least this many dots.  隐私下限：圆点数不少于这个值才显示该六边形。
-   pollSec         How often the app refreshes shared data, in seconds.              多少秒刷新一次共享数据。
+   markWindowMin   Zones count marks from the last N minutes (30–60, default 45).   热区统计最近 N 分钟的标记（30–60，默认 45）。
+   pollSec         How often the app asks the server for zones, in seconds (30–60). 多少秒向服务器刷新一次热区（30–60）。
+                   Local/demo mode re-counts every 12 s and instantly when another tab marks.
+                   本地/演示模式每 12 秒重算一次，别的标签页一标记就立刻更新。
+
+   A zone (hexagon) shows only when it has 3 or more marks — this is fixed, not a setting.
+   一个热区（六边形）至少 3 个标记才会显示——这是固定的隐私规则，不能改。
 
    If backend is 'supabase' but the URL/key are empty or the server does not answer within 5 s,
    the app falls back to local mode automatically, shows an "Offline mode" chip and retries every 2 minutes.
@@ -30,5 +34,6 @@ window.TOT_CONFIG = {
   supabaseUrl: '',             // e.g. https://xxxx.supabase.co  (Peng fills in)
   supabaseAnonKey: '',         // public anon key only, never the service_role key
   liveWindow: { date: '2026-10-31', start: '15:00', end: '23:00', tz: 'America/Toronto' },
-  dotTtlMin: 30, hexWindowMin: 20, hexMinCount: 3, pollSec: 60
+  markWindowMin: 45,           // 30–60
+  pollSec: 45                  // 30–60
 };

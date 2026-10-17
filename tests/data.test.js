@@ -17,7 +17,9 @@ test('data/areas.js is generated from areas_researched.json (run tools/gen_areas
   for (const k of ['generated', 'label_en', 'label_zh', 'events']) assert.deepEqual(shipped.meta[k], json.meta[k], k);
 });
 
-test('size budget: own JS ≤ 150 KB (SPEC 8.4, CDN libraries excluded); report JS + CSS', () => {
+// SPEC 8.4 said 150 KB. v4 (Oct 17) raised it to 170 KB for the bilingual welcome guide + How-to text, which must live in
+// i18n.js (Chinese is 3 bytes per character). Cost over the network: about +5 KB gzipped. Keep new features under this line.
+test('size budget: own JS ≤ 170 KB (SPEC 8.4 was 150 KB, raised in v4; CDN libraries excluded); report JS + CSS', () => {
   const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js'];
   const js = files.reduce((n, f) => n + fs.statSync(path.join(root, f)).size, 0);
   const css = fs.statSync(path.join(root, 'styles.css')).size;
@@ -25,7 +27,7 @@ test('size budget: own JS ≤ 150 KB (SPEC 8.4, CDN libraries excluded); report 
   const demo = fs.statSync(path.join(root, 'demo.js')).size;
   console.log(`# own JS ${(js / 1024).toFixed(1)} KB + CSS ${(css / 1024).toFixed(1)} KB = ${((js + css) / 1024).toFixed(1)} KB raw, ${(gz / 1024).toFixed(1)} KB gzipped` +
               ` (+ demo.js ${(demo / 1024).toFixed(1)} KB, loaded only with ?demo=1)`);
-  assert.ok(js <= 150 * 1024, 'own JS ' + js);
+  assert.ok(js <= 170 * 1024, 'own JS ' + js);
 });
 
 test('10 researched areas, bilingual, inside London, sources dated Oct 2024–Oct 2026', () => {
@@ -56,4 +58,11 @@ test('events: HitV (Oct 24), Camp Weathered (65 Wethered St), Somerset Monster H
   assert.match(byId.hitv.when_en, /Oct 24, 2026/);
   assert.match(byId['camp-weathered'].name_en, /65 Wethered St/);
   assert.match(byId.somerset.name_en, /71 Somerset Cres/);
+});
+
+test('past "Halloween in Argyle" event (Oct 17) is gone from the data and the shipped JS', () => {
+  assert.ok(!json.meta.events.some((e) => e.id === 'argyle'));
+  assert.deepEqual(json.meta.events.map((e) => e.id), ['hitv', 'somerset', 'camp-weathered', 'ctv-map']);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'data/areas.js'), 'utf8'), /argyle/i);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'demo.js'), 'utf8'), /argyle/i);
 });

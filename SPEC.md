@@ -1,8 +1,54 @@
-# London Trick-or-Treat Map: Spec v2 (Oct 17, 2026)
+# London Trick-or-Treat Map: Spec v3 (Oct 17, 2026) — v3 pivot first, then the v2 sections it builds on
 
 Owner: Peng Wu. Builder: Claude Code (headless) on Peng's Mac, in `~/Desktop/万圣节讨糖App`.
 Target night: **Saturday, Oct 31, 2026**, London, Ontario. Sunset 6:18 PM EDT. Peak trick-or-treating is about 5:30 to 8:30 PM.
 Status: nothing gets published and no online accounts get created by the builder. Section 9 lists what Peng would have to set up himself.
+
+## v3 pivot: "Mark it!" for kids & families (Oct 17, 2026)
+
+**This section replaces 2.3 (house markers), 2.5 (live family dots) and the live part of 2.6 below.** Where the older sections disagree with it, this one wins.
+
+**Who it's for.** Kids and families out trick-or-treating, not candy-giving households. Many users are Chinese families who stay near home, often in neighbourhoods that aren't in the researched list.
+
+**Core loop.**
+1. A big glowing arcade button, **"This spot is great! / 这里很热闹！"** (≥ 64 px tall; it's also the centre "Mark it!" tab). Tapping it takes one location fix. If location is off, denied or unavailable, the app says "Tap the map to mark a spot".
+2. The position is blurred on the phone (50 m grid plus up to 25 m jitter) **before** it is sent or stored. The mark gets a random session id that rotates every 30 minutes, optional one-tap tags (🍬 candy, 🎃 decor, 👥 crowded; whitelist), and the time. Marks are deleted after 2 hours.
+3. Limits: 1 mark per device per 5 minutes, and 1 per zone per 30 minutes. They're enforced in the app (localStorage history), in the local adapter and in the `send_mark` RPC (by session hash).
+4. Marks are counted per **H3 res-8 hexagon anywhere in the London box** (lat 42.85–43.10, lng −81.45 to −81.05), over the last `markWindowMin` minutes (30–60, default 45).
+   - Fewer than 3 marks: nothing is shown.
+   - 3–5: teal, Quiet.
+   - 6–14: orange, Lively.
+   - 15+: hot pink, Super hot, with a faster pulse.
+   - Each zone gets a "🔥 n marked" badge with the top tag when it's common (≥ 2 marks and ≥ 30%).
+   - **NEW / 新发现** shows for 30 minutes after the 3rd mark.
+5. Rendering: live zones are SVG hexagons in their own pane, pulsing through CSS opacity animations with no per-frame JS. Only zones in the viewport are drawn, up to 150 zones and 40 badges. Zoomed out, the badges are compact.
+6. Updates: local and demo mode use BroadcastChannel + localStorage and recount every 12 s. With Supabase, the app calls `zone_counts(window)` every 30–60 s, and it returns only cells with count ≥ 3.
+7. **Live window**: Oct 31, 3–11 PM Toronto. Outside it, marks stay in the local adapter as practice and a "Practice mode" chip is shown.
+
+**Secondary layers.** The researched areas become "Good areas to start / 推荐出发区". They're drawn as a faint, dashed "Suggested" base layer, with the planning score (0.7 × research + 0.3 × board votes) on one canvas **below** the live zones. They never hide or dim a live zone.
+- **Suggest an area / 推荐一个区域**: before the night, families pin a neighbourhood with a reason of 80 characters or fewer (no links or phone numbers). Only the res-8 hexagon is kept. A hexagon with 3+ suggestions becomes 💜 "Community suggested". Limits: 3 per device per day, 1 per hexagon.
+- **Near me / 我附近**: live zones within 1, 2 or 5 km (default 2), nearest first. Tapping a row flies there, and 🚶 plans a walk to it. Without location, the list is sorted from the map centre and says so.
+
+**Navigation.**
+- Bottom tabs: Map / Route / Mark it! / Guide.
+- Layer chips: Zones, Areas, Events, plus a "Near me" action.
+- The Board stays, as a 🏆 top-bar icon and a link in the Guide tab.
+- Safety, language toggle, Show my location and the Route planner are kept.
+
+**Removed.** Add my house, house filters and statuses, house markers, share links (`#m=`), the Live tab and the opt-in family dots. This removes their code, tests and Supabase tables/RPCs.
+
+**Guide.** Three welcome cards (key `ltot.guideSeen.v2`):
+1. See where it's fun!
+2. Found a great spot? Tap the big button!
+3. Plan your walk & stay safe.
+
+Card 1 and the How-to panel include "Your area isn't on the map? Mark it! Once 3 people mark it, it lights up." There are ⓘ hints next to the big button (shown until the first mark) and the legend. URL params: `?guide=1`, `?howto=1`, `?lang=zh|en`, `?demo=1`, `?demo=1&near=1`.
+
+**Backend.** `backend.js`:
+- `sendMark` (blurs, then hands the mark to an adapter), `tagMark`, `liveZoneCounts`, `listZones`, `suggestArea`, `communitySuggested`, plus the board methods.
+- `supabase/schema.sql` tables: `marks` and `suggestions` (RLS on, no direct anon access).
+- RPCs: `send_mark`, `tag_mark`, `zone_counts(window_min)` (only n ≥ 3, with top tag and first-lit time), `suggest_area`, `community_suggested()` (only n ≥ 3).
+- Marks are cleaned up after 2 hours. `tests/sql_pglite_check.mjs` tests all of it.
 
 ## 1. Goals
 1. Help parents pick the best neighbourhood and walk a good loop with their kids.

@@ -1,36 +1,47 @@
-/* London Trick-or-Treat Map v2 — plain JS, no build step.
-   Loads after: Leaflet, h3-js (optional), config.js, lib.js, i18n.js, data/areas.js, backend.js, hex.js */
+/* Mark it! London — trick-or-treat map for kids & families (v3). Plain JS, no build step.
+   Loads after: Leaflet, h3-js (optional), config.js, lib.js, i18n.js, data/areas.js, backend.js, hex.js
+   Core loop: tap the big button -> one-shot location -> blurred mark -> zones (H3 res 8) light up at 3+ marks. */
 (function () {
   'use strict';
 
   var LIB = window.TOT_LIB, I18N = window.TOT_I18N, RAW = window.TOT_AREAS_RAW || { meta: {}, areas: [] };
   var CFG = Object.assign({ backend: 'local', liveWindow: { date: '2026-10-31', start: '15:00', end: '23:00', tz: 'America/Toronto' },
-                            dotTtlMin: 30, hexWindowMin: 20, hexMinCount: 3, pollSec: 60 }, window.TOT_CONFIG || {});
-  CFG.hexWindowMin = Math.min(30, Math.max(15, CFG.hexWindowMin));
+                            markWindowMin: 45, pollSec: 45 }, window.TOT_CONFIG || {});
+  CFG.markWindowMin = LIB.clampWindow(CFG.markWindowMin);
+  CFG.pollSec = Math.min(60, Math.max(30, Number(CFG.pollSec) || 45));
 
   // ==== constants ====
   var LONDON = [42.9849, -81.2453];
-  var DEMO = /[?&]demo=1(&|$)/.test(location.search);
-  var P = DEMO ? 'ltot.demo.' : 'ltot.v2.';           // demo data never mixes with real data
-  var STORE = { lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.layers', filters: 'ltot.filters',
-                v1pins: 'ltot.pins.v1', migrated: 'ltot.v2.migrated', tokens: P + 'mine.markers', postTokens: P + 'mine.posts',
-                votes: P + 'mine.votes', reports: P + 'mine.reports', localMk: P + 'mine.local' };
+  var FLAGS = LIB.parseUrlFlags(location.search);   // ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1
+  var DEMO = FLAGS.demo;
+  var DEMO_HOME = [42.9628, -81.2390];                // ?demo=1&near=1 centres "Near me" here (Old South, near Wortley Rd)
+  var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
+  var STORE = { lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
+                session: P + 'session', markHist: P + 'mine.marks', suggestHist: P + 'mine.suggest',
+                postTokens: P + 'mine.posts', votes: P + 'mine.votes', reports: P + 'mine.reports' };
   var PACE = { 'u5': 1.5, '5-8': 2.0, '9-12': 2.5, 'teen': 3.0 };   // km/h including door stops
   var MAX_WALK_TO_AREA_KM = 1.5;
-  var TYPE_ICON = { candy: '🍬', teal: '🩵', fullsize: '🍫', decor: '🎃', pet: '🐶', early: '🕔' };
+  var LOCAL_RECOUNT_MS = 12000;                       // local/demo mode: re-aggregate every 12 s
   var AREAS = (RAW.areas || []).map(LIB.mapArea);
   var EVENTS = ((RAW.meta || {}).events || []);
   var AREA_BY_ID = {};
   AREAS.forEach(function (a) { AREA_BY_ID[a.id] = a; });
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ==== i18n ====
-  var lang = (function () { try { return localStorage.getItem(STORE.lang) === 'zh' ? 'zh' : 'en'; } catch (e) { return 'en'; } })();
+  var lang = FLAGS.lang || (function () { try { return localStorage.getItem(STORE.lang) === 'zh' ? 'zh' : 'en'; } catch (e) { return 'en'; } })();
+  // {win} anywhere (also inside the guide/How-to arrays) = the configured mark window, so the text follows config.js.
+  function fillWin(x) {
+    if (typeof x === 'string') return x.replace(/\{win\}/g, CFG.markWindowMin);
+    if (Array.isArray(x)) return x.map(fillWin);
+    return x;
+  }
   function t(key, vars) {
     var s = I18N[lang][key];
     if (s === undefined) s = I18N.en[key];
     if (s === undefined) return key;
     if (vars && typeof s === 'string') s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined ? vars[k] : m; });
-    return s;
+    return fillWin(s);
   }
   function errText(err) {
     var c = (err && err.code) || '';
@@ -55,8 +66,6 @@
   }
   function lsGet(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
   function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode / full */ } }
-  function ssGet(key, fb) { try { var v = sessionStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
-  function ssSet(key, val) { try { sessionStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* ignore */ } }
   function haversineKm(a, b) { return LIB.distM(a, b) / 1000; }
   function bearingDeg(a, b) {
     var r = Math.PI / 180;
@@ -85,7 +94,6 @@
     for (var i = 1; i <= 5; i++) span.appendChild(i <= n ? document.createTextNode('●') : el('span', { class: 'off', text: '●' }));
     return span;
   }
-  function scoreColor(o) { return o >= 4.5 ? '#ff7a18' : o >= 4 ? '#ffa24d' : '#a855f7'; }
   function narrow() { return window.innerWidth < 760; }
   var toastTimer;
   function toast(msg, ms) {
@@ -105,12 +113,13 @@
     });
   }
   function segSet(id, v) { Array.prototype.forEach.call($(id).children, function (c) { c.setAttribute('aria-checked', String(c.dataset.v === v)); }); }
+  function showErr(id, msg) { $(id).textContent = msg; $(id).hidden = !msg; }
+  function updateCount(inputId, outId, max) { $(outId).textContent = LIB.charCount($(inputId).value) + '/' + (max || 140); }
 
   // ==== device identity (random, local only) ====
   var DEVICE = lsGet(STORE.device, null);
   if (!DEVICE) { DEVICE = LIB.uuid(); lsSet(STORE.device, DEVICE); }
-  var myTokens = lsGet(STORE.tokens, {}), myPostTokens = lsGet(STORE.postTokens, {});
-  var myVotes = lsGet(STORE.votes, {}), myReports = lsGet(STORE.reports, {});
+  var myPostTokens = lsGet(STORE.postTokens, {}), myVotes = lsGet(STORE.votes, {}), myReports = lsGet(STORE.reports, {});
 
   // ==== map ====
   if (typeof L === 'undefined') {
@@ -125,44 +134,49 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
 
-  var grid = window.TOT_HEX ? window.TOT_HEX.makeGrid() : LIB.makeGrid(null);
-  var hexLayer = window.TOT_HEX ? window.TOT_HEX.createLayer(grid) : null;
-  var dotRenderer = L.canvas({ padding: 0.2 });
+  var HEX = window.TOT_HEX;
+  var grid = HEX ? HEX.makeGrid() : LIB.makeGrid(null);
+  var baseLayer = HEX ? HEX.createBaseLayer(grid) : null;
+  var zoneLayer = HEX ? HEX.createZoneLayer(grid, { onTap: zonePopup, badgeHtml: badgeHtml }) : null;
   var layers = {
-    areas: L.layerGroup(), hex: hexLayer || L.layerGroup(), houses: L.layerGroup(), dots: L.layerGroup(), events: L.layerGroup()
+    zones: zoneLayer || L.layerGroup(),
+    areas: L.layerGroup(),
+    events: L.layerGroup()
   };
-  var sharedLayer = L.layerGroup().addTo(map);
+  if (baseLayer) baseLayer.addTo(layers.areas);         // faint planning score lives with the "Suggested" base layer
+  var mineLayer = L.layerGroup().addTo(map);            // sparkles where *I* marked (this phone only)
   var routeLayer = L.layerGroup().addTo(map);
-  var layerOn = Object.assign({ areas: true, hex: true, houses: true, dots: true, events: true }, lsGet(STORE.layers, {}));
+  var layerOn = Object.assign({ zones: true, areas: true, events: true }, lsGet(STORE.layers, {}));
 
   function sheetHeight() { var s = $('sheet'); return s.dataset.open === 'true' && narrow() ? s.offsetHeight : 0; }
   function focusBounds(b) { map.fitBounds(b, { paddingTopLeft: [20, 110], paddingBottomRight: [20, sheetHeight() + 20], maxZoom: 16 }); }
 
   // ==== backend ====
   var backend = window.TOT_BACKEND.createBackend(CFG, { demo: DEMO });
-  var data = { markers: [], posts: { fun: [], decor: [] }, dots: [], live: [], linkMarkers: [], localMarkers: [] };
-  function renderBackendChip() {
-    var chip = $('offlineChip');
-    chip.hidden = backend.mode !== 'offline';
+  var data = { zones: [], suggested: [], posts: { fun: [], decor: [] }, zonesAt: 0 };
+  function markMode() { return LIB.markMode(Date.now(), CFG, DEMO); }
+  function renderChips() {
+    $('offlineChip').hidden = backend.mode !== 'offline';
+    $('demoChip').hidden = !DEMO;
+    $('practiceChip').hidden = markMode() !== 'practice';
     document.querySelectorAll('.local-note').forEach(function (n) { n.hidden = backend.mode === 'supabase'; });
   }
-  backend.onStatus(renderBackendChip);
+  backend.onStatus(renderChips);
   $('offlineChip').addEventListener('click', function () {
     toast(backend.reason === 'notConfigured' ? t('offlineWhy_notConfigured') : t('offlineWhy'), 7000);
   });
-  $('demoChip').hidden = !DEMO;
+  $('practiceChip').addEventListener('click', function () { toast(t('practiceWhy'), 7000); });
 
   // ==== layer chips ====
-  var LAYER_ICONS = { areas: '🏘️', hex: '⬡', houses: '🎃', dots: '👥', events: '📅' };
-  var LAYER_KEYS = { areas: 'layerAreas', hex: 'layerHex', houses: 'layerHouses', dots: 'layerDots', events: 'layerEvents' };
+  var LAYER_ICONS = { zones: '🔥', areas: '🧭', events: '📅' };
+  var LAYER_KEYS = { zones: 'layerZones', areas: 'layerAreas', events: 'layerEvents' };
   function applyLayers() {
     Object.keys(layers).forEach(function (k) {
       var on = !!layerOn[k];
       if (on && !map.hasLayer(layers[k])) layers[k].addTo(map);
       if (!on && map.hasLayer(layers[k])) map.removeLayer(layers[k]);
     });
-    $('legend').hidden = !layerOn.hex;
-    $('hexToggle').checked = !!layerOn.hex;
+    $('legend').hidden = !layerOn.zones;
     renderLayerBar();
   }
   function renderLayerBar() {
@@ -173,16 +187,16 @@
       bar.appendChild(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
         onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]));
     });
+    bar.appendChild(el('button', { type: 'button', class: 'lchip lchip-near', id: 'nearChip', onclick: function () { openNear(); } },
+      [el('span', { class: 'li', text: '📍' }), t('layerNear')]));
   }
   function setLayer(k, on) {
     layerOn[k] = on;
     lsSet(STORE.layers, layerOn);
     applyLayers();
-    if (k === 'hex' && on) scheduleHex(true);
   }
-  $('hexToggle').addEventListener('change', function () { setLayer('hex', this.checked); });
 
-  // ==== areas ====
+  // ==== researched areas ("Suggested / 推荐" base layer) ====
   function scoreGrid(a) {
     return el('div', { class: 'scores' }, [
       el('span', { text: '🍬 ' + t('scoreCandy') }), dots(a.s.candy),
@@ -198,6 +212,7 @@
   }
   function areaPopup(a) {
     return el('div', { class: 'pop' }, [
+      el('div', { class: 'pop-kicker', text: '🧭 ' + t('suggestedTag') }),
       el('div', { class: 'pop-title', text: a.name[lang] }),
       el('div', { class: 'pop-sub', text: t('overall') + ' ' + LIB.overall(a) + ' / 5' }),
       el('div', { class: 'pop-label', text: t('unverified') }),
@@ -209,13 +224,15 @@
       el('button', { class: 'btn btn-primary btn-small', type: 'button', text: t('planHere'), onclick: function () { map.closePopup(); planForArea(a.id); } })
     ]);
   }
+  function shortName(a) { return a.name[lang].split(/ \(| \/ | near |（| \/|附近/)[0].trim(); }
+  var communityGroup = L.layerGroup().addTo(layers.areas);
   function renderAreaLayer() {
-    layers.areas.clearLayers();
+    layers.areas.eachLayer(function (l) { if (l !== baseLayer && l !== communityGroup) layers.areas.removeLayer(l); });
     AREAS.forEach(function (a) {
-      var c = scoreColor(LIB.overall(a));
-      // No bindPopup: Leaflet's popup handler would swallow taps meant for "tap the map" modes.
-      L.circle([a.lat, a.lng], { radius: a.r, color: c, weight: 2, fillColor: c, fillOpacity: 0.08, dashArray: '6 6', bubblingMouseEvents: false, className: 'area-circle' })
-        .bindTooltip(shortName(a), { permanent: true, direction: 'center', className: 'area-label' })
+      // Dashed outline + muted fill: visually separate from live zones, and drawn under them.
+      L.circle([a.lat, a.lng], { radius: a.r, color: '#a78bfa', weight: 1.5, opacity: 0.6, fillColor: '#a78bfa', fillOpacity: 0.05,
+                                 dashArray: '5 7', bubblingMouseEvents: false, className: 'area-circle' })
+        .bindTooltip(shortName(a) + ' · ' + t('suggestedTag'), { permanent: true, direction: 'center', className: 'area-label' })
         .on('click', function (e) {
           if (mode) handleMapTap(e.latlng);
           else L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(areaPopup(a)).openOn(map);
@@ -223,8 +240,25 @@
         .addTo(layers.areas);
     });
   }
-  function shortName(a) { return a.name[lang].split(/ \(| \/ | near |（| \/|附近/)[0].trim(); }
-  function zoomClass() { map.getContainer().classList.toggle('zoom-far', map.getZoom() < 12); }
+  function renderCommunity() {
+    communityGroup.clearLayers();
+    data.suggested.forEach(function (s) {
+      var pts = isCell(s.cell) ? grid.boundary(s.cell) : grid.boundary(grid.cell(s.lat, s.lng));
+      L.polygon(pts, { color: '#c4b5fd', weight: 2, dashArray: '3 6', fillColor: '#7c3aed', fillOpacity: 0.12, className: 'community-hex', bubblingMouseEvents: false })
+        .bindTooltip('💜 ' + t('communityTag'), { permanent: true, direction: 'center', className: 'area-label community-label' })
+        .on('click', function (e) {
+          if (mode) { handleMapTap(e.latlng); return; }
+          L.popup({ maxWidth: 260 }).setLatLng(e.latlng).setContent(el('div', { class: 'pop' }, [
+            el('div', { class: 'pop-kicker', text: '💜 ' + t('communityTag') }),
+            el('div', { class: 'pop-sub', text: t('communityN', { n: s.n }) }),
+            s.reasons.length ? el('ul', { class: 'type-list' }, s.reasons.map(function (r) { return el('li', { text: '“' + r + '”' }); })) : null,
+            el('div', { class: 'pop-small', text: t('communityHelp') })
+          ])).openOn(map);
+        }).addTo(communityGroup);
+    });
+  }
+  function isCell(c) { return grid.kind === 'h3' ? /^[0-9a-f]{15}$/.test(c || '') : /^L-?\d+_-?\d+$/.test(c || ''); }
+  function zoomClass() { map.getContainer().classList.toggle('zoom-far', map.getZoom() < 13); }   // fewer labels when zoomed out
   map.on('zoomend', zoomClass);
   function renderAreaList() {
     var list = $('areaList');
@@ -247,12 +281,14 @@
       ]));
     });
   }
-  function areaOptions(sel, firstVal, firstText, withScore) {
+  function areaOptions(sel, firstVal, firstText, withScore, extra) {
     var cur = sel.value || firstVal;
     sel.textContent = '';
     sel.appendChild(el('option', { value: firstVal, text: firstText }));
+    if (extra) sel.appendChild(el('option', { value: extra.value, text: extra.text }));
     AREAS.forEach(function (a) { sel.appendChild(el('option', { value: a.id, text: a.name[lang] + (withScore ? ' (' + LIB.overall(a) + ')' : '') })); });
     sel.value = cur;
+    if (sel.value !== cur) sel.value = firstVal;
   }
 
   // ==== events ====
@@ -288,21 +324,29 @@
     });
   }
 
-  // ==== live location (v1) ====
-  var geo = { watchId: null, pos: null, acc: 0, following: false, marker: null, circle: null, onFix: [] };
+  // ==== location: "Show my location" (follow) + one-shot fixes for marking ====
+  var geo = { watchId: null, pos: null, posAt: 0, acc: 0, following: false, marker: null, circle: null, onFix: [] };
   function isSecure() { return window.isSecureContext || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname); }
+  function geoOk() { return 'geolocation' in navigator && isSecure(); }
   function updateLocateBtn() {
     $('locateBtn').classList.toggle('on', geo.watchId !== null);
     $('locateLabel').textContent = geo.watchId === null ? t('showMyLocation') : geo.following ? t('following') : t('recenter');
+  }
+  // The first time, explain why the browser is about to ask (then remember). next() runs after "Continue".
+  var locNext = null, locCancel = null;
+  function explainThen(next, cancel) {
+    if (lsGet(STORE.locOk, false)) { next(); return; }
+    var d = $('locDialog');
+    if (typeof d.showModal !== 'function') { next(); return; }
+    locNext = next; locCancel = cancel || null;
+    d.showModal();
   }
   function requestLocation(cb) {
     if (cb) geo.onFix.push(cb);
     if (geo.watchId !== null) { if (geo.pos) flushFix(); return; }
     if (!('geolocation' in navigator)) { toast(t('locUnsupported')); return; }
     if (!isSecure()) { toast(t('locInsecure'), 6000); return; }
-    if (lsGet(STORE.locOk, false)) { startWatch(); return; }
-    var d = $('locDialog');
-    if (typeof d.showModal === 'function') d.showModal(); else startWatch();
+    explainThen(startWatch, function () { geo.onFix = []; });
   }
   function flushFix() { geo.onFix.splice(0).forEach(function (f) { f(geo.pos); }); }
   function startWatch() {
@@ -316,10 +360,7 @@
     if (geo.marker) { map.removeLayer(geo.marker); map.removeLayer(geo.circle); geo.marker = geo.circle = null; }
     updateLocateBtn();
   }
-  function onPos(p) {
-    var first = !geo.pos;
-    geo.pos = [p.coords.latitude, p.coords.longitude];
-    geo.acc = Math.round(p.coords.accuracy || 0);
+  function showMe() {
     if (!geo.marker) {
       geo.circle = L.circle(geo.pos, { radius: geo.acc, color: '#2f80ff', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
       geo.marker = L.marker(geo.pos, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -329,49 +370,259 @@
       geo.circle.setLatLng(geo.pos).setRadius(geo.acc);
     }
     geo.marker.bindTooltip(t('youAreHere', { a: geo.acc }));
+  }
+  function onPos(p) {
+    var first = !geo.pos;
+    geo.pos = [p.coords.latitude, p.coords.longitude];
+    geo.posAt = Date.now();
+    geo.acc = Math.round(p.coords.accuracy || 0);
+    showMe();
     if (geo.following) { if (first) map.setView(geo.pos, Math.max(map.getZoom(), 16)); else map.panTo(geo.pos, { animate: true }); }
     updateLocateBtn();
     flushFix();
   }
   function onPosErr(err) {
-    if (err.code === 1) { stopWatch(); toast(t('locDenied'), 8000); geo.onFix = []; if (live.on) stopSharing(null); }
+    if (err.code === 1) { stopWatch(); toast(t('locDenied'), 8000); geo.onFix = []; }
     else if (!geo.pos) toast(t('locUnavailable'), 5000);
+  }
+  // One-shot position for a mark. ok(pos) or fail() — never keeps watching.
+  function oneShot(ok, fail) {
+    if (geo.pos && Date.now() - geo.posAt < 60000) { ok(geo.pos.slice()); return; }
+    if (!geoOk()) { fail(); return; }
+    explainThen(function () {
+      navigator.geolocation.getCurrentPosition(function (p) {
+        geo.pos = [p.coords.latitude, p.coords.longitude]; geo.posAt = Date.now(); geo.acc = Math.round(p.coords.accuracy || 0);
+        ok(geo.pos.slice());
+      }, function () { fail(); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+    }, fail);
   }
   map.on('dragstart', function () { if (geo.following) { geo.following = false; updateLocateBtn(); } });
   $('locateBtn').addEventListener('click', function () {
     if (geo.watchId === null) { requestLocation(); return; }
-    if (geo.following) { if (live.on) stopSharing(null); stopWatch(); toast(t('locStopped')); return; }
+    if (geo.following) { stopWatch(); toast(t('locStopped')); return; }
     geo.following = true;
     if (geo.pos) map.setView(geo.pos, Math.max(map.getZoom(), 16));
     updateLocateBtn();
   });
-  $('locYes').addEventListener('click', function () { lsSet(STORE.locOk, true); $('locDialog').close(); startWatch(); });
+  $('locYes').addEventListener('click', function () {
+    lsSet(STORE.locOk, true); $('locDialog').close();
+    var n = locNext; locNext = locCancel = null;
+    if (n) n();
+  });
   $('locNo').addEventListener('click', function () {
-    $('locDialog').close(); geo.onFix = [];
-    if (live.on) stopSharing(null);
+    $('locDialog').close();
+    var c = locCancel; locNext = locCancel = null;
+    if (c) c();
   });
 
   // ==== map tap modes ====
-  var mode = null; // 'start' | 'house' | null
+  var mode = null; // 'start' | 'mark' | 'suggest' | null
+  var MODE_TEXT = { start: 'tapForStart', mark: 'tapForMark', suggest: 'tapForSuggest' };
   function setMode(m) {
     mode = m;
     $('modeBanner').hidden = !m;
-    if (m) { $('modeText').textContent = m === 'start' ? t('tapForStart') : t('tapForHouse'); if (narrow()) setSheetOpen(false); }
+    if (m) { $('modeText').textContent = t(MODE_TEXT[m]); if (narrow()) setSheetOpen(false); }
     map.getContainer().style.cursor = m ? 'crosshair' : '';
   }
-  $('modeCancel').addEventListener('click', function () { setMode(null); setSheetOpen(true); });
+  $('modeCancel').addEventListener('click', function () { var was = mode; setMode(null); if (was === 'start') openTab('route'); });
   function handleMapTap(ll) {
-    if (mode === 'start') { setMode(null); setStart([ll.lat, ll.lng], 'map'); openTab('route'); return true; }
-    if (mode === 'house') { setMode(null); openHouseDialog(null, [ll.lat, ll.lng]); return true; }
-    return false;
+    var m = mode;
+    if (!m) return false;
+    setMode(null);
+    if (m === 'start') { setStart([ll.lat, ll.lng], 'map'); openTab('route'); }
+    if (m === 'mark') doMark([ll.lat, ll.lng]);
+    if (m === 'suggest') openSuggest([ll.lat, ll.lng]);
+    return true;
   }
-  map.on('click', function (e) {
-    if (handleMapTap(e.latlng)) return;
-    if (layerOn.hex && hexLayer) hexPopup(e.latlng);
-  });
+  map.on('click', function (e) { handleMapTap(e.latlng); });
 
-  // ==== route planner (v1) ====
-  var route = { start: null, startKind: null, startMarker: null, minutes: 60, age: '5-8', last: null };
+  // ==== MARK IT! ====
+  var markHist = LIB.pruneHistory(lsGet(STORE.markHist, []), Date.now());
+  var lastMark = null;   // { id, token, tags }
+  function waitText(ms) { return Math.max(1, Math.ceil(ms / 60000)); }
+  function startMark() {
+    map.closePopup();
+    if (narrow()) setSheetOpen(false);
+    var pre = LIB.markRate(markHist, null, Date.now());           // device limit can be checked before we know the spot
+    if (!pre.ok) { toast(t('rateDevice', { m: waitText(pre.waitMs) }), 5000); return; }
+    var btn = $('markBtn');
+    btn.classList.add('busy');
+    oneShot(function (pos) {
+      btn.classList.remove('busy');
+      if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); setMode('mark'); return; }
+      doMark(pos);
+    }, function () {
+      btn.classList.remove('busy');
+      toast(t('tapForMark'), 4000);
+      setMode('mark');
+    });
+  }
+  function doMark(pos) {
+    if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); return; }
+    var now = Date.now(), cell = grid.cell(pos[0], pos[1]);
+    var r = LIB.markRate(markHist, cell, now);
+    if (!r.ok) { toast(t(r.reason === 'zone' ? 'rateZone' : 'rateDevice', { m: waitText(r.waitMs) }), 6000); return; }
+    var s = LIB.nextSession(lsGet(STORE.session, null), now);
+    lsSet(STORE.session, s);
+    var token = LIB.randomHex(40);
+    backend.sendMark({ session: s.id, lat: pos[0], lng: pos[1], tags: [] }, token, grid.cell).then(function (res) {
+      markHist = LIB.pruneHistory(markHist.concat({ t: now, cell: cell, id: res.id }), now);
+      lsSet(STORE.markHist, markHist);
+      lastMark = { id: res.id, token: token, tags: [], at: now };
+      lsSet(STORE.markHint, true);
+      $('markHintBtn').hidden = true; $('hintMark').hidden = true;
+      celebrate();
+      openMarkCard();
+      renderMine();
+      refreshZones();
+    }, function (e) {
+      if (e && e.code === 'rate') toast(t('rateDevice', { m: 5 }), 6000);
+      else toast(errText(e), 6000);
+    });
+  }
+  function openMarkCard() {
+    var mm = markMode();
+    $('markCardText').textContent = mm === 'practice' ? t('markedPractice') : t('markedLive', { m: CFG.markWindowMin });
+    renderTagRow();
+    $('markCard').hidden = false;
+    clearTimeout(openMarkCard.timer);
+    openMarkCard.timer = setTimeout(closeMarkCard, 20000);
+  }
+  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); }
+  function renderTagRow() {
+    var row = $('tagRow');
+    row.textContent = '';
+    LIB.MARK_TAGS.forEach(function (tag) {
+      var on = !!(lastMark && lastMark.tags.indexOf(tag) >= 0);
+      row.appendChild(el('button', { type: 'button', class: 'tagbtn', 'aria-pressed': String(on), 'data-tag': tag, onclick: function () { addTag(tag); } },
+        [el('span', { class: 'tg-i', text: LIB.TAG_ICON[tag] }), t('tag_' + tag)]));
+    });
+  }
+  function addTag(tag) {
+    if (!lastMark || lastMark.tags.indexOf(tag) >= 0) return;
+    lastMark.tags.push(tag);
+    renderTagRow();
+    backend.tagMark(lastMark.id, lastMark.token, tag).then(function () { refreshZones(); },
+      function (e) { lastMark.tags = lastMark.tags.filter(function (x) { return x !== tag; }); renderTagRow(); toast(errText(e)); });
+  }
+  $('markCardDone').addEventListener('click', closeMarkCard);
+  $('markCardClose').addEventListener('click', closeMarkCard);
+  $('markBtn').addEventListener('click', startMark);
+  // Small celebration: CSS particles (none with prefers-reduced-motion).
+  var celebrations = 0;
+  function celebrate() {
+    var b = $('markBtn');
+    celebrations++;
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    if (REDUCED) return;
+    var box = $('burst'), r = b.getBoundingClientRect(), w = $('burst').parentNode.getBoundingClientRect();
+    box.textContent = '';
+    box.style.left = (r.left - w.left + r.width / 2) + 'px';
+    box.style.top = (r.top - w.top + r.height / 2) + 'px';
+    var glyphs = ['✨', '🍬', '🎃', '⭐', '🍭', '👻'];
+    for (var i = 0; i < 14; i++) {
+      var ang = (i / 14) * Math.PI * 2, d = 70 + (i % 3) * 30;
+      box.appendChild(el('span', { class: 'bp', text: glyphs[i % glyphs.length],
+        style: '--dx:' + Math.round(Math.cos(ang) * d) + 'px;--dy:' + Math.round(Math.sin(ang) * d - 40) + 'px;animation-delay:' + (i % 4) * 30 + 'ms' }));
+    }
+    clearTimeout(celebrate.timer);
+    celebrate.timer = setTimeout(function () { box.textContent = ''; }, 1400);
+  }
+  // My own marks (this phone): a small sparkle at the hexagon centre. Never sent anywhere.
+  function renderMine() {
+    mineLayer.clearLayers();
+    var now = Date.now();
+    markHist.forEach(function (h) {
+      if (now - h.t > CFG.markWindowMin * 60000 || !isCell(h.cell)) return;
+      L.marker(grid.center(h.cell), { interactive: false, keyboard: false,
+        icon: L.divIcon({ className: '', html: '<div class="mine-spark">✨</div>', iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(mineLayer);
+    });
+  }
+
+  // ==== zones ====
+  var BUCKET_KEY = { quiet: 'legendQuiet', lively: 'legendLively', hot: 'legendHot' };
+  function badgeHtml(z, compact) {
+    // Only numbers and our own strings go into this HTML (no user text). Zoomed out: just "🔥 23" so the glow stays visible.
+    return '<div class="zbadge zb-' + z.bucket + (compact ? ' zb-compact' : '') + '"><span class="mono-num">' +
+      (compact ? '🔥 ' + z.count : t('zoneCount', { n: z.count })) + '</span>' +
+      (z.topTag ? '<i>' + LIB.TAG_ICON[z.topTag] + '</i>' : '') + (z.isNew ? '<em>' + t('newBadge') + '</em>' : '') + '</div>';
+  }
+  function zonePopup(z, ll) {
+    if (mode) { handleMapTap(ll); return; }
+    var c = grid.center(z.cell);
+    L.popup({ maxWidth: 260 }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
+      el('div', { class: 'pop-title', text: (z.bucket === 'hot' ? '🔥 ' : z.bucket === 'lively' ? '🎉 ' : '✨ ') + t(BUCKET_KEY[z.bucket]) +
+        (z.isNew ? ' · ' + t('newBadge') : '') }),
+      el('div', { class: 'mono-num', text: t('zoneInfo', { n: z.count, m: CFG.markWindowMin }) }),
+      z.topTag ? el('div', { text: LIB.TAG_ICON[z.topTag] + ' ' + t('tag_' + z.topTag) }) : null,
+      el('div', { class: 'row row-tight' }, [
+        el('button', { class: 'btn btn-primary btn-small', type: 'button', text: t('routeThere'), onclick: function () { map.closePopup(); routeToZone(z, c); } })
+      ])
+    ])).openOn(map);
+  }
+  function refreshZones() {
+    return backend.listZones(CFG.markWindowMin, grid.cell).then(function (zones) {
+      data.zones = zones.filter(function (z) { return isCell(z.cell); });
+      data.zonesAt = Date.now();
+      if (zoneLayer) zoneLayer.setData(data.zones);
+      renderMine();
+      if (currentTab === 'near' && $('sheet').dataset.open === 'true') renderNear();
+    }, function () { /* keep last */ });
+  }
+  function refreshSuggested() {
+    return backend.communitySuggested().then(function (l) { data.suggested = l; renderCommunity(); }, function () { /* keep last */ });
+  }
+  function computeBase() {
+    if (!baseLayer) return;
+    var votes = LIB.areaVoteTotals(data.posts.fun.concat(data.posts.decor));
+    baseLayer.setData(LIB.planningHexes(AREAS, votes, grid, 400));
+  }
+
+  // ==== Near me ====
+  var near = { km: 2 };
+  segInit('radiusSeg', function (v) { near.km = Number(v); renderNear(); });
+  function nearCenter() {
+    if (geo.pos) return { c: geo.pos, from: 'me' };
+    if (DEMO && FLAGS.near) return { c: DEMO_HOME, from: 'demo' };
+    var m = map.getCenter();
+    return { c: [m.lat, m.lng], from: 'map' };
+  }
+  function openNear() {
+    openTab('near');
+    if (!geo.pos && geoOk() && !(DEMO && FLAGS.near) && lsGet(STORE.locOk, false)) {
+      navigator.geolocation.getCurrentPosition(function (p) {
+        geo.pos = [p.coords.latitude, p.coords.longitude]; geo.posAt = Date.now(); geo.acc = Math.round(p.coords.accuracy || 0);
+        renderNear();
+      }, function () { /* sort from the map centre */ }, { timeout: 8000, maximumAge: 60000 });
+    }
+  }
+  $('openNear').addEventListener('click', openNear);
+  function renderNear() {
+    var nc = nearCenter(), list = $('nearList');
+    var rows = LIB.nearZones(data.zones, nc.c, near.km, grid.center);
+    $('nearFrom').textContent = t(nc.from === 'me' ? 'nearFromMe' : nc.from === 'demo' ? 'nearFromDemo' : 'nearFromMap');
+    list.textContent = '';
+    if (!rows.length) list.appendChild(el('li', { class: 'hint', text: t('nearNone', { km: near.km }) }));
+    rows.slice(0, 30).forEach(function (z) {
+      list.appendChild(el('li', { class: 'near-row' }, [
+        el('button', { type: 'button', class: 'near-main', onclick: function () {
+          if (narrow()) setSheetOpen(false);
+          map.flyTo(z.center, Math.max(map.getZoom(), 15), { duration: REDUCED ? 0 : 0.8 });
+        } }, [
+          el('i', { class: 'lg lg-' + z.bucket }),
+          el('b', { class: 'mono-num', text: fmtDist(z.distM / 1000) }),
+          el('span', { class: 'mono-num', text: t('zoneCount', { n: z.count }) }),
+          z.topTag ? el('span', { text: LIB.TAG_ICON[z.topTag] }) : null,
+          z.isNew ? el('em', { class: 'new-pill', text: t('newBadge') }) : null
+        ]),
+        el('button', { type: 'button', class: 'btn btn-small', text: t('routeBtn'), onclick: function () { routeToZone(z, z.center, nc); } })
+      ]));
+    });
+    $('nearList').dataset.count = String(rows.length);
+  }
+
+  // ==== route planner ====
+  var route = { start: null, startKind: null, startMarker: null, minutes: 60, age: '5-8', last: null, target: null };
   segInit('timeSeg', function (v) { route.minutes = Number(v); });
   segInit('ageSeg', function (v) { route.age = v; });
   function setStart(ll, kind) {
@@ -392,7 +643,8 @@
   });
   $('startTap').addEventListener('click', function () { setMode('start'); });
   function pickArea(start, age, forcedId) {
-    if (forcedId && forcedId !== 'auto') return AREA_BY_ID[forcedId];
+    if (forcedId === 'target' && route.target) return route.target;
+    if (forcedId && forcedId !== 'auto' && AREA_BY_ID[forcedId]) return AREA_BY_ID[forcedId];
     var best = null, bestScore = -Infinity;
     AREAS.forEach(function (a) {
       var d = haversineKm(start, [a.lat, a.lng]);
@@ -401,6 +653,18 @@
       if (score > bestScore) { bestScore = score; best = a; }
     });
     return best;
+  }
+  function targetOption() { return route.target ? { value: 'target', text: '🔥 ' + route.target.name[lang] } : null; }
+  // Walk to a live zone: the zone becomes the loop's destination.
+  function routeToZone(z, c, nc) {
+    route.target = { id: 'target', lat: c[0], lng: c[1], r: 350,
+                     name: { en: I18N.en.zoneTarget.replace('{n}', z.count), zh: I18N.zh.zoneTarget.replace('{n}', z.count) } };
+    areaOptions($('areaSelect'), 'auto', t('autoArea'), true, targetOption());
+    $('areaSelect').value = 'target';
+    if (!route.start && nc && nc.from !== 'map') setStart(nc.c.slice(), nc.from === 'me' ? 'me' : 'map');
+    if (!route.start && geo.pos) setStart(geo.pos.slice(), 'me');
+    openTab('route');
+    if (route.start) buildLoop(); else toast(t('needStart'));
   }
   function buildCheckpoints(start, area, targetKm) {
     var center = [area.lat, area.lng], dStart = haversineKm(start, center);
@@ -527,242 +791,40 @@
     } }));
   }
 
-  // ==== house markers ====
-  var filters = Object.assign({ teal: false, fullsize: false, early: false, hideOut: false }, lsGet(STORE.filters, {}));
-  data.localMarkers = lsGet(STORE.localMk, []).map(LIB.sanitizeMarker).filter(Boolean);
-  // One-time migration of v1 pins into the v2 marker model (kept on this phone only: they were not placed by the household).
-  (function migrate() {
-    if (DEMO || lsGet(STORE.migrated, false)) return;
-    var old = LIB.migrateV1Pins(lsGet(STORE.v1pins, []));
-    lsSet(STORE.migrated, true);
-    if (!old.length) return;
-    data.localMarkers = data.localMarkers.concat(old);
-    lsSet(STORE.localMk, data.localMarkers);
-    setTimeout(function () { toast(t('migrated', { n: old.length }), 6000); }, 800);
-  })();
-  function saveLocalMarkers() { lsSet(STORE.localMk, data.localMarkers); }
-  function isMine(m) { return !!myTokens[m.id] || (m.localOnly && !String(m.id).match(/^link-/)); }
-  function allMarkers() { return data.markers.concat(data.localMarkers); }
-
-  var PUMPKIN = '<svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true">' +
-    '<path d="M20 10c0-4 2-6 5-7" stroke="#3ddc84" stroke-width="3" fill="none" stroke-linecap="round"/>' +
-    '<ellipse cx="13" cy="24" rx="9" ry="12" fill="currentColor"/><ellipse cx="27" cy="24" rx="9" ry="12" fill="currentColor"/>' +
-    '<ellipse cx="20" cy="24" rx="8" ry="13" fill="currentColor" opacity=".85"/>' +
-    '<path d="M13 21l3-4 3 4zM21 21l3-4 3 4zM13 28q7 5 14 0l-3 1-2-1-2 1-2-1-2 1z" fill="#1a0b00"/></svg>';
-  function markerIcon(m, shared) {
-    var badge = m.types.filter(function (x) { return x !== 'candy'; })[0];
-    var cls = 'pk pk-' + m.status + (m.types.indexOf('teal') >= 0 ? ' pk-teal' : '') + (shared ? ' pk-shared' : '');
-    return L.divIcon({ className: '', iconSize: [40, 40], iconAnchor: [20, 36], popupAnchor: [0, -32],
-      html: '<div class="' + cls + '">' + PUMPKIN + (badge ? '<span class="pk-badge">' + TYPE_ICON[badge] + '</span>' : '') + '</div>' });
+  // ==== Suggest an area ====
+  var suggestHist = lsGet(STORE.suggestHist, []), pendingSuggest = null;
+  $('suggestBtn').addEventListener('click', function () { setMode('suggest'); });
+  function openSuggest(pos) {
+    if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('err_outside')); return; }
+    var cell = grid.cell(pos[0], pos[1]), r = LIB.suggestRate(suggestHist, cell, Date.now());
+    if (!r.ok) { toast(t(r.reason === 'hex' ? 'suggestRateHex' : 'suggestRateDay'), 6000); return; }
+    pendingSuggest = { cell: cell, center: grid.center(cell) };   // blurred to the hexagon: only its centre is sent
+    $('suggestReason').value = '';
+    showErr('suggestErr', '');
+    updateCount('suggestReason', 'suggestCount', 80);
+    $('suggestDialog').showModal();
   }
-  function hoursText(m) { return m.start || m.end ? t('hoursFmt', { a: m.start || '…', b: m.end || '…' }) : ''; }
-  function markerPopup(m, shared) {
-    var mine = !shared && isMine(m);
-    var kids = [
-      el('div', { class: 'pop-title', text: m.types.map(function (x) { return TYPE_ICON[x]; }).join(' ') }),
-      el('div', { class: 'st-pill st-' + m.status, text: t('st_' + m.status) }),
-      el('ul', { class: 'type-list' }, m.types.map(function (x) { return el('li', { text: TYPE_ICON[x] + ' ' + t('mt_' + x) }); })),
-      hoursText(m) ? el('div', { class: 'mono-num', text: '🕔 ' + hoursText(m) }) : null,
-      m.note ? el('div', { class: 'pop-p', text: m.note }) : null,
-      shared ? el('div', { class: 'pop-small', text: t('fromLink') }) : m.localOnly ? el('div', { class: 'pop-small', text: t('localOnlyNote') }) : null
-    ];
-    if (mine) {
-      kids.push(el('div', { class: 'pop-small', text: t('yourMarker') }));
-      kids.push(statusButtons(m));
-      kids.push(el('div', { class: 'row row-tight' }, [
-        el('button', { class: 'btn btn-small', type: 'button', text: t('edit'), onclick: function () { map.closePopup(); openHouseDialog(m); } }),
-        el('button', { class: 'btn btn-small btn-danger', type: 'button', text: t('del'), onclick: function () { map.closePopup(); deleteMarker(m); } })
-      ]));
-    } else if (!shared) kids.push(el('div', { class: 'pop-small', text: t('ownerOnly') }));
-    kids.push(el('div', { class: 'pop-small', text: t('expiresNote') }));
-    return el('div', { class: 'pop' }, kids);
-  }
-  function statusButtons(m) {
-    return el('div', { class: 'seg seg-small' }, LIB.STATUSES.map(function (s) {
-      return el('button', { type: 'button', role: 'radio', 'aria-checked': String(m.status === s), text: t('st_' + s),
-        onclick: function () { map.closePopup(); setStatus(m, s); } });
-    }));
-  }
-  function renderMarkers() {
-    layers.houses.clearLayers();
-    var now = Date.now(), shown = LIB.filterMarkers(allMarkers(), filters, now);
-    shown.forEach(function (m) {
-      L.marker([m.lat, m.lng], { icon: markerIcon(m, false), riseOnHover: true })
-        .bindPopup(function () { return markerPopup(m, false); }, { maxWidth: 280 }).addTo(layers.houses);
-    });
-    sharedLayer.clearLayers();
-    LIB.filterMarkers(data.linkMarkers, filters, now).forEach(function (m) {
-      L.marker([m.lat, m.lng], { icon: markerIcon(m, true) }).bindPopup(function () { return markerPopup(m, true); }).addTo(sharedLayer);
-    });
-    $('shownN').textContent = t('shownN', { n: shown.length });
-    $('sharedBanner').hidden = !data.linkMarkers.length;
-    $('sharedText').textContent = t('sharedBanner', { n: data.linkMarkers.length });
-    renderFilterChips();
-    renderMyHouses();
-  }
-  function renderFilterChips() {
-    var box = $('filterChips');
-    box.textContent = '';
-    [['teal', 'fTeal'], ['fullsize', 'fFull'], ['early', 'fEarly'], ['hideOut', 'fHideOut']].forEach(function (f) {
-      box.appendChild(el('button', { type: 'button', class: 'fchip', 'aria-pressed': String(!!filters[f[0]]), text: t(f[1]), onclick: function () {
-        filters[f[0]] = !filters[f[0]];
-        lsSet(STORE.filters, filters);
-        renderMarkers();
-      } }));
-    });
-  }
-  function renderMyHouses() {
-    var list = $('myHouseList'), mine = allMarkers().filter(isMine);
-    list.textContent = '';
-    if (!mine.length) list.appendChild(el('li', { class: 'hint', text: t('noMyHouses') }));
-    mine.forEach(function (m) {
-      list.appendChild(el('li', null, [
-        el('div', { class: 'pl-main', onclick: function () { if (narrow()) setSheetOpen(false); map.setView([m.lat, m.lng], 17); } }, [
-          el('div', null, [el('b', { text: m.types.map(function (x) { return TYPE_ICON[x]; }).join(' ') + ' ' }),
-                           el('span', { class: 'st-pill st-' + m.status, text: t('st_' + m.status) })]),
-          m.note ? el('div', { class: 'pl-note', text: m.note }) : null,
-          m.localOnly ? el('div', { class: 'pl-note', text: t('localOnlyNote') }) : null
-        ]),
-        statusButtons(m),
-        el('div', { class: 'row row-tight' }, [
-          el('button', { class: 'btn btn-small', type: 'button', text: t('edit'), onclick: function () { openHouseDialog(m); } }),
-          el('button', { class: 'btn btn-small btn-danger', type: 'button', text: t('del'), onclick: function () { deleteMarker(m); } })
-        ])
-      ]));
-    });
-  }
-  function setStatus(m, s) {
-    if (m.localOnly) {
-      m.status = s; saveLocalMarkers(); renderMarkers(); scheduleHex(false); toast(t('statusSet'));
-      return;
-    }
-    backend.setMarkerStatus(m.id, s, myTokens[m.id]).then(function () { toast(t('statusSet')); return refreshMarkers(); },
-      function (e) { toast(errText(e)); });
-  }
-  function deleteMarker(m) {
-    if (!window.confirm(t('confirmDel'))) return;
-    if (m.localOnly) {
-      data.localMarkers = data.localMarkers.filter(function (x) { return x !== m; });
-      saveLocalMarkers(); renderMarkers(); toast(t('houseDeleted'));
-      return;
-    }
-    backend.deleteMarker(m.id, myTokens[m.id]).then(function () {
-      delete myTokens[m.id]; lsSet(STORE.tokens, myTokens); toast(t('houseDeleted')); return refreshMarkers();
-    }, function (e) { toast(errText(e)); });
-  }
-
-  // House dialog
-  var draft = null;
-  function openHouseDialog(m, ll) {
-    draft = m ? { ref: m, id: m.id, ll: [m.lat, m.lng], types: m.types.slice(), status: m.status, localOnly: m.localOnly }
-              : { ref: null, id: null, ll: ll, types: ['candy'], status: 'giving', localOnly: false };
-    $('hStart').value = m ? m.start || '' : '';
-    $('hEnd').value = m ? m.end || '' : '';
-    $('hNote').value = m ? m.note || '' : '';
-    $('hErr').hidden = true;
-    renderHouseDialog();
-    $('houseDialog').showModal();
-  }
-  function renderHouseDialog() {
-    if (!draft) return;
-    var grid2 = $('typeGrid');
-    grid2.textContent = '';
-    LIB.MARKER_TYPES.forEach(function (ty) {
-      grid2.appendChild(el('button', { type: 'button', 'aria-pressed': String(draft.types.indexOf(ty) >= 0), class: 'tchip tchip-' + ty,
-        text: TYPE_ICON[ty] + ' ' + t('mt_' + ty), onclick: function () {
-          var i = draft.types.indexOf(ty);
-          if (i >= 0) draft.types.splice(i, 1); else draft.types.push(ty);
-          renderHouseDialog();
-        } }));
-    });
-    var seg = $('statusSeg');
-    seg.textContent = '';
-    LIB.STATUSES.forEach(function (s) {
-      seg.appendChild(el('button', { type: 'button', role: 'radio', 'aria-checked': String(draft.status === s), text: t('st_' + s),
-        onclick: function () { draft.status = s; renderHouseDialog(); } }));
-    });
-    var tc = $('tplChips');
-    tc.textContent = '';
-    t('tpl').forEach(function (line) {
-      tc.appendChild(el('button', { type: 'button', class: 'fchip', text: line, onclick: function () {
-        var cur = $('hNote').value.trim(), next = cur ? cur + ' ' + line : line;
-        if (LIB.charCount(next) <= 140) { $('hNote').value = next; updateCount('hNote', 'hCount'); }
-      } }));
-    });
-    $('hNote').placeholder = t('notePh');
-    updateCount('hNote', 'hCount');
-  }
-  function updateCount(inputId, outId) { $(outId).textContent = t('charCount', { n: LIB.charCount($(inputId).value) }); }
-  $('hNote').addEventListener('input', function () { updateCount('hNote', 'hCount'); });
-  $('hCancel').addEventListener('click', function () { $('houseDialog').close(); draft = null; });
-  function showErr(id, msg) { $(id).textContent = msg; $(id).hidden = !msg; }
-  $('hSave').addEventListener('click', function () {
-    if (!draft) return;
-    if (!draft.types.length) { showErr('hErr', t('pickType')); return; }
-    var note = LIB.checkText($('hNote').value, { optional: true });
-    if (!note.ok) { showErr('hErr', t('err_' + note.error)); return; }
-    var rec = { id: draft.id, lat: draft.ll[0], lng: draft.ll[1], types: LIB.MARKER_TYPES.filter(function (x) { return draft.types.indexOf(x) >= 0; }),
-                status: draft.status, note: note.text, start: $('hStart').value, end: $('hEnd').value, device: DEVICE };
-    if (!LIB.inLondonBox(rec.lat, rec.lng)) { showErr('hErr', t('err_outside')); return; }
-    if (draft.localOnly) {
-      var idx = data.localMarkers.indexOf(draft.ref);
-      var clean = LIB.sanitizeMarker(Object.assign({}, rec, { localOnly: true }));
-      if (idx >= 0) data.localMarkers[idx] = clean;
-      saveLocalMarkers(); $('houseDialog').close(); renderMarkers(); toast(t('houseSaved'));
-      return;
-    }
-    var token = draft.id ? myTokens[draft.id] : LIB.randomHex(40);
-    var btn = $('hSave');
+  $('suggestReason').addEventListener('input', function () { updateCount('suggestReason', 'suggestCount', 80); showErr('suggestErr', ''); });
+  $('suggestCancel').addEventListener('click', function () { $('suggestDialog').close(); pendingSuggest = null; });
+  $('suggestSend').addEventListener('click', function () {
+    if (!pendingSuggest) return;
+    var chk = LIB.checkReason($('suggestReason').value);
+    if (!chk.ok) { showErr('suggestErr', t('err_' + chk.error + (chk.error === 'tooLong' ? '80' : ''))); return; }
+    var ps = pendingSuggest, btn = $('suggestSend');
     btn.disabled = true;
-    backend.upsertMarker(rec, token).then(function (r) {
-      myTokens[r.id] = token; lsSet(STORE.tokens, myTokens);
-      $('houseDialog').close(); draft = null;
-      toast(t('houseSaved'));
-      return refreshMarkers();
-    }, function (e) { showErr('hErr', errText(e)); }).then(function () { btn.disabled = false; });
+    backend.suggestArea({ device: DEVICE, cell: ps.cell, lat: LIB.round(ps.center[0], 4), lng: LIB.round(ps.center[1], 4), reason: chk.text })
+      .then(function () {
+        suggestHist = suggestHist.concat({ t: Date.now(), cell: ps.cell });
+        lsSet(STORE.suggestHist, suggestHist);
+        $('suggestDialog').close(); pendingSuggest = null;
+        toast(t('suggested'), 6000);
+        return refreshSuggested();
+      }, function (e) { showErr('suggestErr', e && e.code === 'rate' ? t('suggestRateDay') : errText(e)); })
+      .then(function () { btn.disabled = false; });
   });
-  $('addHouseBtn').addEventListener('click', function () { setMode('house'); });
-
-  // Share links (#m=...; old v1 links #pins=... still open)
-  $('shareBtn').addEventListener('click', function () {
-    var list = allMarkers().filter(isMine);
-    if (!list.length) { toast(t('nothingToShare')); return; }
-    var url = location.href.split('#')[0] + '#m=' + LIB.encodeMarkers(list);
-    if (url.length > 6000) toast(t('linkLong'), 5000);
-    if (navigator.share) navigator.share({ title: t('appTitle'), text: t('shareText'), url: url }).catch(function (e) { if (e && e.name !== 'AbortError') copyLink(url); });
-    else copyLink(url);
-  });
-  function copyLink(url) {
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast(t('copied')); }, function () { window.prompt(t('copyFail'), url); });
-    else window.prompt(t('copyFail'), url);
-  }
-  function readHash() {
-    var m = /[#&]m=([A-Za-z0-9_-]+)/.exec(location.hash), v1 = /[#&]pins=([A-Za-z0-9_-]+)/.exec(location.hash);
-    data.linkMarkers = m ? LIB.decodeMarkers(m[1]) : v1 ? LIB.decodeV1Pins(v1[1]) : [];
-    renderMarkers();
-    if (!data.linkMarkers.length) return false;
-    openTab('pins');
-    focusBounds(L.latLngBounds(data.linkMarkers.map(function (p) { return [p.lat, p.lng]; })).pad(0.3));
-    return true;
-  }
-  window.addEventListener('hashchange', readHash);
-  function clearHash() { history.replaceState(null, '', location.href.split('#')[0]); }
-  $('saveShared').addEventListener('click', function () {
-    var key = function (p) { return p.lat + ',' + p.lng + ',' + p.types.join(); }, have = {}, added = 0;
-    allMarkers().forEach(function (p) { have[key(p)] = true; });
-    data.linkMarkers.forEach(function (p) {
-      if (have[key(p)]) return;
-      data.localMarkers.push(Object.assign({}, p, { id: 'saved-' + LIB.randomHex(8), localOnly: true }));
-      have[key(p)] = true; added++;
-    });
-    saveLocalMarkers(); data.linkMarkers = []; clearHash(); renderMarkers();
-    toast(t('savedN', { n: added }));
-  });
-  $('hideShared').addEventListener('click', function () { data.linkMarkers = []; clearHash(); renderMarkers(); });
 
   // ==== board ====
   var board = { which: 'fun', sort: 'top' };
-  segInit('pinsSub', function (v) { $('sub-houses').hidden = v !== 'houses'; $('sub-board').hidden = v !== 'board'; });
   segInit('boardSeg', function (v) { board.which = v; renderPosts(); });
   segInit('sortSeg', function (v) { board.sort = v; renderPosts(); });
   $('postBody').addEventListener('input', function () { updateCount('postBody', 'postCount'); showErr('postErr', ''); });
@@ -792,7 +854,7 @@
       var a = p.areaId && AREA_BY_ID[p.areaId], voted = !!myVotes[p.id], mine = !!myPostTokens[p.id];
       list.appendChild(el('li', { class: 'post' }, [
         el('button', { type: 'button', class: 'vote' + (voted ? ' voted' : ''), 'aria-pressed': String(voted), 'aria-label': voted ? t('voted') : t('upvote'),
-          onclick: function () { doVote(p); } }, [el('span', { text: '▲' }), el('b', { class: 'mono-num', text: t('votesN', { n: p.votes }) })]),
+          onclick: function () { doVote(p); } }, [el('span', { text: '▲' }), el('b', { class: 'mono-num', text: String(p.votes) })]),
         el('div', { class: 'post-main' }, [
           el('div', { class: 'post-body', text: p.body }),
           el('div', { class: 'post-meta' }, [
@@ -831,148 +893,31 @@
     }, function (e) { toast(errText(e)); });
   }
 
-  // ==== hotspot hexes ====
-  var hex = { last: 0, timer: null, updatedAt: 0 };
-  function liveOpen() { return LIB.isLiveOpen(Date.now(), CFG, DEMO); }
-  function scheduleHex(force) {
-    if (!hexLayer) return;
-    var wait = force ? 0 : Math.max(0, CFG.pollSec * 1000 - (Date.now() - hex.last));
-    if (hex.timer && !force) return;               // already scheduled: at most one recompute per minute
-    clearTimeout(hex.timer);
-    hex.timer = setTimeout(computeHex, wait);
-  }
-  function computeHex() {
-    hex.timer = null; hex.last = Date.now();
-    var votes = LIB.areaVoteTotals(data.posts.fun.concat(data.posts.decor));
-    var plan = LIB.planningHexes(AREAS, allMarkers(), votes, grid, Date.now(), 400);
-    var okId = grid.kind === 'h3' ? /^[0-9a-f]{15}$/ : /^L-?\d+_-?\d+$/;
-    var live = data.live.filter(function (c) { return okId.test(c.cell) && c.count >= CFG.hexMinCount; });
-    hexLayer.setData(plan, live, liveOpen() ? 'live' : 'plan');
-    hex.updatedAt = Date.now();
-    if (window.console && console.debug) console.debug('[hex] draw ' + hexLayer.lastDrawMs + ' ms, ' + hexLayer.drawn + ' hexes, grid=' + grid.kind);
-    renderHexInfo();
-  }
-  function renderHexInfo() {
-    $('hexMode').textContent = liveOpen() ? t('hexModeLive', { m: CFG.hexWindowMin }) : t('hexModePlan');
-    $('hexUpdated').textContent = hex.updatedAt ? t('hexUpdated', { t: fmtClock(hex.updatedAt) }) : '';
-    $('hexFallback').hidden = grid.kind === 'h3';
-  }
-  function hexPopup(ll) {
-    var r = hexLayer.lookup(ll), kids = [];
-    if (liveOpen()) {
-      kids.push(el('div', { class: 'pop-title', text: r.live ? t('legend' + { quiet: 'Quiet', busy: 'Busy', very: 'Very' }[LIB.liveBucket(r.live.count)]) : '⬡' }));
-      kids.push(el('div', { text: r.live ? t('hexLiveInfo', { n: r.live.count, m: CFG.hexWindowMin }) : t('hexNoData') }));
-    } else {
-      if (!r.plan) return;
-      kids.push(el('div', { class: 'pop-title', text: t('legend' + { quiet: 'Quiet', busy: 'Busy', very: 'Very' }[LIB.planBucket(r.plan.score)]) }));
-      kids.push(el('div', { class: 'mono-num', text: t('hexPlanInfo', { s: Math.round(r.plan.score * 100) }) }));
-    }
-    L.popup({ maxWidth: 240 }).setLatLng(ll).setContent(el('div', { class: 'pop' }, kids)).openOn(map);
-  }
-
-  // ==== live dots ====
-  var live = { on: false, startedAt: 0, lastSentAt: 0, timer: null, warnedOutside: false };
-  var ownSids = ssGet(P + 'ownSids', []), drawnDots = 0;
-  function renderDots() {
-    layers.dots.clearLayers();
-    var others = data.dots.filter(function (d) { return ownSids.indexOf(d.sidHash) < 0; });   // never echo my own dot
-    drawnDots = others.length;
-    others.forEach(function (d) {
-      L.circleMarker([d.lat, d.lng], { renderer: dotRenderer, radius: 5, weight: 1, color: '#e9d5ff', fillColor: '#c084fc', fillOpacity: 0.85, interactive: false })
-        .addTo(layers.dots);
-    });
-    $('othersN').textContent = liveOpen() ? t('othersN', { n: others.length }) : '';
-  }
-  function renderLiveGate() {
-    var open = liveOpen();
-    $('shareToggle').disabled = !open;
-    $('shareToggle').checked = live.on;
-    $('liveGate').hidden = open;
-    $('demoNote').hidden = !DEMO;
-    renderLiveStatus();
-  }
-  function renderLiveStatus() {
-    var box = $('liveStatus'), now = Date.now();
-    if (!live.on) { box.textContent = liveOpen() ? t('sharingOff') : ''; box.classList.remove('on'); return; }
-    box.classList.add('on');
-    if (document.visibilityState !== 'visible') { box.textContent = t('sharingPaused'); return; }
-    var next = live.lastSentAt ? Math.max(0, Math.ceil((live.lastSentAt + 60000 - now) / 1000)) : 0;
-    box.textContent = geo.pos ? t('sharingOn', { s: next, m: Math.ceil(LIB.sharingLeftMs(live.startedAt, now) / 60000) }) : t('liveNeedsLoc');
-  }
-  function startSharing() {
-    if (!liveOpen()) { $('shareToggle').checked = false; toast(t('opensHalloween')); return; }
-    live.on = true; live.startedAt = Date.now(); live.lastSentAt = 0; live.warnedOutside = false;
-    requestLocation(function () { liveTick(); });
-    clearInterval(live.timer);
-    live.timer = setInterval(liveTick, 1000);
-    renderLiveGate();
-  }
-  function stopSharing(msgKey) {
-    live.on = false;
-    clearInterval(live.timer); live.timer = null;
-    var s = ssGet(P + 'session', null);
-    if (s) backend.removeDot(s.id).then(refreshLive, function () { /* it will expire anyway */ });
-    if (msgKey) toast(t(msgKey), 6000);
-    renderLiveGate();
-  }
-  function liveTick() {
-    if (!live.on) return;
-    var now = Date.now();
-    if (!liveOpen()) { stopSharing('windowClosed'); return; }
-    if (LIB.sharingExpired(live.startedAt, now)) { stopSharing('sharingStopped'); return; }
-    var visible = document.visibilityState === 'visible';
-    if (geo.pos && LIB.shouldSendDot(live.lastSentAt, now, visible, 60000)) sendMyDot(now);
-    renderLiveStatus();
-  }
-  function sendMyDot(now) {
-    live.lastSentAt = now;
-    var prev = ssGet(P + 'session', null), s = LIB.nextSession(prev, now);
-    if (s !== prev) ssSet(P + 'session', s);
-    var sid = LIB.sha256Hex(s.id);
-    if (ownSids.indexOf(sid) < 0) { ownSids = ownSids.concat(sid).slice(-6); ssSet(P + 'ownSids', ownSids); }
-    var c = LIB.coarsen(geo.pos[0], geo.pos[1]);
-    if (!LIB.inLondonBox(c[0], c[1])) {
-      if (!live.warnedOutside) { toast(t('dotOutside'), 5000); live.warnedOutside = true; }
-      return;
-    }
-    backend.sendDot({ session: s.id, lat: c[0], lng: c[1], h3: grid.kind === 'h3' ? grid.cell(c[0], c[1]) : null })
-      .then(refreshLive, function (e) { if (e && e.code === 'closed') stopSharing('windowClosed'); });
-  }
-  $('shareToggle').addEventListener('change', function () { if (this.checked) startSharing(); else stopSharing(null); });
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') { liveTick(); refreshAll(); }
-    renderLiveStatus();
-  });
-
-  // ==== data refresh (polling, not sockets) ====
-  function refreshMarkers() {
-    return backend.listMarkers().then(function (l) { data.markers = l; renderMarkers(); scheduleHex(false); }, function () { /* keep last */ });
-  }
+  // ==== data refresh ====
   function refreshPosts() {
     return Promise.all([backend.listPosts('fun'), backend.listPosts('decor')]).then(function (r) {
-      data.posts.fun = r[0]; data.posts.decor = r[1]; renderPosts(); scheduleHex(false);
-    }, function () { /* keep last */ });
-  }
-  function refreshLive() {
-    if (!liveOpen()) { data.dots = []; data.live = []; renderDots(); return Promise.resolve(); }
-    if (DEMO && window.TOT_DEMO) window.TOT_DEMO.seed(backend.local, AREAS);
-    return Promise.all([backend.listDots(), backend.liveHexCounts(CFG.hexWindowMin, grid.cell)]).then(function (r) {
-      data.dots = r[0]; data.live = r[1]; renderDots(); scheduleHex(false);
+      data.posts.fun = r[0]; data.posts.decor = r[1]; renderPosts(); computeBase();
     }, function () { /* keep last */ });
   }
   var refreshing = null;
   function refreshAll() {
     if (refreshing) return refreshing;
-    refreshing = Promise.all([refreshMarkers(), refreshPosts(), refreshLive()]).then(function () { refreshing = null; }, function () { refreshing = null; });
+    refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested()]).then(function () { refreshing = null; }, function () { refreshing = null; });
     return refreshing;
   }
+  // Shared server: poll every 30–60 s. Local/demo: re-count every 12 s (and at once when another tab marks).
+  function zonesShared() { return backend.mode === 'supabase' && backend.isLive(); }
+  setInterval(function () {
+    if (document.visibilityState !== 'visible') return;
+    if (!zonesShared()) refreshZones();
+  }, LOCAL_RECOUNT_MS);
   setInterval(function () {
     if (document.visibilityState === 'visible') refreshAll();
-    renderLiveGate(); renderCountdown();
+    renderChips(); renderCountdown();
   }, CFG.pollSec * 1000);
-  // Another tab (BroadcastChannel) or this tab wrote local data: refresh soon (hexes stay throttled).
   var changeTimer;
   backend.onChange(function () { clearTimeout(changeTimer); changeTimer = setTimeout(refreshAll, 250); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshAll(); });
 
   // ==== safety, countdown, privacy ====
   function renderTips() {
@@ -1001,36 +946,45 @@
     t('privacyItems').forEach(function (it) { dl.appendChild(el('dt', { text: it[0] })); dl.appendChild(el('dd', { text: it[1] })); });
   }
   document.querySelectorAll('.privacy-link').forEach(function (b) { b.addEventListener('click', function () { openTab('privacy'); }); });
-  $('safetyBtn').addEventListener('click', function () { openTab(currentTab === 'safety' && $('sheet').dataset.open === 'true' ? null : 'safety'); });
+  function toggleTab(name) { openTab(currentTab === name && $('sheet').dataset.open === 'true' ? null : name); }
+  $('safetyBtn').addEventListener('click', function () { toggleTab('safety'); });
+  $('helpBtn').addEventListener('click', function () { toggleTab('guide'); });
+  $('boardBtn').addEventListener('click', function () { toggleTab('board'); });
+  $('guideBoard').addEventListener('click', function () { openTab('board'); });
+  $('guideSafety').addEventListener('click', function () { openTab('safety'); });
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
-  var PANELS = ['areas', 'route', 'pins', 'live', 'safety', 'privacy'];
+  var PANELS = ['map', 'near', 'route', 'guide', 'board', 'safety', 'privacy'];
+  var TAB_OF = { near: 'map', board: 'guide', safety: 'guide', privacy: 'guide' };
+  function markCurrent() {
+    var open = $('sheet').dataset.open === 'true', tab = TAB_OF[currentTab] || currentTab;
+    document.querySelectorAll('.tabbar button').forEach(function (b) {
+      if (open && b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+  }
   function setSheetOpen(open) {
     $('sheet').dataset.open = String(open);
     $('sheetHandle').setAttribute('aria-expanded', String(open));
-    if (!open) document.querySelectorAll('.tabbar button').forEach(function (b) { b.removeAttribute('aria-current'); });
-    else if (currentTab) document.querySelectorAll('.tabbar button').forEach(function (b) { if (b.dataset.tab === currentTab) b.setAttribute('aria-current', 'page'); });
+    markCurrent();
   }
   function openTab(name) {
     if (!name) { setSheetOpen(false); return; }
     currentTab = name;
     PANELS.forEach(function (n) { $('panel-' + n).hidden = n !== name; });
-    document.querySelectorAll('.tabbar button').forEach(function (b) {
-      if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
-    });
     setSheetOpen(true);
     $('sheet').scrollTop = 0;
-    if (name === 'live') renderLiveGate();
+    if (name === 'near') renderNear();
   }
   document.querySelector('.tabbar').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.tab === currentTab && $('sheet').dataset.open === 'true') setSheetOpen(false);
+    if (b.dataset.tab === 'mark') { startMark(); return; }      // centre tab = the same flow as the big button
+    if ((TAB_OF[currentTab] || currentTab) === b.dataset.tab && $('sheet').dataset.open === 'true') setSheetOpen(false);
     else openTab(b.dataset.tab);
   });
   $('sheetHandle').addEventListener('click', function () {
-    if ($('sheet').dataset.open === 'true') setSheetOpen(false); else openTab(currentTab || 'areas');
+    if ($('sheet').dataset.open === 'true') setSheetOpen(false); else openTab(currentTab || 'map');
   });
   // Swipe the handle down/up to close/open the panel (passive listeners keep scrolling smooth).
   var swipeY = null;
@@ -1039,7 +993,7 @@
     if (swipeY === null) return;
     var dy = e.changedTouches[0].clientY - swipeY;
     swipeY = null;
-    if (dy > 40) setSheetOpen(false); else if (dy < -40) openTab(currentTab || 'areas');
+    if (dy > 40) setSheetOpen(false); else if (dy < -40) openTab(currentTab || 'map');
   }, { passive: true });
 
   function applyStaticText() {
@@ -1050,22 +1004,29 @@
     lb.textContent = t('langBtn'); lb.setAttribute('aria-label', t('langAria'));
     $('sheetHandle').setAttribute('aria-label', t('sheetToggle'));
     $('postBody').placeholder = t('composePh');
+    $('suggestReason').placeholder = t('suggestPh');
+    $('helpBtn').setAttribute('aria-label', t('helpAria')); $('helpBtn').title = t('helpAria');
+    $('boardBtn').setAttribute('aria-label', t('boardAria')); $('boardBtn').title = t('boardAria');
+    $('markCardClose').setAttribute('aria-label', t('close'));
+    document.querySelectorAll('.ibtn').forEach(function (b) { b.setAttribute('aria-label', t('infoAria')); });
   }
   function renderAll() {
     applyStaticText();
     renderLayerBar();
-    renderAreaLayer(); renderAreaList(); renderEvents();
-    areaOptions($('areaSelect'), 'auto', t('autoArea'), true);
+    renderAreaLayer(); renderCommunity(); renderAreaList(); renderEvents();
+    areaOptions($('areaSelect'), 'auto', t('autoArea'), true, targetOption());
     areaOptions($('postArea'), '', t('noArea'), false);
     renderStartStatus(); renderRouteResult();
-    renderMarkers(); renderPosts(); renderDots();
-    renderTips(); renderCountdown(); renderPrivacy();
-    renderLiveGate(); renderHexInfo(); renderBackendChip();
+    renderPosts(); renderTips(); renderCountdown(); renderPrivacy(); renderHowto();
+    if (zoneLayer) zoneLayer.setData(data.zones);
+    if (!$('guide').hidden) renderGuide();
+    if (!$('markCard').hidden) { renderTagRow(); }
+    if (currentTab === 'near') renderNear();
+    renderChips();
     updateCount('postBody', 'postCount');
     updateLocateBtn();
-    if (mode) $('modeText').textContent = mode === 'start' ? t('tapForStart') : t('tapForHouse');
+    if (mode) $('modeText').textContent = t(MODE_TEXT[mode]);
     if (route.startMarker) route.startMarker.setTooltipContent(t('startLabel'));
-    if ($('houseDialog').open) renderHouseDialog();
   }
   $('langBtn').addEventListener('click', function () {
     lang = lang === 'en' ? 'zh' : 'en';
@@ -1074,27 +1035,155 @@
     renderAll();
   });
 
+  // ==== welcome guide, How-to panel, inline hints ====
+  function safeLS() { try { return window.localStorage; } catch (e) { return null; } }
+  var guideIdx = 0, guideReturn = null;
+  function guideCount() { return t('guideCards').length; }
+  function renderGuide() {
+    var track = $('guideTrack'), dotBox = $('guideDots');
+    track.textContent = ''; dotBox.textContent = '';
+    t('guideCards').forEach(function (c, i) {
+      var card = el('section', { class: 'gcard', 'aria-labelledby': 'gcardH' + i }, [
+        el('div', { class: 'gnum mono', text: '0' + (i + 1) }),
+        el('h2', { id: 'gcardH' + i, text: c[0] }),
+        el('ul', { class: 'glist' }, c[1].map(function (line) { return el('li', { text: line }); }))
+      ]);
+      if (i === 0) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
+        return el('span', null, [el('i', { class: 'lg lg-' + k }), t(BUCKET_KEY[k])]);
+      }))));
+      if (i === 1) card.appendChild(el('div', { class: 'gbtn-demo', 'aria-hidden': 'true' }, [el('span', { text: '✨ ' + t('markBtn') })]));
+      track.appendChild(card);
+      dotBox.appendChild(el('button', { type: 'button', class: 'gdot', 'aria-label': t('guideDotAria', { n: i + 1 }), onclick: function () { guideGo(i); } }));
+    });
+    $('guidePrev').setAttribute('aria-label', t('guidePrev'));
+    $('guideNext').setAttribute('aria-label', t('guideNext'));
+    guideGo(guideIdx);
+  }
+  function guideGo(i) {
+    var n = guideCount(), hadFocus = document.activeElement;
+    guideIdx = Math.max(0, Math.min(n - 1, i));
+    $('guideTrack').style.transform = 'translateX(' + (-100 * guideIdx) + '%)';
+    Array.prototype.forEach.call($('guideTrack').children, function (c, k) { c.setAttribute('aria-hidden', String(k !== guideIdx)); });
+    Array.prototype.forEach.call($('guideDots').children, function (d, k) {
+      if (k === guideIdx) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+    });
+    function pad(x) { return (x < 10 ? '0' : '') + x; }
+    var step = $('guideStep');
+    step.textContent = pad(guideIdx + 1) + ' / ' + pad(n);
+    step.setAttribute('aria-label', t('guideStep', { n: guideIdx + 1, total: n }));
+    var last = guideIdx === n - 1;
+    $('guidePrev').disabled = guideIdx === 0;
+    $('guideNext').hidden = last;
+    $('guideDone').hidden = !last;
+    if (last && hadFocus === $('guideNext')) $('guideDone').focus();
+    if (!last && hadFocus === $('guideDone')) $('guideNext').focus();
+    if (guideIdx === 0 && hadFocus === $('guidePrev')) $('guideNext').focus();
+  }
+  function openGuide() {
+    guideReturn = document.activeElement;
+    guideIdx = 0;
+    $('guide').hidden = false;
+    renderGuide();
+    $('guideNext').focus();
+  }
+  function closeGuide(how) {
+    if ($('guide').hidden) return;
+    $('guide').hidden = true;
+    LIB.markGuideSeen(safeLS(), how);
+    if (guideReturn && guideReturn.focus && document.contains(guideReturn)) guideReturn.focus();
+    guideReturn = null;
+  }
+  function guideFocusables() {
+    return Array.prototype.filter.call($('guide').querySelectorAll('button'), function (b) { return !b.hidden && !b.disabled; });
+  }
+  $('guideSkip').addEventListener('click', function () { closeGuide('skipped'); });
+  $('guideDone').addEventListener('click', function () { closeGuide('done'); });
+  $('guidePrev').addEventListener('click', function () { guideGo(guideIdx - 1); });
+  $('guideNext').addEventListener('click', function () { guideGo(guideIdx + 1); });
+  $('guide').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeGuide('skipped'); return; }
+    if (e.key === 'ArrowRight') { guideGo(guideIdx + 1); return; }
+    if (e.key === 'ArrowLeft') { guideGo(guideIdx - 1); return; }
+    if (e.key !== 'Tab') return;
+    var f = guideFocusables(), first = f[0], lastF = f[f.length - 1];   // focus trap
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastF.focus(); }
+    else if (!e.shiftKey && document.activeElement === lastF) { e.preventDefault(); first.focus(); }
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!$('guide').hidden && !$('guide').contains(e.target)) { var f = guideFocusables(); if (f.length) f[f.length - 1].focus(); }
+  });
+  // Swipe left/right between cards (passive listeners keep the page smooth).
+  var gx = null, gy = null;
+  $('guideViewport').addEventListener('touchstart', function (e) { gx = e.touches[0].clientX; gy = e.touches[0].clientY; }, { passive: true });
+  $('guideViewport').addEventListener('touchend', function (e) {
+    if (gx === null) return;
+    var dx = e.changedTouches[0].clientX - gx, dy = e.changedTouches[0].clientY - gy;
+    gx = gy = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) guideGo(guideIdx + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+
+  function renderHowto() {
+    var box = $('howtoList');
+    box.textContent = '';
+    t('howtoSections').forEach(function (sec) {
+      box.appendChild(el('h3', { text: sec[0] }));
+      box.appendChild(el('ul', null, sec[1].map(function (line) { return el('li', { text: line }); })));
+    });
+  }
+  $('replayGuide').addEventListener('click', openGuide);
+
+  // ⓘ hints: tap to show a one-line note, tap again (or Esc) to hide. The big-button hint shows until the first mark.
+  $('markHintBtn').hidden = !!lsGet(STORE.markHint, false);
+  function closeHints(except) {
+    document.querySelectorAll('.ibtn').forEach(function (b) {
+      if (b === except) return;
+      b.setAttribute('aria-expanded', 'false');
+      $(b.getAttribute('aria-controls')).hidden = true;
+    });
+  }
+  document.querySelectorAll('.ibtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var open = b.getAttribute('aria-expanded') !== 'true';
+      closeHints(b);
+      b.setAttribute('aria-expanded', String(open));
+      $(b.getAttribute('aria-controls')).hidden = !open;
+    });
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHints(null); closeMarkCard(); } });
+
   // ==== boot ====
   applyLayers();
   renderAll();
-  if (!readHash()) map.setView(L.latLngBounds(AREAS.map(function (a) { return [a.lat, a.lng]; })).getCenter(), 12);
+  map.setView(L.latLngBounds(AREAS.map(function (a) { return [a.lat, a.lng]; })).getCenter(), 12);
   zoomClass();
-  // ?demo=1 loads demo.js (test data) first; normal visits never download it.
+  if (DEMO && FLAGS.near) {
+    map.setView(DEMO_HOME, 14);
+    L.marker(DEMO_HOME, { interactive: false, icon: L.divIcon({ className: '', html: '<div class="start-pin">🏠</div>', iconSize: [34, 34], iconAnchor: [17, 17] }) }).addTo(map);
+  }
+  // ?demo=1 loads demo.js (fake marks) first; normal visits never download it.
   (DEMO ? new Promise(function (resolve) {
     var sc = document.createElement('script');
-    sc.src = 'demo.js'; sc.onload = sc.onerror = resolve;
+    sc.src = 'demo.js?v=5'; sc.onload = sc.onerror = resolve;
     document.head.appendChild(sc);
-  }) : Promise.resolve()).then(refreshAll).then(function () { scheduleHex(true); });
+  }) : Promise.resolve()).then(function () {
+    if (DEMO && window.TOT_DEMO) window.TOT_DEMO.seed(backend.local, grid);
+    return refreshAll();
+  }).then(function () { if (FLAGS.near) openNear(); });
+  if (FLAGS.howto) openTab('guide');
+  if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
 
   // Hook for automated checks (harmless in normal use).
   window.__ltot = {
-    t: t, lib: LIB, backend: backend, grid: grid, demo: DEMO, map: map,
-    hexPerf: function () { return hexLayer ? { ms: hexLayer.lastDrawMs, drawn: hexLayer.drawn, plan: hexLayer.plan.length, live: hexLayer.live.length, grid: grid.kind } : null; },
-    refresh: refreshAll, computeHex: computeHex, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
+    t: t, lib: LIB, backend: backend, grid: grid, demo: DEMO, map: map, flags: FLAGS,
+    zonePerf: function () { return zoneLayer ? { ms: zoneLayer.lastDrawMs, drawn: zoneLayer.drawn, badges: zoneLayer.badges, zones: data.zones.length,
+                                                 base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
+    refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
+    openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
-      return { lang: lang, mode: backend.mode, markers: data.markers.length, local: data.localMarkers.length, link: data.linkMarkers.length,
-               posts: data.posts.fun.length + data.posts.decor.length, dots: data.dots.length, drawnDots: drawnDots, ownSids: ownSids.slice(),
-               live: live.on, liveOpen: liveOpen(), layers: Object.assign({}, layerOn) };
+      return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
+                 return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };
+               }), suggested: data.suggested.length, posts: data.posts.fun.length + data.posts.decor.length,
+               myMarks: markHist.length, celebrations: celebrations, layers: Object.assign({}, layerOn), tab: currentTab };
     }
   };
 })();

@@ -12,8 +12,6 @@
   var LAT0 = 42.98, LNG0 = -81.245;          // fixed reference so the coarsening grid never shifts
   var M_PER_DEG_LAT = 111320;
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
-  var MARKER_TYPES = ['candy', 'teal', 'fullsize', 'decor', 'pet', 'early'];
-  var STATUSES = ['giving', 'later', 'out'];
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
 
@@ -44,18 +42,15 @@
     var w = (cfg && cfg.liveWindow) || DEFAULT_WINDOW;
     return { start: zonedToUtcMs(w.date, w.start, w.tz), end: zonedToUtcMs(w.date, w.end, w.tz) };
   }
-  // Live features are open only inside the window (inclusive start, exclusive end), or always in demo mode.
+  // Live (shared) marking is open only inside the window (inclusive start, exclusive end), or always in demo mode.
   function isLiveOpen(nowMs, cfg, demo) {
     if (demo) return true;
     var w = liveWindow(cfg);
     return nowMs >= w.start && nowMs < w.end;
   }
   // Nov 1, 2026 06:00 in Toronto. DST ends at 2 AM that morning, so this is 06:00 EST (UTC-5) = 11:00 UTC.
-  var MARKER_EXPIRES_MS = zonedToUtcMs('2026-11-01', '06:00', TZ);
-  function isMarkerExpired(m, nowMs) {
-    var exp = m && m.expiresAt ? Number(m.expiresAt) : MARKER_EXPIRES_MS;
-    return nowMs >= exp;
-  }
+  // After this, suggestions close (the night is over).
+  var SEASON_END_MS = zonedToUtcMs('2026-11-01', '06:00', TZ);
 
   // ==== geometry ====
   function distM(a, b) {
@@ -71,7 +66,7 @@
   }
   function round(n, d) { var f = Math.pow(10, d); return Math.round(n * f) / f; }
 
-  // Coarsen a live position before it leaves the phone: snap to a ~50 m grid, then add up to 25 m of random jitter.
+  // Coarsen a position before it leaves the phone: snap to a ~50 m grid, then add up to 25 m of random jitter.
   function coarsen(lat, lng, rnd, gridM, jitterM) {
     rnd = rnd || Math.random;
     gridM = gridM || 50;
@@ -84,7 +79,7 @@
     return [round(LAT0 + y / M_PER_DEG_LAT, 6), round(LNG0 + x / M_PER_DEG_LNG, 6)];
   }
 
-  // ==== ids, sessions, dots ====
+  // ==== ids, sessions ====
   function randomHex(n, rnd) {
     var s = '', i;
     var c = typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues ? globalThis.crypto : null;
@@ -104,53 +99,137 @@
       ((parseInt(h[16], 16) & 3) | 8).toString(16) + h.slice(17, 20) + '-' + h.slice(20, 32);
   }
   var SESSION_MS = 30 * 60000;
-  // Random live-dot session id, not tied to the device; a new one every 30 minutes.
+  // Random mark session id, not tied to the device; a new one every 30 minutes.
   function nextSession(prev, nowMs, rnd) {
     if (prev && prev.id && nowMs - prev.startedAt < SESSION_MS && nowMs >= prev.startedAt) return prev;
     return { id: randomHex(32, rnd), startedAt: nowMs };
   }
-  function shouldSendDot(lastSentAt, nowMs, visible, minMs) {
-    if (!visible) return false;
-    return !lastSentAt || nowMs - lastSentAt >= (minMs || 60000);
-  }
-  var SHARE_MAX_MS = 90 * 60000;
-  function sharingLeftMs(startedAt, nowMs) { return Math.max(0, startedAt + SHARE_MAX_MS - nowMs); }
-  function sharingExpired(startedAt, nowMs) { return nowMs - startedAt >= SHARE_MAX_MS; }
-  function isDotFresh(dot, nowMs, ttlMin) { return nowMs - dot.updatedAt < (ttlMin || 30) * 60000; }
-  function pruneDots(dots, nowMs, ttlMin) { return dots.filter(function (d) { return isDotFresh(d, nowMs, ttlMin); }); }
 
-  // ==== hex aggregation & scores ====
-  function countDotsByCell(dots, cellFn, nowMs, windowMin) {
-    var out = {}, cut = nowMs - (windowMin || 20) * 60000;
-    dots.forEach(function (d) {
-      if (d.updatedAt < cut) return;
-      var c = d.h3 || cellFn(d.lat, d.lng);
-      if (c) out[c] = (out[c] || 0) + 1;
+  // ==== marks & zones ====
+  var MARK_TAGS = ['candy', 'decor', 'crowded'];
+  var TAG_ICON = { candy: '🍬', decor: '🎃', crowded: '👥' };
+  var MIN_ZONE = 3;                     // privacy floor: a zone shows only at 3+ marks
+  var NEW_MS = 30 * 60000;              // "NEW" badge for 30 min after a zone first lights up
+  var MARK_KEEP_MS = 2 * 3600000;       // marks are deleted after 2 hours
+  var RATE_DEVICE_MS = 5 * 60000, RATE_ZONE_MS = 30 * 60000;
+  function clampWindow(w) { w = Number(w) || 45; return Math.min(60, Math.max(30, Math.round(w))); }
+  // Zone colour from the number of marks in the window: <3 none, 3–5 teal, 6–14 orange, 15+ hot pink.
+  function zoneBucket(n) { return n < MIN_ZONE ? null : n < 6 ? 'quiet' : n < 15 ? 'lively' : 'hot'; }
+  function cleanTags(tags) {
+    return (Array.isArray(tags) ? tags : []).filter(function (t, i, a) { return MARK_TAGS.indexOf(t) >= 0 && a.indexOf(t) === i; });
+  }
+  function tagsValid(tags) { return (tags || []).every(function (t) { return MARK_TAGS.indexOf(t) >= 0; }); }
+  function marksInWindow(marks, nowMs, windowMin) {
+    var cut = nowMs - clampWindow(windowMin) * 60000;
+    return marks.filter(function (m) { return m.createdAt > cut && m.createdAt <= nowMs; });
+  }
+  // A tag is "common" in a zone when at least 2 marks and 30% of them carry it.
+  function topTag(tagCounts, n) {
+    var best = null, bestN = 0;
+    MARK_TAGS.forEach(function (t) { if ((tagCounts[t] || 0) > bestN) { best = t; bestN = tagCounts[t]; } });
+    return bestN >= 2 && bestN >= 0.3 * n ? best : null;
+  }
+  // marks: [{cell?, lat, lng, tags, createdAt}] -> zones with 3+ marks in the window, hottest first.
+  // firstLitAt = time of the 3rd-oldest stored mark in the cell (the moment the zone first reached 3).
+  function aggregateZones(marks, cellFn, nowMs, windowMin, max) {
+    var cut = nowMs - clampWindow(windowMin) * 60000, cells = {};
+    marks.forEach(function (m) {
+      if (m.createdAt > nowMs || nowMs - m.createdAt > MARK_KEEP_MS) return;
+      var c = m.cell || (cellFn ? cellFn(m.lat, m.lng) : null);
+      if (!c) return;
+      var z = cells[c] || (cells[c] = { cell: c, count: 0, tags: {}, times: [] });
+      z.times.push(m.createdAt);
+      if (m.createdAt <= cut) return;
+      z.count++;
+      cleanTags(m.tags).forEach(function (t) { z.tags[t] = (z.tags[t] || 0) + 1; });
     });
-    return out;
+    var out = [];
+    Object.keys(cells).forEach(function (k) {
+      var z = cells[k];
+      if (z.count < MIN_ZONE) return;                         // 3+ rule: nothing below that leaves this function
+      z.times.sort(function (a, b) { return a - b; });
+      z.firstLitAt = z.times[MIN_ZONE - 1];
+      delete z.times;
+      z.topTag = topTag(z.tags, z.count);
+      z.bucket = zoneBucket(z.count);
+      z.isNew = isZoneNew(z.firstLitAt, nowMs);
+      out.push(z);
+    });
+    out.sort(function (a, b) { return b.count - a.count; });
+    return out.slice(0, max || 300);
   }
-  // Privacy floor: cells with fewer than `min` dots are dropped entirely ("no data").
-  function suppressSmall(counts, min) {
-    min = min || 3;
-    return Object.keys(counts).filter(function (k) { return counts[k] >= min; })
-      .map(function (k) { return { cell: k, count: counts[k] }; });
+  function isZoneNew(firstLitAt, nowMs) { return !!firstLitAt && nowMs - firstLitAt >= 0 && nowMs - firstLitAt < NEW_MS; }
+  // Server rows ({cell, count, topTag, firstLitAt}) -> the same shape as aggregateZones, re-checking the 3+ rule.
+  function decorateZones(rows, nowMs) {
+    return rows.filter(function (r) { return r && r.count >= MIN_ZONE; }).map(function (r) {
+      return { cell: r.cell, count: r.count, tags: r.tags || {}, topTag: MARK_TAGS.indexOf(r.topTag) >= 0 && (r.topTagN || 2) >= 2 ? r.topTag : null,
+               firstLitAt: r.firstLitAt || null, isNew: isZoneNew(r.firstLitAt, nowMs), bucket: zoneBucket(r.count) };
+    }).sort(function (a, b) { return b.count - a.count; });
   }
+  // Rate limits for marking. history: [{t, cell}] from this device. 1 mark per 5 min, 1 per zone per 30 min.
+  function markRate(history, cell, nowMs) {
+    var last = 0, lastZone = 0;
+    (history || []).forEach(function (h) {
+      if (h.t > nowMs) return;
+      if (h.t > last) last = h.t;
+      if (h.cell === cell && h.t > lastZone) lastZone = h.t;
+    });
+    if (last && nowMs - last < RATE_DEVICE_MS) return { ok: false, reason: 'device', waitMs: RATE_DEVICE_MS - (nowMs - last) };
+    if (lastZone && nowMs - lastZone < RATE_ZONE_MS) return { ok: false, reason: 'zone', waitMs: RATE_ZONE_MS - (nowMs - lastZone) };
+    return { ok: true };
+  }
+  function pruneHistory(history, nowMs) { return (history || []).filter(function (h) { return nowMs - h.t < 24 * 3600000; }).slice(-50); }
+  // Blur a position before it leaves the phone or is stored: ~50 m grid + up to 25 m random jitter.
+  function blurPoint(lat, lng, rnd) { return coarsen(lat, lng, rnd, 50, 25); }
+  // "Near me": zones within radiusKm of center, nearest first. centerOf(cell) -> [lat, lng].
+  function nearZones(zones, center, radiusKm, centerOf) {
+    var r = (radiusKm || 2) * 1000;
+    return zones.map(function (z) {
+      var c = centerOf(z.cell);
+      return Object.assign({}, z, { center: c, distM: Math.round(distM(center, c)) });
+    }).filter(function (z) { return z.distM <= r; })
+      .sort(function (a, b) { return (a.distM - b.distM) || (b.count - a.count); });
+  }
+  // Practice outside the live window, live inside it, demo always.
+  function markMode(nowMs, cfg, demo) { return demo ? 'demo' : isLiveOpen(nowMs, cfg, false) ? 'live' : 'practice'; }
+
+  // ==== community suggestions ("Suggest an area") ====
+  var SUGGEST_MAX_DAY = 3, SUGGEST_MIN = 3;
+  function checkReason(text) { return checkText(text, { max: 80, optional: true }); }
+  // history: [{t, cell}] -> 3 per device per day, 1 per hex.
+  function suggestRate(history, cell, nowMs) {
+    var day = (history || []).filter(function (h) { return nowMs - h.t < 24 * 3600000; });
+    if ((history || []).some(function (h) { return h.cell === cell; })) return { ok: false, reason: 'hex' };
+    if (day.length >= SUGGEST_MAX_DAY) return { ok: false, reason: 'day' };
+    return { ok: true };
+  }
+  // suggestions: [{cell, lat, lng, reason, createdAt}] -> hexes with 3+ suggestions.
+  function communitySuggested(suggestions, min) {
+    var by = {};
+    (suggestions || []).forEach(function (s) {
+      var e = by[s.cell] || (by[s.cell] = { cell: s.cell, n: 0, lat: 0, lng: 0, reasons: [], last: 0 });
+      e.n++; e.lat += s.lat; e.lng += s.lng;
+      if (s.reason) e.reasons.push([s.createdAt || 0, s.reason]);
+    });
+    return Object.keys(by).map(function (k) { return by[k]; }).filter(function (e) { return e.n >= (min || SUGGEST_MIN); }).map(function (e) {
+      e.reasons.sort(function (a, b) { return b[0] - a[0]; });
+      return { cell: e.cell, n: e.n, lat: round(e.lat / e.n, 4), lng: round(e.lng / e.n, 4),
+               reasons: e.reasons.slice(0, 3).map(function (r) { return r[1]; }) };
+    }).sort(function (a, b) { return b.n - a.n; });
+  }
+
+  // ==== planning base layer (researched areas + board votes) ====
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
   function normalise(v, max) { return max > 0 ? clamp01(v / max) : 0; }
-  function blendHexScore(area, votes, pins) { return clamp01(0.5 * area + 0.3 * votes + 0.2 * pins); }
+  function blendPlanScore(area, votes) { return clamp01(0.7 * area + 0.3 * votes); }
   function areaBaseScore(a) { return (a.s.candy + a.s.decor + a.s.safety) / 15; }
   // 1 at the centre, 0.6 at the radius, fading to 0 at radius + 500 m.
   function areaFalloff(d, r) {
     if (d <= r) return 1 - 0.4 * d / r;
     return Math.max(0, 0.6 * (1 - (d - r) / 500));
   }
-  function planBucket(s) { return s < 0.45 ? 'quiet' : s < 0.7 ? 'busy' : 'very'; }
-  function liveBucket(n) { return n < 6 ? 'quiet' : n < 12 ? 'busy' : 'very'; }
-
-  // Planning-mode score for every hex near an area or containing a marker.
-  function planningHexes(areas, markers, voteTotals, grid, nowMs, max) {
-    var cells = {}, k;
-    var maxVotes = 0;
+  function planningHexes(areas, voteTotals, grid, max) {
+    var cells = {}, k, maxVotes = 0;
     Object.keys(voteTotals || {}).forEach(function (id) { maxVotes = Math.max(maxVotes, voteTotals[id]); });
     areas.forEach(function (a) {
       var base = areaBaseScore(a), vNorm = normalise((voteTotals || {})[a.id] || 0, maxVotes);
@@ -158,25 +237,15 @@
       grid.disk(grid.cell(a.lat, a.lng), ring).forEach(function (c) {
         var w = areaFalloff(distM(grid.center(c), [a.lat, a.lng]), a.r);
         if (w <= 0) return;
-        var e = cells[c] || (cells[c] = { cell: c, a: 0, v: 0, p: 0, n: 0 });
+        var e = cells[c] || (cells[c] = { cell: c, a: 0, v: 0 });
         e.a = Math.max(e.a, w * base);
         e.v = Math.max(e.v, w * vNorm);
       });
     });
-    var maxPins = 0;
-    (markers || []).forEach(function (m) {
-      if (isMarkerExpired(m, nowMs)) return;
-      if (!(m.status === 'giving' || (m.types || []).indexOf('decor') >= 0)) return;
-      var c = grid.cell(m.lat, m.lng);
-      var e = cells[c] || (cells[c] = { cell: c, a: 0, v: 0, p: 0, n: 0 });
-      e.n++;
-      if (e.n > maxPins) maxPins = e.n;
-    });
     var out = [];
     for (k in cells) {
       var e = cells[k];
-      e.p = normalise(e.n, maxPins);
-      e.score = blendHexScore(e.a, e.v, e.p);
+      e.score = blendPlanScore(e.a, e.v);
       if (e.score > 0.05) out.push(e);
     }
     out.sort(function (x, y) { return y.score - x.score; });
@@ -252,7 +321,7 @@
   }
   function overall(a) { return Math.round((a.s.candy * 0.4 + a.s.decor * 0.3 + a.s.safety * 0.3) * 10) / 10; }
 
-  // ==== text checks (board posts & marker notes) ====
+  // ==== text checks (board posts & suggestion reasons) ====
   var RE_URL = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|ca|net|org|io|ly|co|me|app|info|biz|xyz|link|site|gg|tv|to)\b)/i;
   var RE_EMAIL = /[^\s@]+@[^\s@]+\.[a-z]{2,}/i;
   var RE_PHONE = /(\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b|\b\d{3}[\s.-]\d{4}\b|\d{7,}/;
@@ -280,101 +349,6 @@
   }
   function charCount(s) { return Array.from(String(s || '')).length; }
 
-  // ==== house markers ====
-  var RE_HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-  function sanitizeMarker(m) {
-    if (!m || typeof m !== 'object') return null;
-    var lat = Number(m.lat), lng = Number(m.lng);
-    if (!inLondonBox(lat, lng)) return null;
-    var types = (Array.isArray(m.types) ? m.types : []).filter(function (t, i, a) {
-      return MARKER_TYPES.indexOf(t) >= 0 && a.indexOf(t) === i;
-    });
-    if (!types.length) return null;
-    var note = checkText(m.note, { optional: true });
-    if (!note.ok) return null;
-    return {
-      id: m.id ? String(m.id).slice(0, 40) : null,
-      lat: round(lat, 5), lng: round(lng, 5), types: types,
-      status: STATUSES.indexOf(m.status) >= 0 ? m.status : 'giving',
-      note: note.text,
-      start: RE_HHMM.test(m.start || '') ? m.start : '',
-      end: RE_HHMM.test(m.end || '') ? m.end : '',
-      expiresAt: Number(m.expiresAt) || MARKER_EXPIRES_MS,
-      localOnly: !!m.localOnly
-    };
-  }
-  // v1 pins (candy / fullsize / decor / avoid + rating) -> v2 markers. "avoid" becomes a greyed "out" marker with a ⚠️ note.
-  function migrateV1Pins(pins) {
-    if (!Array.isArray(pins)) return [];
-    return pins.map(function (p) {
-      if (!p) return null;
-      var map = { candy: ['candy'], fullsize: ['fullsize'], decor: ['decor'], avoid: ['candy'] };
-      var types = map[p.type] || ['candy'];
-      var note = String(p.note || '').slice(0, 130);
-      if (p.type === 'avoid') note = ('⚠️ ' + note).trim();
-      var ok = checkText(note, { optional: true });
-      return sanitizeMarker({
-        id: 'v1-' + String(p.id || Math.random().toString(36).slice(2, 9)).slice(0, 24),
-        lat: p.lat, lng: p.lng, types: types, status: p.type === 'avoid' ? 'out' : 'giving',
-        note: ok.ok ? ok.text : '', localOnly: true
-      });
-    }).filter(Boolean);
-  }
-  // filters: { teal, fullsize, early, hideOut } — all active filters must match.
-  function filterMarkers(markers, f, nowMs) {
-    f = f || {};
-    return markers.filter(function (m) {
-      if (isMarkerExpired(m, nowMs)) return false;
-      if (f.hideOut && m.status === 'out') return false;
-      if (f.teal && m.types.indexOf('teal') < 0) return false;
-      if (f.fullsize && m.types.indexOf('fullsize') < 0) return false;
-      if (f.early && m.types.indexOf('early') < 0) return false;
-      return true;
-    });
-  }
-  // Compact share links: #m=<base64url of [[lat,lng,typeBits,statusIdx,note,start,end],...]>
-  function b64urlEncode(str) {
-    var bytes = new TextEncoder().encode(str), bin = '';
-    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function b64urlDecode(s) {
-    s = s.replace(/-/g, '+').replace(/_/g, '/');
-    while (s.length % 4) s += '=';
-    var bin = atob(s), bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
-  }
-  function encodeMarkers(list) {
-    return b64urlEncode(JSON.stringify(list.map(function (m) {
-      var bits = 0;
-      m.types.forEach(function (t) { bits |= 1 << MARKER_TYPES.indexOf(t); });
-      return [m.lat, m.lng, bits, STATUSES.indexOf(m.status), m.note || '', m.start || '', m.end || ''];
-    })));
-  }
-  function decodeMarkers(s) {
-    try {
-      var arr = JSON.parse(b64urlDecode(s));
-      if (!Array.isArray(arr)) return [];
-      return arr.slice(0, 300).map(function (a, i) {
-        if (!Array.isArray(a)) return null;
-        var types = MARKER_TYPES.filter(function (t, k) { return (a[2] >> k) & 1; });
-        return sanitizeMarker({ id: 'link-' + i, lat: a[0], lng: a[1], types: types, status: STATUSES[a[3]],
-                                note: a[4], start: a[5], end: a[6], localOnly: true });
-      }).filter(Boolean);
-    } catch (e) { return []; }
-  }
-  // v1 links used #pins=...; decode them through the v1 migration.
-  function decodeV1Pins(s) {
-    try {
-      var arr = JSON.parse(b64urlDecode(s)), types = ['candy', 'fullsize', 'decor', 'avoid'];
-      if (!Array.isArray(arr)) return [];
-      return migrateV1Pins(arr.slice(0, 300).map(function (a, i) {
-        return Array.isArray(a) ? { id: 'link' + i, lat: a[0], lng: a[1], type: types[a[2]], note: a[4] } : null;
-      }));
-    } catch (e) { return []; }
-  }
-
   // ==== board ====
   function visiblePosts(posts) { return posts.filter(function (p) { return (p.reports || 0) < 3 && !p.hidden; }); }
   function sortPosts(posts, how) {
@@ -397,6 +371,29 @@
     ms = Math.max(0, ms);
     return { d: Math.floor(ms / 864e5), h: Math.floor(ms / 36e5) % 24, m: Math.floor(ms / 6e4) % 60, s: Math.floor(ms / 1e3) % 60 };
   }
+
+  // ==== URL flags + first-visit guide ====
+  // ?guide=1 forces the welcome cards, ?howto=1 opens the How-to panel, ?lang=zh|en picks the language for this load,
+  // ?demo=1 runs the demo, ?near=1 opens the "Near me" panel.
+  var GUIDE_KEY = 'ltot.guideSeen.v2';
+  function parseUrlFlags(search) {
+    var q = {};
+    String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) {
+      if (!kv) return;
+      var i = kv.indexOf('='), k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1);
+      try { k = decodeURIComponent(k); v = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (e) { return; }
+      q[k.toLowerCase()] = v.trim().toLowerCase();
+    });
+    function on(v) { return v === '1' || v === 'true' || v === 'yes'; }
+    var l = (q.lang || '').split(/[-_]/)[0];
+    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near) };
+  }
+  function guideSeen(storage) { try { return !!(storage && storage.getItem(GUIDE_KEY)); } catch (e) { return false; } }
+  function markGuideSeen(storage, how) {
+    try { storage.setItem(GUIDE_KEY, how === 'skipped' ? 'skipped' : 'done'); return true; } catch (e) { return false; }
+  }
+  // First visit shows the cards; ?guide=1 always does; ?howto=1 or ?near=1 alone open their panel instead.
+  function shouldShowGuide(flags, seen) { return !!(flags && flags.guide) || (!seen && !(flags && (flags.howto || flags.near))); }
 
   // ==== SHA-256 (edit-token hashes; crypto.subtle is missing on some file:// pages) ====
   var K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
@@ -434,20 +431,22 @@
   }
 
   return {
-    TZ: TZ, LONDON_BOX: LONDON_BOX, MARKER_TYPES: MARKER_TYPES, STATUSES: STATUSES, BOARDS: BOARDS,
-    MARKER_EXPIRES_MS: MARKER_EXPIRES_MS, SESSION_MS: SESSION_MS, SHARE_MAX_MS: SHARE_MAX_MS,
-    tzOffsetMin: tzOffsetMin, zonedToUtcMs: zonedToUtcMs, liveWindow: liveWindow, isLiveOpen: isLiveOpen,
-    isMarkerExpired: isMarkerExpired, distM: distM, inLondonBox: inLondonBox, round: round, coarsen: coarsen,
-    randomHex: randomHex, uuid: uuid, nextSession: nextSession, shouldSendDot: shouldSendDot,
-    sharingLeftMs: sharingLeftMs, sharingExpired: sharingExpired, isDotFresh: isDotFresh, pruneDots: pruneDots,
-    countDotsByCell: countDotsByCell, suppressSmall: suppressSmall, normalise: normalise, blendHexScore: blendHexScore,
-    areaBaseScore: areaBaseScore, areaFalloff: areaFalloff, planBucket: planBucket, liveBucket: liveBucket,
+    TZ: TZ, LONDON_BOX: LONDON_BOX, BOARDS: BOARDS, SEASON_END_MS: SEASON_END_MS, SESSION_MS: SESSION_MS,
+    MARK_TAGS: MARK_TAGS, TAG_ICON: TAG_ICON, MIN_ZONE: MIN_ZONE, NEW_MS: NEW_MS, MARK_KEEP_MS: MARK_KEEP_MS,
+    RATE_DEVICE_MS: RATE_DEVICE_MS, RATE_ZONE_MS: RATE_ZONE_MS, SUGGEST_MAX_DAY: SUGGEST_MAX_DAY, SUGGEST_MIN: SUGGEST_MIN,
+    tzOffsetMin: tzOffsetMin, zonedToUtcMs: zonedToUtcMs, liveWindow: liveWindow, isLiveOpen: isLiveOpen, markMode: markMode,
+    distM: distM, inLondonBox: inLondonBox, round: round, coarsen: coarsen, blurPoint: blurPoint,
+    randomHex: randomHex, uuid: uuid, nextSession: nextSession,
+    clampWindow: clampWindow, zoneBucket: zoneBucket, cleanTags: cleanTags, tagsValid: tagsValid, marksInWindow: marksInWindow,
+    topTag: topTag, aggregateZones: aggregateZones, decorateZones: decorateZones, isZoneNew: isZoneNew,
+    markRate: markRate, pruneHistory: pruneHistory, nearZones: nearZones,
+    checkReason: checkReason, suggestRate: suggestRate, communitySuggested: communitySuggested,
+    normalise: normalise, blendPlanScore: blendPlanScore, areaBaseScore: areaBaseScore, areaFalloff: areaFalloff,
     planningHexes: planningHexes, clipToBounds: clipToBounds, makeGrid: makeGrid, localCell: localCell,
     localCenter: localCenter, localBoundary: localBoundary, localDisk: localDisk,
-    invertCrowd: invertCrowd, mapArea: mapArea, overall: overall,
-    checkText: checkText, charCount: charCount, sanitizeMarker: sanitizeMarker, migrateV1Pins: migrateV1Pins,
-    filterMarkers: filterMarkers, encodeMarkers: encodeMarkers, decodeMarkers: decodeMarkers, decodeV1Pins: decodeV1Pins,
+    invertCrowd: invertCrowd, mapArea: mapArea, overall: overall, checkText: checkText, charCount: charCount,
     visiblePosts: visiblePosts, sortPosts: sortPosts, areaVoteTotals: areaVoteTotals, rateOk: rateOk,
-    countdownParts: countdownParts, sha256Hex: sha256Hex
+    countdownParts: countdownParts, sha256Hex: sha256Hex,
+    GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide
   };
 });

@@ -1,6 +1,6 @@
-// Headless browser check (SPEC §8.2–8.4). Needs Google Chrome and a local server:
+// Headless browser check for v3 "Mark it!" (SPEC §8.2–8.4 + v3 pivot). Needs Google Chrome and a local server:
 //   python3 -m http.server 8080      (in the project folder)
-//   node tests/headless_check.mjs    (screenshots go to /tmp/ltot-test/v2-*.png)
+//   node tests/headless_check.mjs    (screenshots go to /tmp/ltot-test/v3-*.png)
 // Talks to Chrome over the DevTools protocol with Node's built-in WebSocket — nothing to install.
 // Never contacts a Supabase project: the "offline" test points config at https://ltot-test.invalid (a name that cannot resolve).
 import { spawn } from 'node:child_process';
@@ -12,9 +12,9 @@ const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/M
 const PORT = 9333;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(OUT, { recursive: true });
-rmSync(OUT + '/profile-v2', { recursive: true, force: true });
+rmSync(OUT + '/profile-v3', { recursive: true, force: true });
 
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${OUT}/profile-v2`,
+const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${OUT}/profile-v3`,
   '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--window-size=390,844'], { stdio: 'ignore' });
 let ver;
 for (let i = 0; i < 60 && !ver; i++) { try { ver = await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); } catch { await sleep(250); } }
@@ -92,190 +92,216 @@ async function openPage(path, opts = {}) {
   };
   return p;
 }
+// The welcome guide covers the screen on a first visit: close it before the other flows.
+async function dismissGuide(p) { if (await p.ev(`!document.getElementById('guide').hidden`)) { await p.click('#guideSkip'); await sleep(200); } }
+async function allowLoc(p) { if (await p.ev(`document.getElementById('locDialog').open`)) { await p.click('#locYes'); } }
 const realErrors = (p) => p.errors.filter((e) => !/ERR_BLOCKED_BY_CLIENT|ltot-test\.invalid|ERR_NAME_NOT_RESOLVED|Failed to fetch|favicon/.test(e));
 
 await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissions: ['geolocation'] });
 
-// =========================================================== 1. normal page (planning mode, local backend)
+// =========================================================== 1. normal page (practice mode today, local backend)
 {
-  const p = await openPage('', { geo: [42.9668, -81.2455] });
+  const p = await openPage('', { geo: [42.966812, -81.245533] });
   check('page loads with no JS errors (390×844)', realErrors(p).length === 0, realErrors(p).join(' | '));
+  check('first visit: welcome guide with 3 cards', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===3`));
+  check('card 1 explains zones + “Your area isn’t on the map? Mark it!”', /Glowing hexagons/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)) &&
+    /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
+  await p.shot('v3-guide-en.png');
+  await p.click('#guideNext'); await sleep(350); await p.click('#guideNext'); await sleep(350);
+  check('Got it on the last card closes it and remembers ltot.guideSeen.v2', await p.ev(`!document.getElementById('guideDone').hidden`) &&
+    (await p.click('#guideDone'), await sleep(200), await p.ev(`document.getElementById('guide').hidden && localStorage.getItem('ltot.guideSeen.v2')==='done'`)));
   const st = await p.ev('__ltot.state()');
-  check('local backend by default', st.mode === 'local', st.mode);
-  const perf = await p.ev('__ltot.hexPerf()');
-  check('h3-js loaded: hex grid is H3 resolution 8', perf.grid === 'h3', JSON.stringify(perf));
-  check('planning hexes drawn (0 < n ≤ 400)', perf.drawn > 0 && perf.drawn <= 400, `${perf.drawn} drawn of ${perf.plan}`);
-  check('single canvas renderer for hexes', (await p.ev('document.querySelectorAll(".hex-canvas").length')) === 1);
-  check('first screen: sheet closed, 4 big buttons', await p.ev(`document.getElementById('sheet').dataset.open==='false' && [...document.querySelectorAll('.tabbar button')].filter(b=>b.getBoundingClientRect().height>=56).length===4`));
+  check('local backend, practice mode (today is not Oct 31)', st.mode === 'local' && st.markMode === 'practice' && await p.ev(`!document.getElementById('practiceChip').hidden`), st.mode + '/' + st.markMode);
+  const perf = await p.ev('__ltot.zonePerf()');
+  check('h3-js loaded: zones use H3 resolution 8', perf.grid === 'h3', JSON.stringify(perf));
+  check('one canvas for the faint planning base layer', (await p.ev('document.querySelectorAll(".hex-canvas").length')) === 1 && perf.base > 0, `base hexes ${perf.base}`);
+  check('tabs: Map / Route / Mark it! / Guide, all ≥ 56 px, Mark it! in the centre',
+    await p.ev(`[...document.querySelectorAll('.tabbar button')].map(b=>b.dataset.tab).join()==='map,route,mark,guide' && [...document.querySelectorAll('.tabbar button')].every(b=>b.getBoundingClientRect().height>=56) && document.querySelectorAll('.tabbar button')[2].classList.contains('tab-mark')`));
+  const bh = await p.ev(`document.getElementById('markBtn').getBoundingClientRect().height`);
+  check('big glowing button ≥ 64 px, visible on the map', bh >= 64 && await p.ev(`(function(){var r=document.getElementById('markBtn').getBoundingClientRect(); return r.bottom<=document.querySelector('.tabbar').getBoundingClientRect().top && r.top>0;})()`), bh + ' px');
+  check('first-time ⓘ hint next to the big button', await p.ev(`!document.getElementById('markHintBtn').hidden`));
+  check('no house UI left', await p.ev(`!document.getElementById('addHouseBtn') && !document.getElementById('filterChips') && !document.querySelector('.pk')`));
   check('3 event markers on the map', (await p.ev('document.querySelectorAll(".ev-pin").length')) === 3);
   check('HUD overlay present and not clickable', await p.ev(`getComputedStyle(document.querySelector('.hud')).pointerEvents==='none' && getComputedStyle(document.querySelector('.hud')).display!=='none'`));
-  await p.shot('v2-map-hex.png');
+  check('legend: Quiet / Lively / Super hot + ⓘ “3+” note', /Quiet[\s\S]*Lively[\s\S]*Super hot/.test(await p.ev(`document.getElementById('legend').textContent`)) &&
+    (await p.click('#legend .ibtn'), await sleep(150), /3 or more people marked it in the last 45 minutes/.test(await p.ev(`document.getElementById('hintLegend').textContent`)) && await p.ev(`!document.getElementById('hintLegend').hidden`)));
+  check('mark window text follows config.js (no raw {win} placeholders)', !(await p.ev(`document.body.textContent.includes('{win}')`)) &&
+    /last 45 minutes/.test(await p.ev(`document.getElementById('howtoList').textContent`)));
+  await p.click('#legend .ibtn');
+  await p.shot('v3-map-practice.png');
 
-  // CPU-throttled redraw timing (roughly a mid-range phone)
-  await p.s('Emulation.setCPUThrottlingRate', { rate: 4 });
-  const times = [];
-  for (const z of [12, 13, 14, 13]) { await p.ev(`__ltot.map.setZoom(${z}, {animate:false})`); await sleep(300); times.push((await p.ev('__ltot.hexPerf()')).ms); }
-  await p.s('Emulation.setCPUThrottlingRate', { rate: 1 });
-  check('hex redraw < 16 ms at 4× CPU throttle', Math.max(...times) < 16, times.join(' / ') + ' ms');
+  // the big button creates a mark (one-shot location; first time explains, then asks)
+  await p.click('#markBtn'); await sleep(500);
+  await allowLoc(p); await sleep(1500);
+  const m1 = await p.ev('__ltot.state()');
+  check('big button → a mark is stored (practice, local)', m1.marks === 1 && m1.myMarks === 1, JSON.stringify({ marks: m1.marks, mine: m1.myMarks }));
+  check('“Marked! 🎉” card with 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3`) &&
+    /Practice mark/.test(await p.ev(`document.getElementById('markCardText').textContent`)));
+  check('celebration (particles + pulse) played once', (await p.ev('__ltot.state().celebrations')) === 1 && await p.ev(`document.getElementById('markBtn').classList.contains('pop')`));
+  await p.shot('v3-marked.png');
+  await p.click('#tagRow [data-tag="candy"]'); await sleep(400);
+  const stored = await p.ev(`JSON.parse(localStorage.getItem('ltot.v3.marks'))[0]`);
+  check('tag added with one tap', stored.tags.join() === 'candy' && await p.ev(`document.querySelector('#tagRow [data-tag="candy"]').getAttribute('aria-pressed')==='true'`), stored.tags.join());
+  const dist = __dist([42.966812, -81.245533], [stored.lat, stored.lng]);
+  check('stored mark is blurred (moved, < ~65 m), raw position not stored', dist > 0 && dist < 65 && !(await p.ev(`JSON.stringify(localStorage).includes('42.966812')`)), dist.toFixed(1) + ' m');
+  check('1 mark → no zone shown (3+ rule)', (await p.ev('__ltot.state().zones.length')) === 0 && (await p.ev('document.querySelectorAll(".zbadge").length')) === 0);
+  await p.click('#markCardDone'); await sleep(200);
+  check('ⓘ hint goes away after the first mark', await p.ev(`document.getElementById('markHintBtn').hidden`));
+  await p.click('.tabbar [data-tab="mark"]'); await sleep(800);
+  check('centre “Mark it!” tab runs the same flow → kind 5-minute limit message', /mark again in \d+ min/.test(await p.ev(`document.getElementById('toast').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
+    await p.ev(`document.getElementById('toast').textContent`));
 
   // layers
-  const layerNames = ['areas', 'hex', 'houses', 'dots', 'events'];
   let layerOk = true;
-  for (const k of layerNames) {
+  for (const k of ['zones', 'areas', 'events']) {
     await p.click(`.lchip[data-layer="${k}"]`); await sleep(150);
     const off = await p.ev(`!__ltot.state().layers['${k}'] && document.querySelector('.lchip[data-layer="${k}"]').getAttribute('aria-pressed')==='false'`);
     await p.click(`.lchip[data-layer="${k}"]`); await sleep(150);
-    const on = await p.ev(`__ltot.state().layers['${k}']`);
-    if (!off || !on) layerOk = false;
+    if (!off || !(await p.ev(`__ltot.state().layers['${k}']`))) layerOk = false;
   }
-  check('each map layer toggles off and on', layerOk && realErrors(p).length === 0);
-  check('hex layer back with legend', await p.ev(`!document.getElementById('legend').hidden && document.querySelectorAll('.hex-canvas').length===1`));
+  check('layer chips Zones / Areas / Events toggle off and on (+ Near me chip)', layerOk && await p.ev(`!!document.getElementById('nearChip')`) && realErrors(p).length === 0);
 
   // tabs
   let tabsOk = true;
-  for (const tab of ['areas', 'route', 'pins', 'live']) {
+  for (const tab of ['map', 'route', 'guide']) {
     await p.click(`.tabbar [data-tab="${tab}"]`); await sleep(200);
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
-  check('all 4 tabs open their panel', tabsOk);
+  check('Map / Route / Guide tabs open their panel', tabsOk);
+  check('Guide tab = How-to (13 sections) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 13 && await p.ev(`!!document.getElementById('guideBoard')`));
+  await p.click('#guideBoard'); await sleep(200);
+  check('Board opens from the Guide tab (secondary)', await p.ev(`!document.getElementById('panel-board').hidden`));
 
-  // area popup with sources + label
+  // area popup = "Suggested" base layer
   const pop = await p.ev(`(function(){var c; __ltot.map.eachLayer(function(l){ if(!c && l.options && l.options.className==='area-circle') c=l; });
     c.fire('click',{latlng:c.getLatLng()}); var t=document.querySelector('.leaflet-popup-content').textContent; __ltot.map.closePopup(); return t;})()`);
-  check('area popup: scores, label, dated sources', /Based on local news and parent reports, 2026/.test(pop) && /Sources/.test(pop) && /20\d\d-\d\d/.test(pop) && /Candy/.test(pop), pop.slice(0, 90) + '…');
-
-  // live gate (today is not Oct 31)
-  await p.click('.tabbar [data-tab="live"]'); await sleep(200);
-  check('live toggle disabled outside Oct 31 window, shows "Opens Halloween night"',
-    await p.ev(`document.getElementById('shareToggle').disabled && !document.getElementById('liveGate').hidden && /Opens Halloween night/.test(document.getElementById('liveGate').textContent)`));
-  check('consent text is the exact spec wording', await p.ev(`[...document.querySelectorAll('.consent p')].some(n=>n.textContent==="Share an anonymous dot so other families can see where it's busy. No name, rough location only, disappears after 30 minutes.")`));
+  check('researched area popup: “Suggested”, scores, dated sources', /Suggested/.test(pop) && /Sources/.test(pop) && /20\d\d-\d\d/.test(pop), pop.slice(0, 90) + '…');
+  check('researched areas drawn dashed with a muted fill', await p.ev(`(function(){var ok=false; __ltot.map.eachLayer(function(l){ if(l.options && l.options.className==='area-circle') ok = !!l.options.dashArray && l.options.fillOpacity<=0.08; }); return ok;})()`));
 
   // board
-  await p.click('.tabbar [data-tab="pins"]'); await sleep(150);
-  await p.click('#pinsSub [data-v="board"]'); await sleep(150);
+  await p.click('#boardBtn'); await sleep(200);
   await p.ev(`document.getElementById('postBody').value='best street: www.spam.com'; document.getElementById('postBtn').click()`); await sleep(300);
-  check('board rejects links', await p.ev(`!document.getElementById('postErr').hidden && /Links/.test(document.getElementById('postErr').textContent)`));
-  await p.ev(`document.getElementById('postBody').value='call 519 555 1234'; document.getElementById('postBtn').click()`); await sleep(300);
-  check('board rejects phone numbers', await p.ev(`/Phone/.test(document.getElementById('postErr').textContent)`));
+  check('board rejects links', /Links/.test(await p.ev(`document.getElementById('postErr').textContent`)));
   await p.ev(`document.getElementById('postArea').value='old-north'; document.getElementById('postBody').value='Old North was so friendly!'; document.getElementById('postBtn').click()`); await sleep(600);
-  check('valid post appears', await p.ev(`/Old North was so friendly/.test(document.getElementById('postList').textContent)`));
-  await p.click('#postList .vote'); await sleep(500);
-  const v1 = await p.ev(`document.querySelector('#postList .vote b').textContent`);
-  await p.click('#postList .vote'); await sleep(400);
-  const v2 = await p.ev(`document.querySelector('#postList .vote b').textContent`);
-  check('one upvote per device', v1 === '1' && v2 === '1' && await p.ev(`document.querySelector('#postList .vote').classList.contains('voted')`), `${v1} → ${v2}`);
-  await p.shot('v2-board-local.png');
+  check('valid post appears', /Old North was so friendly/.test(await p.ev(`document.getElementById('postList').textContent`)));
 
-  // house marker via a real tap on the map
-  await p.click('#pinsSub [data-v="houses"]'); await sleep(150);
-  const before = await p.ev('document.querySelectorAll(".pk").length');
-  await p.click('#addHouseBtn'); await sleep(400);
-  check('“Add my house” enters tap mode', await p.ev(`!document.getElementById('modeBanner').hidden`));
-  await p.tap(195, 420);
-  check('tapping the map opens the house dialog', await p.ev(`document.getElementById('houseDialog').open`));
-  await p.click('#typeGrid .tchip-teal'); await sleep(100);
-  await p.click('#tplChips .fchip'); await sleep(100);
-  check('template note fills the note box with a counter', await p.ev(`document.getElementById('hNote').value.length>5 && /\\/140/.test(document.getElementById('hCount').textContent)`));
-  check('house dialog warns about names', await p.ev(`/Don't post your name/.test(document.getElementById('houseDialog').textContent)`));
-  await p.ev(`document.getElementById('hStart').value='17:30'; document.getElementById('hEnd').value='20:30'`);
-  await p.click('#hSave'); await sleep(700);
-  const after = await p.ev('document.querySelectorAll(".pk").length');
-  check('marker saved and drawn as a glowing pumpkin', after === before + 1 && await p.ev(`document.querySelectorAll('.pk-teal.pk-giving').length>=1`), `${before} → ${after}`);
-  await p.ev(`[...document.querySelectorAll('#myHouseList .seg button')][2].click()`); await sleep(600);
-  check('one-tap “Out of candy” greys the marker', await p.ev(`document.querySelectorAll('.pk-out').length>=1`));
-  await p.ev(`[...document.querySelectorAll('#filterChips .fchip')][3].click()`); await sleep(200);
-  check('filter “hide out” hides it', (await p.ev('document.querySelectorAll(".pk-out").length')) === 0);
-  await p.ev(`[...document.querySelectorAll('#filterChips .fchip')][3].click()`); await sleep(200);
+  // suggest an area via a real tap on the map
+  await p.ev(`__ltot.openTab('map')`); await sleep(150);
+  await p.click('#suggestBtn'); await sleep(400);
+  check('“Suggest an area” enters tap mode', /Tap your neighbourhood/.test(await p.ev(`document.getElementById('modeText').textContent`)));
+  await p.ev(`__ltot.map.setView([43.0262, -81.2765], 15, {animate:false})`); await sleep(300);
+  await p.tap(195, 330);
+  check('tapping the map opens the suggestion dialog', await p.ev(`document.getElementById('suggestDialog').open`));
+  await p.ev(`document.getElementById('suggestReason').value='see www.x.com'; document.getElementById('suggestSend').click()`); await sleep(300);
+  check('suggestion rejects links', /Links/.test(await p.ev(`document.getElementById('suggestErr').textContent`)));
+  await p.ev(`document.getElementById('suggestReason').value='Lots of porch lights'; document.getElementById('suggestSend').click()`); await sleep(600);
+  check('suggestion saved (needs 3 to show)', !(await p.ev(`document.getElementById('suggestDialog').open`)) && /needs 3/.test(await p.ev(`document.getElementById('toast').textContent`)) && (await p.ev('__ltot.state().suggested')) === 0);
 
   // language
   await p.click('#langBtn'); await sleep(400);
   const zh = await p.ev(`({ title: document.title, lang: document.documentElement.lang, tabs: [...document.querySelectorAll('.tabbar button')].map(b=>b.textContent).join('|'),
-     leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n),
-     consent: document.querySelector('.consent p').textContent })`);
-  check('one-tap Chinese: title, tabs, consent', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && /社区/.test(zh.tabs) && /匿名圆点/.test(zh.consent), zh.tabs);
+     btn: document.getElementById('markBtn').textContent, legend: document.getElementById('legend').textContent,
+     leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n) })`);
+  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这里很热闹！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
   check('no untranslated i18n keys on screen', zh.leftovers.length === 0, zh.leftovers.join(','));
-  await p.click('.tabbar [data-tab="areas"]'); await sleep(200);
-  await p.shot('v2-areas-zh.png');
+  await p.click('.tabbar [data-tab="map"]'); await sleep(200);
+  check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
+  await p.shot('v3-map-panel-zh.png');
   await p.click('#safetyBtn'); await sleep(200);
-  check('safety panel: 10 tips', (await p.ev('document.querySelectorAll("#tipList li").length')) === 10);
+  check('safety panel: 10 tips incl. “go with a grown-up”', (await p.ev('document.querySelectorAll("#tipList li").length')) === 10 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 8 sections', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 8 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh) with 10 sections', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 10 && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
-  check('privacy page (en)', /What|No accounts/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
+
+  // URL params on the same profile (guide already seen)
+  const g = await openPage('?guide=1&lang=zh', { wait: 3000 });
+  check('?guide=1&lang=zh forces the welcome cards in Chinese', await g.ev(`!document.getElementById('guide').hidden && /看看哪里好玩/.test(document.getElementById('guideTrack').textContent)`));
+  await g.shot('v3-guide-zh.png');
+  const h = await openPage('?howto=1', { wait: 3000 });
+  check('?howto=1 opens the How-to (Guide) panel, no cards', await h.ev(`!document.getElementById('panel-guide').hidden && document.getElementById('guide').hidden`));
+  await h.shot('v3-howto.png');
 }
 
-// =========================================================== 2. two demo tabs (?demo=1)
+// =========================================================== 2. demo (?demo=1): zones, counts tick up, two tabs
 {
-  const a = await openPage('?demo=1', { geo: [42.9668, -81.2455] });
-  const b = await openPage('?demo=1', { geo: [42.999, -81.2475] });
+  const a = await openPage('?demo=1', { geo: [42.9668, -81.2455], wait: 5000 });
+  const b = await openPage('?demo=1', { geo: [42.999, -81.2475], wait: 5000 });
+  await dismissGuide(a); await dismissGuide(b);
   check('demo tabs load without errors', realErrors(a).length + realErrors(b).length === 0, realErrors(a).concat(realErrors(b)).join(' | '));
-  check('demo chip shown, live toggle enabled', await a.ev(`!document.getElementById('demoChip').hidden && !document.getElementById('shareToggle').disabled`));
-  const pa = await a.ev('__ltot.state().posts'), pb0 = await b.ev('__ltot.state().posts');
-  await a.ev(`__ltot.openTab('pins'); document.querySelector('#pinsSub [data-v="board"]').click();
-    document.getElementById('postBody').value='Tab A says hi from Baker St'; document.getElementById('postBtn').click()`);
-  await sleep(1500);
-  check('post from tab A appears in tab B without reload', /Tab A says hi/.test(await b.ev(`document.getElementById('postList').textContent`)) && (await b.ev('__ltot.state().posts')) === pb0 + 1, `A had ${pa}, B ${pb0} → ${await b.ev('__ltot.state().posts')}`);
-
-  // marker status change propagates
-  await a.ev(`document.querySelector('#pinsSub [data-v="houses"]').click(); document.getElementById('addHouseBtn').click()`); await sleep(400);
-  const pt = await a.ev(`(function(){ __ltot.map.setView([42.970, -81.240], 16, {animate:false}); var r=document.getElementById('map').getBoundingClientRect();
-    var c=__ltot.map.latLngToContainerPoint([42.970, -81.240]); return [r.left+c.x, r.top+c.y]; })()`);
-  await sleep(300);
-  await a.tap(pt[0], pt[1]);
-  check('demo tab: house dialog opened from a map tap', await a.ev(`document.getElementById('houseDialog').open`));
-  await a.click('#hSave'); await sleep(900);
-  const bOut0 = await b.ev('document.querySelectorAll(".pk-out").length');
-  await a.ev(`__ltot.openTab('pins'); [...document.querySelectorAll('#myHouseList .seg button')][2].click()`); await sleep(1500);
-  const bOut1 = await b.ev('document.querySelectorAll(".pk-out").length');
-  check('“Out of candy” in tab A updates tab B', bOut1 === bOut0 + 1, `${bOut0} → ${bOut1}`);
-
-  // live dots
-  await a.ev(`__ltot.openTab('live')`); await sleep(200);
-  await a.click('#shareToggle'); await sleep(600);
-  if (await a.ev(`document.getElementById('locDialog').open`)) { await a.click('#locYes'); }
-  await sleep(2500);
+  check('DEMO chip shown', await a.ev(`!document.getElementById('demoChip').hidden && document.getElementById('practiceChip').hidden`));
   const sa = await a.ev('__ltot.state()');
+  const counts = sa.zones.map((z) => z.count);
+  check('demo zones with counts appear (range of colours)', sa.zones.length >= 6 && new Set(sa.zones.map((z) => z.bucket)).size === 3 && counts.every((n) => n >= 3),
+    counts.join(','));
+  const hyde = sa.zones.find((z) => z.isNew && z.bucket === 'hot');
+  check('a hot NEW zone outside the researched areas (Hyde Park)', !!hyde && await a.ev(`(function(){var c=__ltot.grid.center(${JSON.stringify(hyde ? hyde.cell : '')}); return __ltot.lib.distM(c,[43.010,-81.335])<600;})()`));
+  await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(800);
+  const badges = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
+  check('zoomed out: compact badges “🔥 n” + NEW + top-tag emoji', badges.length >= 5 && badges.every((t) => /^🔥 \d+/.test(t)) && badges.some((t) => /NEW/.test(t)) && badges.some((t) => /🍬/.test(t)), badges.slice(0, 6).join(' | '));
+  await a.shot('v3-demo-zones.png');
+  await a.ev(`__ltot.map.setView([42.9655, -81.2440], 14, {animate:false})`); await sleep(800);
+  const full = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
+  check('street zoom: full badge “🔥 23 marked”', full.some((t) => /^🔥 23 marked/.test(t)), full.join(' | '));
+  await a.shot('v3-demo-street.png');
+  await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(500);
+  check('zones are SVG paths with CSS pulse classes (no per-frame JS)', await a.ev(`document.querySelectorAll('path.zone-hot').length>=1 && document.querySelectorAll('path.zone-lively').length>=1 && document.querySelectorAll('path.zone-quiet').length>=1 && getComputedStyle(document.querySelector('path.zone-hot')).animationName==='zflash'`));
+  check('community-suggested hexagon drawn (dashed)', await a.ev(`document.querySelectorAll('path.community-hex').length===1`) && (await a.ev('__ltot.state().suggested')) === 1);
+  const zp = await a.ev('__ltot.zonePerf()');
+  check('zone layer draws only viewport zones, capped', zp.drawn > 0 && zp.drawn <= 150 && zp.badges <= 40, JSON.stringify(zp));
+  const sum0 = (await a.ev('__ltot.state()')).zones.reduce((n, z) => n + z.count, 0);
+  await sleep(13500);
+  const sum1 = (await a.ev('__ltot.state()')).zones.reduce((n, z) => n + z.count, 0);
+  check('fake marks keep arriving: counts tick up', sum1 > sum0, `${sum0} → ${sum1}`);
+
+  // a real mark in tab A shows in tab B
+  const bMarks0 = await b.ev('__ltot.state().marks');
+  await a.click('#markBtn'); await sleep(2000); await allowLoc(a); await sleep(1500);
+  const myId = await a.ev(`(JSON.parse(localStorage.getItem('ltot.demo.mine.marks'))||[]).slice(-1).map(h=>h.id)[0]`);
+  check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /next 45 minutes/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
   await sleep(1200);
-  const sb = await b.ev('__ltot.state()');
-  check('tab A is sharing and sent one coarsened dot', sa.live && sa.ownSids.length === 1, JSON.stringify({ live: sa.live, own: sa.ownSids.length }));
-  const bSeesA = await b.ev(`(async function(){ var d = await __ltot.backend.listDots(); return d.some(function(x){ return x.sidHash===${JSON.stringify(sa.ownSids[0])}; }); })()`);
-  check('tab B sees tab A’s dot', bSeesA && sb.drawnDots === sb.dots, `B drew ${sb.drawnDots}/${sb.dots}`);
-  check('tab A does not draw its own dot twice', sa.drawnDots === sa.dots - 1, `A drew ${sa.drawnDots} of ${sa.dots}`);
-  const stored = await a.ev(`(async function(){ var d = await __ltot.backend.listDots(); var me = d.filter(function(x){ return x.sidHash===${JSON.stringify(sa.ownSids[0])}; })[0]; return me ? [me.lat, me.lng] : null; })()`);
-  const dist = stored ? __dist([42.9668, -81.2455], stored) : 1e9;
-  check('sent position is coarsened (moved, but < ~65 m)', stored && dist > 0.5 && dist < 65, stored ? dist.toFixed(1) + ' m from the real spot' : 'none');
-  check('status line shows sharing countdown', /Sharing · next update in \d+ s · stops by itself in 90 min/.test(await a.ev(`document.getElementById('liveStatus').textContent`)));
-  await a.ev('__ltot.computeHex()');
-  const lp = await a.ev('__ltot.hexPerf()');
-  const liveCounts = await a.ev(`(async function(){ return (await __ltot.backend.liveHexCounts(20, __ltot.grid.cell)).map(function(c){return c.count;}); })()`);
-  check('live hex mode: only hexes with ≥ 3 dots', lp.live > 0 && liveCounts.every((n) => n >= 3), `live hexes ${lp.live}, counts ${liveCounts.join(',')}`);
-  await a.ev(`__ltot.openTab(null); __ltot.map.setView([42.968, -81.247], 14, {animate:false})`); await sleep(800);
-  await a.shot('v2-live-demo.png');
-  await a.ev(`__ltot.openTab('live')`); await sleep(400);
-  await a.shot('v2-live-panel.png');
-  await b.ev(`__ltot.openTab('pins'); document.querySelector('#pinsSub [data-v="board"]').click()`); await sleep(300);
-  await b.shot('v2-board.png');
-  await a.click('#shareToggle'); await sleep(1500);
-  const bStill = await b.ev(`(async function(){ var d = await __ltot.backend.listDots(); return d.some(function(x){ return x.sidHash===${JSON.stringify(sa.ownSids[0])}; }); })()`);
-  check('turning sharing off removes the dot for others', !bStill && !(await a.ev('__ltot.state().live')));
-  check('demo tabs: no JS errors after live test', realErrors(a).length + realErrors(b).length === 0, realErrors(a).concat(realErrors(b)).join(' | '));
+  check('the mark from tab A shows in tab B (BroadcastChannel + localStorage)', await b.ev(`__ltot.backend.local._get('marks',[]).some(m=>m.id===${JSON.stringify(myId)})`) && (await b.ev('__ltot.state().marks')) > bMarks0,
+    `B marks ${bMarks0} → ${await b.ev('__ltot.state().marks')}`);
+  await a.click('#markCardDone');
+
+  // Near me (demo home)
+  const n = await openPage('?demo=1&near=1', { wait: 5000 });
+  await dismissGuide(n);
+  check('?demo=1&near=1 opens “Near me” centred on the demo home', await n.ev(`!document.getElementById('panel-near').hidden && /pretend home/.test(document.getElementById('nearFrom').textContent)`));
+  const rows = await n.ev(`[...document.querySelectorAll('#nearList .near-main b')].map(b=>b.textContent)`);
+  const toM = (s) => /km/.test(s) ? parseFloat(s) * 1000 : parseFloat(s);
+  check('Near me rows sorted by distance, within 2 km', rows.length >= 2 && rows.every((r, i) => i === 0 || toM(rows[i - 1]) <= toM(r)) && rows.every((r) => toM(r) <= 2000), rows.join(' / '));
+  await n.shot('v3-near.png');
+  await n.click('#radiusSeg [data-v="5"]'); await sleep(200);
+  const r5 = Number(await n.ev(`document.getElementById('nearList').dataset.count`));
+  await n.click('#radiusSeg [data-v="1"]'); await sleep(200);
+  const r1 = Number(await n.ev(`document.getElementById('nearList').dataset.count`));
+  check('1 km / 2 km / 5 km toggle filters the list', r1 <= rows.length && rows.length < r5, `${r1} / ${rows.length} / ${r5}`);
+  await n.click('#radiusSeg [data-v="2"]'); await sleep(200);
+  await n.click('#nearList .near-row .btn'); await sleep(800);
+  check('Route button on a row plans a walk to that zone', await n.ev(`!document.getElementById('panel-route').hidden && document.getElementById('areaSelect').value==='target'`));
+  const nz = await openPage('?demo=1&near=1&lang=zh', { wait: 5000 });
+  await dismissGuide(nz);
+  check('Near me in Chinese', /我附近的热闹地方/.test(await nz.ev(`document.getElementById('panel-near').textContent`)) && /人标记/.test(await nz.ev(`document.getElementById('nearList').textContent`)));
+  await nz.shot('v3-near-zh.png');
+  await nz.ev(`__ltot.openTab(null); __ltot.map.setView([42.975, -81.27], 12, {animate:false})`); await sleep(900);
+  await nz.shot('v3-demo-zones-zh.png');
+  check('demo tabs: no JS errors', [a, b, n, nz].every((x) => realErrors(x).length === 0), [a, b, n, nz].map(realErrors).flat().join(' | '));
 }
 
 // =========================================================== 3. h3-js blocked → local hex grid fallback
 {
-  const p = await openPage('', { block: ['*h3-js*'] });
-  const perf = await p.ev('__ltot.hexPerf()');
-  check('h3-js blocked → local hex grid still draws', perf.grid === 'local' && perf.drawn > 0, JSON.stringify(perf));
-  await p.ev(`__ltot.openTab('live')`); await sleep(200);
-  check('fallback note visible', await p.ev(`!document.getElementById('hexFallback').hidden`));
+  const p = await openPage('?demo=1', { block: ['*h3-js*'], wait: 5000 });
+  await dismissGuide(p);
+  const perf = await p.ev('__ltot.zonePerf()');
+  check('h3-js blocked → local hex grid: zones + base layer still draw', perf.grid === 'local' && perf.zones >= 6 && perf.base > 0, JSON.stringify(perf));
   check('no JS errors with h3 blocked', realErrors(p).length === 0, realErrors(p).join(' | '));
 }
 
 // =========================================================== 4. backend 'supabase' but not configured
 {
-  const cfg = `window.TOT_CONFIG={backend:'supabase',supabaseUrl:'',supabaseAnonKey:'',liveWindow:{date:'2026-10-31',start:'15:00',end:'23:00',tz:'America/Toronto'},dotTtlMin:30,hexWindowMin:20,hexMinCount:3,pollSec:60};`;
+  const cfg = `window.TOT_CONFIG={backend:'supabase',supabaseUrl:'',supabaseAnonKey:'',liveWindow:{date:'2026-10-31',start:'15:00',end:'23:00',tz:'America/Toronto'},markWindowMin:45,pollSec:45};`;
   const p = await openPage('', { config: cfg });
   check('supabase selected but empty → offline chip, local mode', await p.ev(`!document.getElementById('offlineChip').hidden && __ltot.backend.reason==='notConfigured'`));
   check('…and supabase-js is not downloaded', !p.requests.some((u) => /supabase-js/.test(u)));
@@ -283,20 +309,21 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
 
 // =========================================================== 5. supabase configured but unreachable → automatic fallback
 {
-  const cfg = `window.TOT_CONFIG={backend:'supabase',supabaseUrl:'https://ltot-test.invalid',supabaseAnonKey:'${'x'.repeat(40)}',liveWindow:{date:'2026-10-31',start:'15:00',end:'23:00',tz:'America/Toronto'},dotTtlMin:30,hexWindowMin:20,hexMinCount:3,pollSec:60};`;
+  const cfg = `window.TOT_CONFIG={backend:'supabase',supabaseUrl:'https://ltot-test.invalid',supabaseAnonKey:'${'x'.repeat(40)}',liveWindow:{date:'2026-10-31',start:'15:00',end:'23:00',tz:'America/Toronto'},markWindowMin:45,pollSec:45};`;
   const p = await openPage('', { config: cfg, wait: 8000 });
   check('supabase-js lazy-loaded from CDN (SRI ok) only when configured', p.requests.some((u) => /supabase-js@2\.118\.0/.test(u)) && await p.ev(`!!(window.supabase && window.supabase.createClient)`));
   check('unreachable server → “Offline mode” chip', await p.ev(`__ltot.backend.mode==='offline' && !document.getElementById('offlineChip').hidden`));
-  await p.ev(`__ltot.openTab('pins'); document.querySelector('#pinsSub [data-v="board"]').click();
-    document.getElementById('postBody').value='works offline'; document.getElementById('postBtn').click()`); await sleep(800);
+  await p.ev(`__ltot.openTab('board'); document.getElementById('postBody').value='works offline'; document.getElementById('postBtn').click()`); await sleep(800);
   check('board still works offline (saved locally)', /works offline/.test(await p.ev(`document.getElementById('postList').textContent`)));
   check('no unexpected JS errors in offline mode', realErrors(p).length === 0, realErrors(p).join(' | '));
 }
 
 // =========================================================== 6. reduced motion
 {
-  const p = await openPage('', { reducedMotion: true, wait: 2500 });
-  check('prefers-reduced-motion turns the radar HUD off', await p.ev(`getComputedStyle(document.querySelector('.hud')).display==='none'`));
+  const p = await openPage('?demo=1', { reducedMotion: true, wait: 4000 });
+  await dismissGuide(p);
+  check('prefers-reduced-motion: HUD off, zones and button glow do not animate', await p.ev(`getComputedStyle(document.querySelector('.hud')).display==='none' &&
+    getComputedStyle(document.querySelector('.mb-glow')).animationName==='none' && [...document.querySelectorAll('path.zone')].every(z=>getComputedStyle(z).animationName==='none')`));
 }
 
 function __dist(a, b) {
@@ -306,7 +333,7 @@ function __dist(a, b) {
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
-writeFileSync(`${OUT}/v2-results.txt`, results.join('\n') + `\n\n${pass} passed, ${fail} failed\n`);
+writeFileSync(`${OUT}/v3-results.txt`, results.join('\n') + `\n\n${pass} passed, ${fail} failed\n`);
 ws.close();
 chrome.kill();
 await sleep(500);

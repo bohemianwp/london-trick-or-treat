@@ -107,7 +107,7 @@ Scores are 1 to 5, higher is better. For crowd, 5 means comfortable and 1 means 
 ## Events before Halloween night
 
 - Halloween in the Village (Wortley Village): Sat Oct 24 2026, carnival 1-5 PM, parade 5:30-7 PM ([link](https://www.hitv.ca/))
-- Halloween in Argyle trick-or-treat (1815 Dundas St E): Sat Oct 17 2026, 11 AM-2 PM ([link](https://www.londontourism.ca/events/halloween-in-argyle))
+- (Past, removed from the app on 2026-10-17) Halloween in Argyle trick-or-treat (1815 Dundas St E): Sat Oct 17 2026, 11 AM-2 PM ([link](https://www.londontourism.ca/events/halloween-in-argyle))
 - Somerset Monster House (71 Somerset Cres): Oct 8-31 2026, donations ([link](https://www.todocanada.ca/city/london/halloween-haunts/))
 - Camp Weathered display (65 Wethered St) and other big houses: Halloween season ([link](https://www.cbc.ca/news/canada/london/here-s-a-halloween-map-of-the-biggest-scary-houses-to-visit-in-london-9.6944487))
 - CTV London Halloween displays map 2026: updated Oct 15 2026 ([link](https://www.ctvnews.ca/london/article/halloween-displays-in-and-around-the-london-area-3/))

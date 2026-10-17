@@ -1,8 +1,11 @@
 /* Data-access layer: one interface, two adapters.
    LocalAdapter    — localStorage + BroadcastChannel (default, and the automatic fallback).
    SupabaseAdapter — supabase-js v2 from a CDN, loaded only when config.backend === 'supabase' and it is configured.
-   Interface: listMarkers, upsertMarker, setMarkerStatus, deleteMarker, listPosts, createPost, vote, report, deletePost,
-              sendDot, removeDot, listDots, liveHexCounts. Every method returns a Promise.
+   Interface: listPosts, createPost, vote, report, deletePost (board),
+              sendMark, tagMark, liveZoneCounts, listZones (marks → zones), suggestArea, communitySuggested.
+   Every method returns a Promise.
+   Privacy: sendMark() blurs the position (~50 m grid + jitter) BEFORE either adapter sees it, so the raw position
+   is never stored or sent. Zones come back only when they have 3+ marks.
    Errors carry err.code: invalid | forbidden | rate | closed | outside | text:<empty|tooLong|url|email|phone|profanity> */
 (function (root, factory) {
   var B = factory(root, root.TOT_LIB || (typeof require === 'function' ? require('./lib.js') : null));
@@ -13,8 +16,9 @@
 
   var SB_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
   var SB_SRI = 'sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK';
-  var METHODS = ['listMarkers', 'upsertMarker', 'setMarkerStatus', 'deleteMarker', 'listPosts', 'createPost',
-                 'vote', 'report', 'deletePost', 'sendDot', 'removeDot', 'listDots', 'liveHexCounts'];
+  var METHODS = ['listPosts', 'createPost', 'vote', 'report', 'deletePost',
+                 'sendMark', 'tagMark', 'liveZoneCounts', 'suggestArea', 'communitySuggested'];
+  var LIVE_METHODS = { sendMark: 1, tagMark: 1, liveZoneCounts: 1 };   // outside the live window these stay local (practice)
   var HOUR = 3600000;
 
   function fail(code) { var e = new Error(code); e.code = code; e.validation = true; return Promise.reject(e); }
@@ -52,55 +56,6 @@
       this.listeners.forEach(function (f) { f(kind, remote); });
     },
     onChange: function (fn) { this.listeners.push(fn); },
-
-    // ---------------- markers
-    listMarkers: function () {
-      var now = this.now();
-      return ok(this._get('markers', []).filter(function (m) { return !LIB.isMarkerExpired(m, now); })
-        .map(function (m) { var c = Object.assign({}, m); delete c.tokenHash; delete c.deviceHash; return c; }));
-    },
-    upsertMarker: function (m, token) {
-      if (!token || token.length < 16) return fail('invalid');
-      if (m && m.note) { var tc = LIB.checkText(m.note, { optional: true }); if (!tc.ok) return fail('text:' + tc.error); }
-      var clean = LIB.sanitizeMarker(m);
-      if (!clean) return fail(m && !LIB.inLondonBox(+m.lat, +m.lng) ? 'outside' : 'invalid');
-      if (this.now() >= LIB.MARKER_EXPIRES_MS) return fail('closed');
-      var list = this._get('markers', []), hash = LIB.sha256Hex(token), now = this.now();
-      if (clean.id) {
-        var i = list.findIndex(function (x) { return x.id === clean.id; });
-        if (i < 0) return fail('forbidden');
-        if (list[i].tokenHash !== hash) return fail('forbidden');
-        list[i] = Object.assign(list[i], clean, { tokenHash: hash, updatedAt: now });
-      } else {
-        var dev = m.device ? LIB.sha256Hex('device:' + m.device) : null;
-        var mine = list.filter(function (x) { return dev && x.deviceHash === dev; }).length;
-        if (mine >= 3) return fail('rate');                               // at most 3 houses per device
-        clean.id = LIB.uuid();
-        clean.deviceHash = dev;
-        clean.createdAt = now;
-        clean.tokenHash = hash;
-        list.push(clean);
-      }
-      this._set('markers', list);
-      return ok({ id: clean.id });
-    },
-    setMarkerStatus: function (id, status, token) {
-      if (LIB.STATUSES.indexOf(status) < 0) return fail('invalid');
-      var list = this._get('markers', []), hash = LIB.sha256Hex(token || '');
-      var m = list.find(function (x) { return x.id === id; });
-      if (!m || m.tokenHash !== hash) return fail('forbidden');
-      m.status = status;
-      m.updatedAt = this.now();
-      this._set('markers', list);
-      return ok(true);
-    },
-    deleteMarker: function (id, token) {
-      var list = this._get('markers', []), hash = LIB.sha256Hex(token || '');
-      var keep = list.filter(function (x) { return !(x.id === id && x.tokenHash === hash); });
-      if (keep.length === list.length) return fail('forbidden');
-      this._set('markers', keep);
-      return ok(true);
-    },
 
     // ---------------- board
     listPosts: function (board) {
@@ -153,44 +108,65 @@
       return ok(true);
     },
 
-    // ---------------- live dots
-    sendDot: function (d) {
+    // ---------------- marks (already blurred by createBackend().sendMark)
+    // m: { session, lat, lng, cell, tags }, token: random secret kept on this phone (lets it add tags later).
+    sendMark: function (m, token) {
       var now = this.now();
-      if (!d || !/^[a-f0-9]{16,64}$/.test(d.session || '')) return fail('invalid');
-      if (!LIB.inLondonBox(+d.lat, +d.lng)) return fail('outside');
-      if (!LIB.isLiveOpen(now, this.cfg, this.demo)) return fail('closed');
-      var ttl = this.cfg.dotTtlMin || 30, sid = LIB.sha256Hex(d.session);
-      var dots = LIB.pruneDots(this._get('dots', []), now, ttl);
-      var cur = dots.find(function (x) { return x.sidHash === sid; });
-      if (cur && now - cur.updatedAt < 30000) return ok(false);          // one dot per session every 30 s
-      var rec = { sidHash: sid, lat: LIB.round(+d.lat, 4), lng: LIB.round(+d.lng, 4),
-                  h3: /^[0-9a-f]{15}$/.test(d.h3 || '') ? d.h3 : null, updatedAt: now };
-      if (cur) Object.assign(cur, rec); else dots.push(rec);
-      this._set('dots', dots);
-      return ok(true);
+      if (!m || !/^[a-f0-9]{16,64}$/.test(m.session || '') || !token || token.length < 16 || !m.cell) return fail('invalid');
+      if (!LIB.inLondonBox(+m.lat, +m.lng)) return fail('outside');
+      if (!LIB.tagsValid(m.tags)) return fail('invalid');
+      var sid = LIB.sha256Hex(m.session), marks = this._prune();
+      var mine = marks.filter(function (x) { return x.sidHash === sid; });
+      if (mine.some(function (x) { return now - x.createdAt < LIB.RATE_DEVICE_MS; })) return fail('rate');
+      if (mine.some(function (x) { return x.cell === m.cell && now - x.createdAt < LIB.RATE_ZONE_MS; })) return fail('rate');
+      var rec = { id: LIB.uuid(), sidHash: sid, lat: LIB.round(+m.lat, 4), lng: LIB.round(+m.lng, 4), cell: String(m.cell).slice(0, 20),
+                  tags: LIB.cleanTags(m.tags), createdAt: now, tokenHash: LIB.sha256Hex(token) };
+      marks.push(rec);
+      this._set('marks', marks);
+      return ok({ id: rec.id });
     },
-    // Turning sharing off removes your dot at once instead of waiting for the 30-minute expiry.
-    removeDot: function (session) {
-      var sid = LIB.sha256Hex(session || '');
-      this._set('dots', this._get('dots', []).filter(function (x) { return x.sidHash !== sid; }));
-      return ok(true);
+    tagMark: function (id, token, tag) {
+      if (LIB.MARK_TAGS.indexOf(tag) < 0) return fail('invalid');
+      var marks = this._get('marks', []), m = marks.find(function (x) { return x.id === id; });
+      if (!m || m.tokenHash !== LIB.sha256Hex(token || '')) return fail('forbidden');
+      if (this.now() - m.createdAt > 15 * 60000) return fail('closed');
+      if (m.tags.indexOf(tag) < 0) m.tags.push(tag);
+      this._set('marks', marks);
+      return ok(m.tags.slice());
     },
-    listDots: function () {
-      var now = this.now(), ttl = this.cfg.dotTtlMin || 30;
-      return ok(LIB.pruneDots(this._get('dots', []), now, ttl).map(function (d) {
-        return { sidHash: d.sidHash, lat: d.lat, lng: d.lng, updatedAt: d.updatedAt };
-      }));
+    // Marks older than 2 hours are deleted on every read/write.
+    _prune: function () {
+      var now = this.now(), all = this._get('marks', []);
+      var keep = all.filter(function (x) { return now - x.createdAt < LIB.MARK_KEEP_MS; });
+      if (keep.length !== all.length) this._set('marks', keep);
+      return keep;
     },
-    // Client-side aggregation (the server does this in SQL). cellFn maps lat,lng -> cell id.
-    liveHexCounts: function (windowMin, cellFn) {
-      var self = this;
-      var w = Math.min(30, Math.max(15, windowMin || this.cfg.hexWindowMin || 20));
-      return this.listDots().then(function (dots) {
-        var counts = LIB.countDotsByCell(dots.map(function (d) { return { lat: d.lat, lng: d.lng, updatedAt: d.updatedAt }; }),
-                                         cellFn, self.now(), w);
-        return LIB.suppressSmall(counts, self.cfg.hexMinCount || 3);
-      });
-    }
+    // Same contract as the zone_counts RPC: only cells with 3+ marks, never ids, sessions or positions.
+    liveZoneCounts: function (windowMin, cellFn) {
+      var zones = LIB.aggregateZones(this._prune(), cellFn, this.now(), windowMin || this.cfg.markWindowMin, 300);
+      return ok(zones.map(function (z) { return { cell: z.cell, count: z.count, tags: z.tags, topTag: z.topTag, firstLitAt: z.firstLitAt }; }));
+    },
+    markCount: function () { return this._prune().length; },
+
+    // ---------------- community suggestions
+    // s: { device, cell, lat, lng (hex centre), reason }
+    suggestArea: function (s) {
+      var now = this.now();
+      if (!s || !s.device || String(s.device).length < 8 || !s.cell) return fail('invalid');
+      if (!LIB.inLondonBox(+s.lat, +s.lng)) return fail('outside');
+      if (now >= LIB.SEASON_END_MS) return fail('closed');
+      var tc = LIB.checkReason(s.reason);
+      if (!tc.ok) return fail('text:' + tc.error);
+      var dev = LIB.sha256Hex('device:' + s.device), all = this._get('suggestions', []);
+      var hist = all.filter(function (x) { return x.deviceHash === dev; }).map(function (x) { return { t: x.createdAt, cell: x.cell }; });
+      if (!LIB.suggestRate(hist, s.cell, now).ok) return fail('rate');
+      var rec = { id: LIB.uuid(), deviceHash: dev, cell: String(s.cell).slice(0, 20), lat: LIB.round(+s.lat, 4), lng: LIB.round(+s.lng, 4),
+                  reason: tc.text || null, createdAt: now };
+      all.push(rec);
+      this._set('suggestions', all);
+      return ok({ id: rec.id });
+    },
+    communitySuggested: function () { return ok(LIB.communitySuggested(this._get('suggestions', []))); }
   };
   // ==== SupabaseAdapter ====
   function loadScript(src, sri) {
@@ -228,24 +204,6 @@
     _q: function (fn) { var self = this; return this.ready.then(function () { return fn(self.db); }).then(unwrap); },
     rpc: function (name, args) { return this._q(function (db) { return db.rpc(name, args); }); },
     ping: function () { return this._q(function (db) { return db.from('posts').select('id').limit(1); }); },
-    listMarkers: function () {
-      return this._q(function (db) {
-        return db.from('markers').select('id,lat,lng,types,status,note,start_time,end_time,expires_at')
-          .gt('expires_at', new Date().toISOString()).limit(2000);
-      }).then(function (rows) {
-        return rows.map(function (r) {
-          return { id: r.id, lat: r.lat, lng: r.lng, types: r.types, status: r.status, note: r.note || '',
-                   start: hhmm(r.start_time), end: hhmm(r.end_time), expiresAt: Date.parse(r.expires_at) };
-        });
-      });
-    },
-    upsertMarker: function (m, token) {
-      return this.rpc('upsert_marker', { p_id: m.id || null, p_lat: m.lat, p_lng: m.lng, p_types: m.types, p_status: m.status,
-        p_note: m.note || null, p_start: m.start || null, p_end: m.end || null, p_token: token, p_device: m.device || null })
-        .then(function (id) { return { id: id }; });
-    },
-    setMarkerStatus: function (id, status, token) { return this.rpc('set_marker_status', { p_id: id, p_token: token, p_status: status }); },
-    deleteMarker: function (id, token) { return this.rpc('delete_marker', { p_id: id, p_token: token }); },
     listPosts: function (board) {
       return this._q(function (db) {
         var q = db.from('posts').select('id,board,area_id,lat,lng,body,votes,created_at').eq('hidden', false);
@@ -268,16 +226,25 @@
       return this.rpc('report_post', { p_post_id: postId, p_voter: voter }).then(function (n) { return { ok: n >= 0, already: n < 0 }; });
     },
     deletePost: function (id, token) { return this.rpc('delete_post', { p_id: id, p_token: token }); },
-    sendDot: function (d) { return this.rpc('send_dot', { p_session: d.session, p_lat: d.lat, p_lng: d.lng, p_h3: d.h3 || null }); },
-    removeDot: function (session) { return this.rpc('remove_dot', { p_session: session }); },
-    listDots: function () {
-      return this.rpc('live_dots_recent', {}).then(function (rows) {
-        return rows.map(function (r) { return { sidHash: r.sid_hash, lat: r.lat, lng: r.lng, updatedAt: Date.parse(r.updated_at) }; });
+    sendMark: function (m, token) {
+      return this.rpc('send_mark', { p_session: m.session, p_lat: m.lat, p_lng: m.lng, p_h3: m.cell, p_tags: m.tags || [], p_token: token })
+        .then(function (id) { return { id: id }; });
+    },
+    tagMark: function (id, token, tag) { return this.rpc('tag_mark', { p_id: id, p_token: token, p_tag: tag }); },
+    liveZoneCounts: function (windowMin) {
+      return this.rpc('zone_counts', { p_window_min: LIB.clampWindow(windowMin) }).then(function (rows) {
+        return rows.map(function (r) {
+          return { cell: r.h3_r8, count: r.n, topTag: r.top_tag, topTagN: r.top_tag_n, firstLitAt: r.first_lit_at ? Date.parse(r.first_lit_at) : null };
+        });
       });
     },
-    liveHexCounts: function (windowMin) {
-      return this.rpc('live_hex_counts', { p_window_min: windowMin || 20 }).then(function (rows) {
-        return rows.map(function (r) { return { cell: r.h3_r8, count: r.n }; });
+    suggestArea: function (s) {
+      return this.rpc('suggest_area', { p_device: s.device, p_h3: s.cell, p_lat: s.lat, p_lng: s.lng, p_reason: s.reason || null })
+        .then(function (id) { return { id: id }; });
+    },
+    communitySuggested: function () {
+      return this.rpc('community_suggested', {}).then(function (rows) {
+        return rows.map(function (r) { return { cell: r.h3_r8, n: r.n, lat: r.lat, lng: r.lng, reasons: r.reasons || [] }; });
       });
     }
   };
@@ -294,7 +261,8 @@
   }
   function createBackend(cfg, opts) {
     opts = opts || {};
-    var local = new LocalAdapter({ cfg: cfg, demo: opts.demo, prefix: opts.demo ? 'ltot.demo.' : 'ltot.v2.', storage: opts.storage, channel: opts.channel });
+    var now = opts.now || function () { return Date.now(); };
+    var local = new LocalAdapter({ cfg: cfg, demo: opts.demo, prefix: opts.demo ? 'ltot.demo.' : 'ltot.v3.', storage: opts.storage, channel: opts.channel, now: opts.now });
     var api = { local: local, mode: 'local', reason: '', onChange: function (fn) { local.onChange(fn); } };
     var statusFns = [], remote = null, retry = null, cacheKey = 'ltot.cache.';
     api.onStatus = function (fn) { statusFns.push(fn); };
@@ -316,16 +284,16 @@
     }
     function viaLocal(name, args) {
       var p = local[name].apply(local, args);
-      if (name === 'listMarkers') return p.then(function (l) { return cached('markers').concat(l); });
       if (name === 'listPosts') return p.then(function (l) { return cached('posts.' + (args[0] || '')).concat(l); });
       return p;
     }
+    // Practice mode: outside Oct 31 3–11 PM marks never leave this browser.
+    api.isLive = function () { return LIB.isLiveOpen(now(), cfg, false); };
     METHODS.forEach(function (name) {
       api[name] = function () {
         var args = arguments;
-        if (api.mode !== 'supabase') return viaLocal(name, args);
+        if (api.mode !== 'supabase' || (LIVE_METHODS[name] && !api.isLive())) return viaLocal(name, args);
         return withTimeout(remote[name].apply(remote, args), timeoutMs).then(function (res) {
-          if (name === 'listMarkers') cache('markers', res);
           if (name === 'listPosts') cache('posts.' + (args[0] || ''), res);
           return res;
         }, function (err) {
@@ -335,8 +303,19 @@
         });
       };
     });
+    // Blur first, then hand to an adapter: the raw position never reaches storage or the network.
+    var rawSend = api.sendMark;
+    api.sendMark = function (m, token, cellFn, rnd) {
+      if (!m || !LIB.inLondonBox(+m.lat, +m.lng)) return fail('outside');
+      var b = LIB.blurPoint(+m.lat, +m.lng, rnd);
+      if (!LIB.inLondonBox(b[0], b[1])) return fail('outside');
+      return rawSend({ session: m.session, lat: b[0], lng: b[1], cell: cellFn ? cellFn(b[0], b[1]) : m.cell, tags: m.tags || [] }, token);
+    };
+    api.listZones = function (windowMin, cellFn) {
+      return api.liveZoneCounts(windowMin, cellFn).then(function (rows) { return LIB.decorateZones(rows, now()); });
+    };
     return api;
   }
 
-  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS };
+  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS, LIVE_METHODS: LIVE_METHODS };
 });

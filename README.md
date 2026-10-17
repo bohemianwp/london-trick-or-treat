@@ -1,19 +1,21 @@
-# 🎃 London Trick-or-Treat Map v2 · 伦敦安省万圣节讨糖地图
+# 🎃 Mark it! London Trick-or-Treat Map v3 · 标记它！伦敦万圣节讨糖地图
 
-A free, phone-first map for a happy, safe Halloween night (**Sat Oct 31, 2026**) in **London, Ontario**.
-一个免费、手机优先的地图网页，帮伦敦（安省）的家长规划开心又安全的万圣节之夜（**2026 年 10 月 31 日，周六**）。
+A free, phone-first map **for kids and families out trick-or-treating** in **London, Ontario** on **Sat Oct 31, 2026**.
+Found a fun street? Tap the big glowing button. When 3 or more families mark the same spot, it lights up for everyone.
+一个免费、手机优先的地图网页，**给出门讨糖的孩子和家长用**（安省伦敦，**2026 年 10 月 31 日，周六**）。
+找到好玩的街道？点那个发光的大按钮。同一个地方有 3 个以上家庭标记，它就会在地图上亮起来。
 
-The first screen is the map plus 4 big buttons · 打开就是地图 + 4 个大按钮：
-
-| Button 按钮 | What it does 做什么 |
+| | What it does · 做什么 |
 |---|---|
-| 🏘️ **Areas · 社区** | 10 researched neighbourhoods with scores, cautions and **dated sources**, plus an events list (HitV Oct 24, Camp Weathered, Somerset Monster House). 10 个调研过的社区（评分、注意事项、**带日期的来源**），加活动列表。 |
-| 🗺️ **Route · 路线** | Walking loop for 30/60/90 min by kid age (OSRM foot routing, straight-line fallback). 按时间和孩子年龄生成步行环线。 |
-| 📌 **Pins / Board · 标记 / 投票** | **Houses**: a household marks its own house — 🍬 candy, 🩵 teal pumpkin, 🍫 full-size, 🎃 decorations, 🐶 pet treats, 🕔 open early; one-tap *Giving now / Starting later / Out of candy*; optional hours. **Board**: "Most fun neighbourhood" and "Best decorations", one upvote per phone, report (hidden at 3). **房屋**：住户标自己家（类型、一键状态、时间）。**投票板**：两个板块，每台手机赞一次，举报 3 次自动隐藏。 |
-| 📡 **Live · 实时** | ⬡ Hotspot hexagons (Quiet / Busy / Very busy) and opt-in anonymous family dots on **Oct 31, 3–11 PM** only. ⬡ 热区六边形 + 自愿分享的匿名家庭圆点（**仅 10/31 15:00–23:00**）。 |
+| ✨ **This spot is great! · 这里很热闹！** | The big arcade button. One tap marks where you are (one-shot location, blurred ~50 m). Location off? Tap the map instead. Then optional one-tap tags: 🍬 Lots of candy · 🎃 Great decorations · 👥 Crowded. Limit: 1 mark per 5 min, same spot once per 30 min. 大按钮：一点就标记你现在的位置（只定位一次，模糊约 50 米）。没开定位就点地图。之后可选标签：🍬 糖很多 · 🎃 装饰超棒 · 👥 人很多。限制：5 分钟一次，同一地方 30 分钟一次。 |
+| 🔥 **Zones · 热区** | Marks from the last **45 min** (30–60, `config.js`) grouped into H3 hexagons **anywhere in London**. Shown only at **3+ marks**: teal 3–5 (Quiet), orange 6–14 (Lively), hot pink 15+ (Super hot, faster pulse). Badge "🔥 23 marked", top-tag emoji, **NEW** for 30 min after a zone first lights up. 最近 **45 分钟**的标记按 H3 六边形汇总，**全伦敦任何地方**都算。**3 个以上**才显示：青色 3–5（安静），橙色 6–14（很热闹），亮粉 15+（超级火爆，闪得更快）。 |
+| 📍 **Near me · 我附近** | Live zones within 1 / 2 / 5 km, nearest first; tap to fly there, 🚶 to walk there. For families who'd rather stay close to home. 1/2/5 公里内的热区，近的在前；点一下飞过去，点 🚶 规划走过去。适合不想开车去市中心的家庭。 |
+| 📌 **Suggest an area · 推荐一个区域** | Before Oct 31: pin your neighbourhood (only the ~800 m hexagon is kept) with an optional 80-character reason. At 3 suggestions it shows as 💜 Community suggested. 3 per phone per day, 1 per hexagon. 万圣节前在地图上推荐你的社区（只保存约 800 米的六边形），3 个家庭推荐后显示为 💜 社区推荐。 |
+| 🧭 **Good areas to start · 推荐出发区** | The 10 researched neighbourhoods (dated sources) + events, drawn as a faint dashed "Suggested" base layer **under** the live zones. 10 个调研过的社区（带日期来源）+ 活动，作为淡淡的虚线「推荐」底层，画在实时热区**下面**。 |
 
-Top bar: 🦺 Safety tips · 中文/EN toggle · countdown. Privacy page is linked from Safety and Live.
-顶栏：🦺 安全提示 · 中英切换 · 倒计时。隐私说明从「安全」和「实时」里进入。
+Bottom tabs · 底部标签：**🗺️ Map 地图 · 🚶 Route 路线 · ✨ Mark it! 标记！ · 📖 Guide 指南**.
+Top bar · 顶栏：🏆 Board 投票板 · 🦺 Safety 安全 · ? How-to 使用说明 · 中文/EN.
+First visit shows 3 welcome cards (remembered in `ltot.guideSeen.v2`). 第一次打开会显示 3 张欢迎卡片。
 
 No install, no login, no build step. 不用安装、不用登录、不需要编译。
 
@@ -27,13 +29,17 @@ python3 -m http.server 8080
 ```
 
 Open http://localhost:8080 . Stop with `Control + C`. 打开 http://localhost:8080，用完按 `Control + C` 停止。
-Double-clicking `index.html` also works (everything except location may be limited). 双击 `index.html` 也能用。
 
-**Try the shared features on one computer · 在一台电脑上试共享功能**
-Open http://localhost:8080/?demo=1 in **two tabs**. Posts, marker status and live dots made in one tab show up in the other.
-Demo mode uses separate test data and turns live mode on regardless of the date.
-用**两个标签页**打开 http://localhost:8080/?demo=1。一个标签页里发帖、改标记状态、分享圆点，另一个会同步出现。
-演示模式用单独的测试数据，并且不管日期都打开实时模式。
+**Live window · 实时时段**: Oct 31, 3–11 PM Toronto time marks are live and shared. Any other time marks stay on your phone as practice (🧪 **Practice mode** chip).
+10 月 31 日下午 3 点到晚上 11 点（多伦多时间）标记实时共享；其他时间标记只存在你的手机上，算练习（显示 🧪 **练习模式**）。
+
+**Demo & screenshot links · 演示和截图用的网址**
+
+| URL | Shows · 显示 |
+|---|---|
+| `?demo=1` | Fake marks around Old South/Baker St, Old North, Carling Heights, Ferndale, plus hot **NEW** zones in Hyde Park and Lambeth and one 💜 community-suggested area. A new fake mark every ~4 s. Open it in **two tabs**: a mark in one shows in the other. 假标记 + 新热区 + 社区推荐，每 4 秒左右来一个新标记。**两个标签页**打开，一个标记另一个会出现。 |
+| `?demo=1&near=1` | Opens **Near me** from a pretend home in Old South · 从老南区一个假想的家打开「我附近」 |
+| `?guide=1` · `?howto=1` · `?lang=zh` / `?lang=en` | Welcome cards · How-to panel · language (combine freely) · 欢迎卡片 · 使用说明 · 语言（可组合） |
 
 ---
 
@@ -41,37 +47,30 @@ Demo mode uses separate test data and turns live mode on regardless of the date.
 
 `config.js` decides · 由 `config.js` 决定：
 
-- **`backend: 'local'`** (default · 默认) — everything is stored in this browser only (`localStorage` = the browser's built-in notebook). No account, nothing leaves the phone. Good for trying it out; friends won't see each other's markers.
-  所有数据只存在这个浏览器里（`localStorage`，浏览器自带的小本子）。不用账号，数据不出手机。适合试用，但朋友之间看不到彼此的标记。
-- **`backend: 'supabase'`** — markers, posts and live dots are shared through your own free Supabase project. Setup steps: [`supabase/README.md`](supabase/README.md).
-  通过你自己的免费 Supabase 项目共享。设置步骤见 [`supabase/README.md`](supabase/README.md)。
+- **`backend: 'local'`** (default · 默认) — everything stays in this browser (`localStorage` = the browser's built-in notebook). Tabs in the same browser share instantly (BroadcastChannel); zones are re-counted every 12 s.
+  所有数据只存在这个浏览器里（`localStorage`，浏览器自带的小本子）。同一浏览器的多个标签页即时同步；热区每 12 秒重算。
+- **`backend: 'supabase'`** — marks, suggestions and board posts are shared through your own free Supabase project; the app asks for zones every 30–60 s (`pollSec`). Setup: [`supabase/README.md`](supabase/README.md).
+  通过你自己的免费 Supabase 项目共享；app 每 30–60 秒问一次服务器。设置步骤见 [`supabase/README.md`](supabase/README.md)。
 
-If Supabase is selected but unreachable (or not filled in), the app falls back to local mode by itself and shows a **📴 Offline mode** chip.
-选了 Supabase 但连不上（或没填好），app 会自动退回本地模式，并显示 **📴 离线模式** 小标签。
-
-Sharing a link still works in both modes: **Pins → Share link** packs your markers into the link (`#m=…`). Old v1 `#pins=` links still open.
-两种模式下都能用链接分享：**标记 → 分享链接** 会把你的标记打包进链接。旧版 `#pins=` 链接仍然能打开。
+If Supabase is selected but unreachable (or not filled in), the app falls back to local mode and shows **📴 Offline mode**.
+选了 Supabase 但连不上（或没填好），会自动退回本地模式并显示 **📴 离线模式**。
 
 ---
 
 ## 3. Publish it free · 免费发布
 
 Phones need an `https://` address for location. 手机定位需要 `https://` 地址。
-
-- **Netlify Drop** (easiest · 最简单): https://app.netlify.com/drop → drag the folder in → you get `https://xxx.netlify.app`. A free account keeps the site up.
-  把文件夹拖进去，得到一个 `https://xxx.netlify.app` 链接。注册免费账号网站才会长期保留。
-- **GitHub Pages**: new public repository → upload the files → Settings → Pages → Branch `main` / root.
-  新建公开仓库 → 上传文件 → Settings → Pages → 选 `main` 分支根目录。
+This repo is published with **GitHub Pages** from `main` (Settings → Pages → Branch `main` / root). Netlify Drop also works.
+这个仓库用 **GitHub Pages** 从 `main` 分支发布。Netlify Drop 也可以。
 
 Files the site needs · 网站需要的文件：`index.html`, `styles.css`, `config.js`, `lib.js`, `i18n.js`, `backend.js`, `hex.js`, `app.js`, `demo.js`, `data/areas.js`.
-Not needed online · 不需要上传：`tests/`, `tools/`, `supabase/`, `app.v1.bak.js`, `*.md`, `*.log`.
 
 ---
 
 ## 4. Privacy in one paragraph · 隐私一段话说清
 
-No accounts, names, emails, phone numbers or photos. Board text is max 140 characters; links and phone numbers are blocked. House markers expire **Nov 1, 6 AM**. Live dots are **off by default**, only on Oct 31 3–11 PM, rounded to ~50 m plus up to 25 m of random jitter, use a random ID that changes every 30 min, disappear after 30 min, stop by themselves after 90 min, and busy hexes show only when **3 or more** families are in one. Full text: in the app → 🦺 Safety → Privacy.
-不收集账号、姓名、邮箱、电话、照片。帖子最多 140 字，链接和电话号码会被拦下。房屋标记 **11 月 1 日早上 6 点**过期。实时圆点**默认关闭**，只在 10/31 15:00–23:00 可开，位置取整到约 50 米再随机挪动最多 25 米，随机编号每 30 分钟换一次，30 分钟后消失，90 分钟后自动停止分享，一个六边形里**至少 3 个家庭**才显示热闹程度。全文在 app 里：🦺 安全 → 隐私。
+No accounts, names, emails, phone numbers or photos. A mark is rounded to ~50 m and moved randomly up to 25 m **before it leaves the phone or is stored**, carries a random ID that changes every 30 min, and is deleted after 2 hours. A zone appears only with **3 or more** marks — nobody can see a single mark. Suggestions keep only the ~800 m hexagon. Board text max 140 characters, suggestion reasons max 80; links and phone numbers are blocked. Full text: in the app → 🦺 Safety → Privacy.
+不收集账号、姓名、邮箱、电话、照片。标记在**离开手机或被保存之前**先取整到约 50 米、再随机挪动最多 25 米，随机编号每 30 分钟换一次，2 小时后删除。一个热区**至少 3 个标记**才显示，没人能看到单个标记。推荐区域只保存约 800 米的六边形。帖子最多 140 字、推荐理由最多 80 字，链接和电话号码会被拦下。全文在 app 里：🦺 安全 → 隐私。
 
 ---
 
@@ -79,29 +78,31 @@ No accounts, names, emails, phone numbers or photos. Board text is max 140 chara
 
 | File 文件 | What 是什么 |
 |---|---|
-| `index.html` / `styles.css` | Page + neon Halloween/HUD theme (system fonts only) · 页面 + 霓虹万圣节/雷达风格（只用系统字体） |
-| `config.js` | Backend settings (EN/中文 comments) · 后端设置（中英注释） |
-| `lib.js` | Pure functions: time window, coarsening, hex scores, text filter, SHA-256… (tested in Node) · 纯函数，可在 Node 里测试 |
+| `index.html` / `styles.css` | Page + neon Halloween/HUD theme, arcade button, CSS-animated zones · 页面 + 霓虹万圣节/雷达风格、街机按钮、CSS 动画热区 |
+| `config.js` | Backend settings, `markWindowMin` (30–60), `pollSec` (EN/中文 comments) · 后端设置（中英注释） |
+| `lib.js` | Pure functions: zone colours, 3+ rule, mark window, rate limits, blurring, Near me, suggestions, time window, text filter… (tested in Node) · 纯函数，可在 Node 里测试 |
 | `i18n.js` | Every UI string in `en` and `zh` · 所有界面文字的中英两套 |
-| `backend.js` | One data interface: LocalAdapter (localStorage + BroadcastChannel) and SupabaseAdapter, with automatic fallback · 数据层：本地 / Supabase 两种实现，自动切换 |
-| `hex.js` | Hotspot layer: one canvas, H3 res 8 (h3-js) or built-in hex grid fallback · 热区图层 |
-| `demo.js` | Test data for `?demo=1` only · 只在 `?demo=1` 时加载的测试数据 |
-| `data/areas_researched.json` → `data/areas.js` | Research data (source of truth) → generated copy for the page: `python3 tools/gen_areas.py` · 调研数据（原件）→ 页面用的生成副本 |
-| `supabase/` | `schema.sql`, `cleanup.sql`, setup README · 数据库建表、清理脚本、设置说明 |
-| `tests/` | `node --test` unit tests; `headless_check.mjs` (Chrome); `sql_pglite_check.mjs`; `supabase_smoke.mjs` + `load_sim.mjs` (need a project) · 测试 |
+| `backend.js` | One data interface (`sendMark`, `tagMark`, `listZones`, `liveZoneCounts`, `suggestArea`, `communitySuggested`, board): LocalAdapter and SupabaseAdapter, automatic fallback · 数据层：本地 / Supabase 两种实现，自动切换 |
+| `hex.js` | Map layers: one canvas for the faint planning base, SVG hexagons + CSS pulse for live zones, capped badges · 地图图层 |
+| `demo.js` | Fake marks for `?demo=1` only · 只在 `?demo=1` 时加载的假数据 |
+| `data/areas_researched.json` → `data/areas.js` | Research data (source of truth) → generated copy: `python3 tools/gen_areas.py` · 调研数据（原件）→ 页面用的生成副本 |
+| `supabase/` | `schema.sql` (marks, suggestions, board + RPCs), `cleanup.sql`, setup README · 数据库 |
+| `tests/` | Unit tests, `headless_check.mjs` (Chrome), `sql_pglite_check.mjs` (Postgres in WebAssembly), `supabase_smoke.mjs` + `load_sim.mjs` (need a real project) · 测试 |
 
 ## 6. Tests · 测试
 
 ```bash
-node --test                                   # 34 unit tests: lib, i18n, data, backend · 单元测试
+node --test tests/*.test.js                   # unit tests: zones, rate limits, blurring, i18n, guide, data, backend · 单元测试
 python3 -m http.server 8080 &                 # then · 然后
-node tests/headless_check.mjs                 # 56 browser checks at 390×844, screenshots → /tmp/ltot-test/v2-*.png
+node tests/headless_check.mjs                 # browser checks at 390×844, screenshots → /tmp/ltot-test/v3-*.png
 ```
+
+PGlite SQL check (no Supabase account needed) · 数据库检查（不需要 Supabase 账号）：see the header of `tests/sql_pglite_check.mjs`.
 
 ## Notes · 说明
 
-- Area scores come from local news and parent reports (Oct 2024 – Oct 2026); every source is listed with its date. The JSON's `crowd` (5 = comfortable) is inverted in the app (5 = very busy).
-  社区评分来自本地新闻和家长反馈（2024 年 10 月至 2026 年 10 月），每条来源都带日期。JSON 里的 `crowd`（5 = 宽松）在 app 里反过来显示（5 = 很挤）。
-- Routing uses free public OSRM servers, only when you press *Build*; if they fail, the app draws straight lines and says so.
-  路线用免费公共 OSRM 服务器，只在点「生成」时调用；连不上就画直线并明确提示。
-- Map © OpenStreetMap contributors. Hex grid: Uber H3 via `h3-js`. 地图 © OpenStreetMap 贡献者。六边形网格：Uber H3（`h3-js`）。
+- Area scores come from local news and parent reports (Oct 2024 – Oct 2026); every source is listed with its date. Live zones from real marks always win over them.
+  社区评分来自本地新闻和家长反馈（2024 年 10 月至 2026 年 10 月），每条来源都带日期。真实标记形成的热区永远优先。
+- Routing uses free public OSRM servers, only when you press *Build* or 🚶 on a zone; if they fail, the app draws straight lines and says so.
+  路线用免费公共 OSRM 服务器，只在点「生成」或热区的 🚶 时调用；连不上就画直线并明确提示。
+- Map © OpenStreetMap contributors. Hex grid: Uber H3 via `h3-js` (built-in hex grid if it fails to load). 地图 © OpenStreetMap 贡献者。六边形网格：Uber H3（`h3-js`），加载失败时用内置网格。
