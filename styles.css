@@ -64,7 +64,25 @@ a { color: #d8b4fe; }
   flex: none; text-align: center; padding: 4px 10px 5px; font-size: .88rem; font-weight: 600; color: var(--orange-2);
   background: rgba(7,6,13,.9); border-bottom: 1px solid var(--line);
 }
-.cd-digits { color: #fff; text-shadow: 0 0 6px var(--orange), 0 0 16px rgba(255,122,24,.6); letter-spacing: .5px; }
+.cd-digits { color: #fff; text-shadow: 0 0 6px var(--orange), 0 0 16px rgba(255,122,24,.6); white-space: nowrap; }
+/* live seconds: every unit has a fixed width, so ticking never shifts the line */
+.cd-u { display: inline-block; }
+.cd-n { display: inline-block; width: 2ch; text-align: right; font-weight: 800; }
+.cd-u i { display: inline-block; min-width: 1ch; font-style: normal; font-weight: 600; color: var(--orange-2); }
+:lang(zh) .cd-u i { width: 1em; }
+.cd-s { color: #ffe9f5; animation: cd-tick-a .7s ease-out; }
+.cd-s.odd { animation-name: cd-tick-b; }      /* a new animation name each second replays the flicker without a reflow */
+@keyframes cd-tick-a { 0% { opacity: .45; text-shadow: 0 0 2px #fff, 0 0 10px var(--magenta), 0 0 22px var(--magenta); }
+                       30% { opacity: 1; } 45% { opacity: .75; } 100% { opacity: 1; text-shadow: 0 0 6px var(--magenta), 0 0 14px rgba(255,45,149,.55); } }
+@keyframes cd-tick-b { 0% { opacity: .45; text-shadow: 0 0 2px #fff, 0 0 10px var(--magenta), 0 0 22px var(--magenta); }
+                       30% { opacity: 1; } 45% { opacity: .75; } 100% { opacity: 1; text-shadow: 0 0 6px var(--magenta), 0 0 14px rgba(255,45,149,.55); } }
+[data-phase="on"] .cd-msg { display: inline-block; color: #fff; font-weight: 900; animation: cd-pulse 1.6s ease-in-out infinite; }
+@keyframes cd-pulse { 0%, 100% { text-shadow: 0 0 6px var(--orange), 0 0 14px rgba(255,122,24,.6); }
+                      50% { text-shadow: 0 0 10px var(--orange), 0 0 26px var(--magenta), 0 0 40px rgba(255,45,149,.6); } }
+[data-phase="after"] .cd-msg { color: #d8b4fe; }
+/* "🧪 Practice mode" / "📴 Offline mode": icon only on phones, so the top bar fits at 390 px */
+@media (max-width: 480px) { .chip-split { padding: 0; min-width: 44px; } .chip-split .chip-txt { display: none; } }
+.chip-tour { font-size: 15px; }
 
 /* ---------- map ---------- */
 .mapwrap { position: relative; flex: 1; min-height: 0; overflow: hidden; }  /* the closed sheet must not cover the tab bar */
@@ -312,6 +330,12 @@ input[type="time"] { font-family: var(--mono); color-scheme: dark; }
 .check { font-size: .9rem; color: var(--muted); }
 .warn { background: rgba(255,122,24,.1); border: 1px solid var(--orange); color: #ffd9b3; border-radius: 12px; padding: 10px 12px; font-size: .9rem; margin: 8px 0; }
 .warn-inline { color: #ffd9b3; font-size: .82rem; }
+.route-hints { margin-top: 6px; }
+.route-hints .hint, .route-hints .warn { margin: 6px 0 0; }
+.loop-note { color: var(--teal); }
+.fb-ok { color: var(--teal); font-weight: 700; margin: 8px 0; }
+#panel-feedback textarea { min-height: 64px; }
+#fbOut { margin-top: 8px; font-size: 14px; }
 .info { background: rgba(168,85,247,.1); border: 1px dashed var(--purple); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: .9rem; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .fchip { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 14px; font-weight: 600; text-align: left; }
@@ -428,6 +452,29 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
 #guideDone { padding: 0 18px; }
 @keyframes guide-in { from { opacity: 0; } to { opacity: 1; } }
 
+/* ---------- ▶ How to use: tour overlay ---------- */
+.tour { position: fixed; inset: 0; z-index: 3500; }                         /* blocks taps on the app while it plays */
+.tour-ring { position: fixed; left: 0; top: 0; width: 0; height: 0; border-radius: 16px; pointer-events: none;
+             box-shadow: 0 0 0 200vmax rgba(5,2,12,.74), 0 0 0 3px var(--orange), 0 0 22px 6px rgba(255,122,24,.75), inset 0 0 14px rgba(255,122,24,.5);
+             transition: transform .55s cubic-bezier(.3,.8,.3,1), width .55s cubic-bezier(.3,.8,.3,1), height .55s cubic-bezier(.3,.8,.3,1);
+             animation: tour-glow 1.4s ease-in-out infinite; }
+@keyframes tour-glow { 50% { box-shadow: 0 0 0 200vmax rgba(5,2,12,.74), 0 0 0 3px #ffd9b3, 0 0 30px 10px rgba(255,122,24,.9), inset 0 0 18px rgba(255,122,24,.6); } }
+.tour-card { position: fixed; left: 10px; right: 10px; bottom: calc(86px + var(--safe-b)); margin: 0 auto; max-width: 440px; padding: 10px 12px 12px;
+             border: 1.5px solid var(--orange); border-radius: 16px; background: linear-gradient(160deg, #1d0d33, var(--panel) 60%, #220d0a);
+             box-shadow: var(--glow-o), 0 0 30px rgba(168,85,247,.3); }
+.tour-card-top { bottom: auto; top: calc(56px + env(safe-area-inset-top, 0px)); }
+.tour-bar { display: flex; gap: 4px; }
+.tour-bar i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.tour-bar b { display: block; height: 100%; background: var(--orange); box-shadow: var(--glow-o); transform-origin: left; transform: scaleX(var(--p, 0)); }
+.tour-top { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font: 700 12px var(--mono); }
+.tour-demo { color: var(--teal); letter-spacing: .5px; }
+#tourCount { color: var(--orange-2); }
+.tour-cap { margin: 6px 0 10px; font-size: 1.02rem; font-weight: 700; line-height: 1.4; min-height: 2.8em; }
+.tour-ctl { display: flex; gap: 6px; }
+.tour-ctl .btn { flex: 1 1 0; padding: 0 8px; }
+.tour-drop { font-size: 24px; text-align: center; animation: tour-drop .7s cubic-bezier(.3,1.4,.5,1) both; filter: drop-shadow(0 0 6px #ff7a18); }
+@keyframes tour-drop { from { transform: translateY(-70px) scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
 @media (min-width: 760px) {
   .sheet { left: auto; right: 12px; bottom: 12px; top: 64px; width: 400px; max-height: none; border: 1.5px solid var(--orange); border-radius: 18px; }
   .sheet[data-open="false"] { transform: translateX(calc(100% + 24px)); }
@@ -443,6 +490,9 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
   .markbtn { transition: none; }
   .sheet { transition: none; }
   .guide { animation: none; }
+  .cd-s, .cd-s.odd, [data-phase="on"] .cd-msg { animation: none; }
+  .tour-ring { transition: none; animation: none; }
+  .tour-drop { animation: none; }
   .guide-track, .gdot::before { transition: none; }
 }
 

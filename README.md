@@ -40,6 +40,9 @@ Open http://localhost:8080 . Stop with `Control + C`. 打开 http://localhost:80
 | `?demo=1` | Fake marks around Old South/Baker St, Old North, Carling Heights, Ferndale, plus hot **NEW** zones in Hyde Park and Lambeth and one 💜 community-suggested area. A new fake mark every ~4 s. Open it in **two tabs**: a mark in one shows in the other. 假标记 + 新热区 + 社区推荐，每 4 秒左右来一个新标记。**两个标签页**打开，一个标记另一个会出现。 |
 | `?demo=1&near=1` | Opens **Near me** from a pretend home in Old South · 从老南区一个假想的家打开「我附近」 |
 | `?guide=1` · `?howto=1` · `?lang=zh` / `?lang=en` | Welcome cards · How-to panel · language (combine freely) · 欢迎卡片 · 使用说明 · 语言（可组合） |
+| `?tour=1` · `?tour=1&tourStep=4` | Plays the ▶ How to use tour · jumps to step N (1–7) and pauses there · 播放「▶ 怎么用」演示 · 跳到第 N 步（1–7）并暂停 |
+| `?feedback=1` | Opens the 💬 Feedback panel · 打开「💬 反馈」面板 |
+| `?now=2026-10-31T17:30:00-04:00` | Pretends it is that time, for the countdown only (screenshots) · 只让倒计时假装是这个时间（截图用） |
 
 ---
 
@@ -85,6 +88,7 @@ No accounts, names, emails, phone numbers or photos. A mark is rounded to ~50 m 
 | `backend.js` | One data interface (`sendMark`, `tagMark`, `listZones`, `liveZoneCounts`, `suggestArea`, `communitySuggested`, board): LocalAdapter and SupabaseAdapter, automatic fallback · 数据层：本地 / Supabase 两种实现，自动切换 |
 | `hex.js` | Map layers: one canvas for the faint planning base, SVG hexagons + CSS pulse for live zones, capped badges · 地图图层 |
 | `demo.js` | Fake marks for `?demo=1` only · 只在 `?demo=1` 时加载的假数据 |
+| `tour.js` | ▶ How to use: the tour timeline + spotlight; demo zones stay in memory · 「▶ 怎么用」演示的时间线和聚光灯，演示数据只在内存里 |
 | `data/areas_researched.json` → `data/areas.js` | Research data (source of truth) → generated copy: `python3 tools/gen_areas.py` · 调研数据（原件）→ 页面用的生成副本 |
 | `supabase/` | `schema.sql` (marks, suggestions, board + RPCs), `cleanup.sql`, setup README · 数据库 |
 | `tests/` | Unit tests, `headless_check.mjs` (Chrome), `sql_pglite_check.mjs` (Postgres in WebAssembly), `supabase_smoke.mjs` + `load_sim.mjs` (need a real project) · 测试 |

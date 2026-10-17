@@ -19,15 +19,17 @@ test('data/areas.js is generated from areas_researched.json (run tools/gen_areas
 
 // SPEC 8.4 said 150 KB. v4 (Oct 17) raised it to 170 KB for the bilingual welcome guide + How-to text, which must live in
 // i18n.js (Chinese is 3 bytes per character). Cost over the network: about +5 KB gzipped. Keep new features under this line.
-test('size budget: own JS ≤ 170 KB (SPEC 8.4 was 150 KB, raised in v4; CDN libraries excluded); report JS + CSS', () => {
-  const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js'];
+// v=6 (Oct 17) raised it to 195 KB, now counting tour.js too: live countdown, feedback panel, route hints and the ▶ How to use tour
+// (≈ +28 KB raw JS, ≈ +11 KB gzipped incl. CSS). Peng asked for all four; see SUMMARY_countdown.md.
+test('size budget: own JS ≤ 195 KB (SPEC 8.4 was 150 KB, raised in v4 and v6; CDN libraries excluded); report JS + CSS', () => {
+  const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js', 'tour.js'];
   const js = files.reduce((n, f) => n + fs.statSync(path.join(root, f)).size, 0);
   const css = fs.statSync(path.join(root, 'styles.css')).size;
   const gz = require('node:zlib').gzipSync(Buffer.concat(files.concat('styles.css').map((f) => fs.readFileSync(path.join(root, f)))), { level: 9 }).length;
   const demo = fs.statSync(path.join(root, 'demo.js')).size;
   console.log(`# own JS ${(js / 1024).toFixed(1)} KB + CSS ${(css / 1024).toFixed(1)} KB = ${((js + css) / 1024).toFixed(1)} KB raw, ${(gz / 1024).toFixed(1)} KB gzipped` +
               ` (+ demo.js ${(demo / 1024).toFixed(1)} KB, loaded only with ?demo=1)`);
-  assert.ok(js <= 170 * 1024, 'own JS ' + js);
+  assert.ok(js <= 195 * 1024, 'own JS ' + js);
 });
 
 test('10 researched areas, bilingual, inside London, sources dated Oct 2024–Oct 2026', () => {

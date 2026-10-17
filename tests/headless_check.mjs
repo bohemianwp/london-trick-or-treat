@@ -1,4 +1,4 @@
-// Headless browser check for v3 "Mark it!" (SPEC §8.2–8.4 + v3 pivot). Needs Google Chrome and a local server:
+// Headless browser check for v3 "Mark it!" (SPEC §8.2–8.4 + v3 pivot) and the v=6 additions (countdown, feedback, route, tour). Needs Google Chrome and a local server:
 //   python3 -m http.server 8080      (in the project folder)
 //   node tests/headless_check.mjs    (screenshots go to /tmp/ltot-test/v3-*.png)
 // Talks to Chrome over the DevTools protocol with Node's built-in WebSocket — nothing to install.
@@ -324,6 +324,134 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await dismissGuide(p);
   check('prefers-reduced-motion: HUD off, zones and button glow do not animate', await p.ev(`getComputedStyle(document.querySelector('.hud')).display==='none' &&
     getComputedStyle(document.querySelector('.mb-glow')).animationName==='none' && [...document.querySelectorAll('path.zone')].every(z=>getComputedStyle(z).animationName==='none')`));
+  check('prefers-reduced-motion: the seconds digit does not flicker', await p.ev(`getComputedStyle(document.querySelector('#countdown .cd-s')).animationName==='none'`));
+  await p.click('#tourBtn'); await sleep(900);
+  const r1 = await p.ev(`document.getElementById('tourRing').style.transform`);
+  await sleep(4500);
+  const still = await p.ev(`__ltot.tour.state().idx===0 && !document.getElementById('tourNext').hidden && document.getElementById('tourPause').hidden`);
+  await p.click('#tourNext'); await sleep(300);
+  check('prefers-reduced-motion: tour waits on Next/Back cards (no auto-advance)', still && (await p.ev('__ltot.tour.state().idx')) === 1 &&
+    r1 !== await p.ev(`document.getElementById('tourRing').style.transform`));
+  await p.ev(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`); await sleep(200);
+  check('…Esc ends it', await p.ev(`document.getElementById('tour').hidden && !__ltot.tour.state().active`));
+}
+
+// =========================================================== 7. v=6: live-seconds countdown
+{
+  const p = await openPage('', { wait: 3500 });
+  await dismissGuide(p);
+  const c1 = await p.ev(`document.getElementById('countdown').textContent`);
+  const w1 = await p.ev(`document.querySelector('#countdown .cd-digits').getBoundingClientRect().width`);
+  await sleep(1300);
+  const c2 = await p.ev(`document.getElementById('countdown').textContent`);
+  const w2 = await p.ev(`document.querySelector('#countdown .cd-digits').getBoundingClientRect().width`);
+  check('countdown ticks every second: “Halloween in 14d 01h 05m 32s” format', /Halloween in \d\dd \d\dh \d\dm \d\ds$/.test(c1) && c1 !== c2, c1 + ' → ' + c2);
+  check('…digits have a fixed width (no shifting between ticks)', Math.abs(w1 - w2) < 0.01, w1 + ' / ' + w2);
+  check('…seconds digit has the CSS flicker, monospace + tabular-nums', await p.ev(`(function(){var s=getComputedStyle(document.querySelector('#countdown .cd-s')), d=getComputedStyle(document.querySelector('#countdown .cd-digits'));
+    return /cd-tick-[ab]/.test(s.animationName) && d.fontVariantNumeric==='tabular-nums' && /mono/i.test(d.fontFamily);})()`));
+  check('top bar fits at 390 px (practice chip shows its icon only)', await p.ev(`[...document.querySelectorAll('.topbar > *')].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().right<=390)`) &&
+    await p.ev(`getComputedStyle(document.querySelector('#practiceChip .chip-txt')).display==='none' && document.getElementById('practiceChip').getAttribute('aria-label')==='Practice mode'`));
+  check('countdown is role="timer" (not announced every second)', await p.ev(`document.getElementById('countdown').getAttribute('role')==='timer'`));
+  await p.shot('v6-countdown.png');
+
+  const z = await openPage('?lang=zh&howto=1', { wait: 3000 });
+  check('Chinese units: “离万圣节还有 13天 23时 04分 07秒”', /离万圣节还有 \d\d天 \d\d时 \d\d分 \d\d秒$/.test(await z.ev(`document.getElementById('countdown').textContent`)),
+    await z.ev(`document.getElementById('countdown').textContent`));
+
+  const on = await openPage('?now=2026-10-31T17:30:00-04:00', { wait: 3000 });
+  await dismissGuide(on);
+  check('?now=Oct 31 5:30 PM → “Halloween is ON! 🎃” with a pulsing glow', (await on.ev(`document.getElementById('countdown').textContent`)) === 'Halloween is ON! 🎃' &&
+    await on.ev(`getComputedStyle(document.querySelector('#countdown .cd-msg')).animationName==='cd-pulse'`));
+  await on.shot('v6-halloween-on.png');
+  const edge = await openPage('?now=2026-10-31T16:59:58-04:00&lang=zh', { wait: 600 });
+  const e1 = await edge.ev(`document.getElementById('countdown').dataset.phase`);
+  await sleep(2600);
+  check('4:59:58 PM → switches to “万圣节开始啦！” by itself at 5:00:00 PM', e1 === 'before' && /^万圣节开始啦！/.test(await edge.ev(`document.getElementById('countdown').textContent`)), e1);
+  const after = await openPage('?now=2026-11-01T00:00:05-04:00', { wait: 2500 });
+  check('after Nov 1 midnight → “see you next Halloween”', /See you next Halloween/.test(await after.ev(`document.getElementById('countdown').textContent`)));
+  check('countdown pages: no JS errors', [p, z, on, edge, after].every((x) => realErrors(x).length === 0), [p, z, on, edge, after].map(realErrors).flat().join(' | '));
+}
+
+// =========================================================== 8. v=6: feedback panel (mailto + copy)
+{
+  await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  const p = await openPage('?feedback=1', { wait: 3000 });
+  check('?feedback=1 opens the Feedback panel (no welcome cards)', await p.ev(`!document.getElementById('panel-feedback').hidden && document.getElementById('guide').hidden`));
+  check('3 questions (≤ 500 chars), optional name, “no kids’ names” note', await p.ev(`[...document.querySelectorAll('#panel-feedback textarea.fb-in')].map(t=>t.maxLength).join()==='500,500,500' && !!document.getElementById('fbNameIn')`) &&
+    /Please don’t include your kids’ names/.test(await p.ev(`document.getElementById('panel-feedback').textContent`)));
+  await p.ev(`(function(){var a=document.getElementById('fbConfusingIn'); a.value='The colours & NEW badge?'; a.dispatchEvent(new Event('input'));
+    var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
+  const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
+  check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D6') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+  await p.click('#fbCopy'); await sleep(500);
+  check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
+  await p.shot('v6-feedback.png');
+  await p.ev(`__ltot.openTab('guide')`);
+  check('Feedback is easy to find: 💬 button in the Guide tab', await p.ev(`!document.getElementById('feedbackBtn').hidden && document.getElementById('feedbackBtn').getBoundingClientRect().top < innerHeight`));
+  check('feedback page: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
+}
+
+// =========================================================== 9. v=6: route hints, houses, closed loop (routers blocked → straight-line fallback)
+{
+  const p = await openPage('?howto=1', { wait: 3000, block: ['*routing.openstreetmap.de*', '*router.project-osrm.org*'] });
+  await p.ev(`__ltot.openTab('route'); document.querySelector('#ageSeg [data-v="u5"]').click(); document.querySelector('#timeSeg [data-v="90"]').click()`);
+  check('under 5 + 90 min → “Little ones usually tire after 30–45 min” + “Best start: 5:30 PM”', /Little ones usually tire after 30–45 min/.test(await p.ev(`document.getElementById('staminaHint').textContent`)) &&
+    await p.ev(`document.getElementById('staminaHint').className==='warn'`) && /Best start: 5:30 PM \(sunset 6:18 PM\)/.test(await p.ev(`document.getElementById('startHint').textContent`)));
+  await p.ev(`document.querySelector('#ageSeg [data-v="teen"]').click()`);
+  check('13+ → neutral hint + “Most fun 6–8:30 PM”', await p.ev(`document.getElementById('staminaHint').className==='hint'`) && /Most fun 6–8:30 PM/.test(await p.ev(`document.getElementById('startHint').textContent`)));
+  await p.ev(`__ltot.setStart([42.9640,-81.2500],'map'); __ltot.buildLoop()`); await sleep(1500);
+  const res = await p.ev(`(function(){var l=null; __ltot.map.eachLayer(function(x){ if(x.options && x.options.className==='route-line') l=x.getLatLngs(); });
+    return { houses: document.getElementById('housesEst').textContent, note: document.querySelector('.loop-note').textContent,
+             first: l && [l[0].lat,l[0].lng], last: l && [l[l.length-1].lat,l[l.length-1].lng], turns: [...document.querySelectorAll('.turns li')].map(x=>x.textContent) }; })()`);
+  check('route shows “≈ N houses” and “Start & finish (car / home)”', /^≈ \d+ houses$/.test(res.houses) && /Start & finish \(car \/ home\)/.test(res.note), res.houses + ' / ' + res.note);
+  check('the loop ends where it starts (line + last turn back to the start)', !!res.first && __dist(res.first, res.last) < 1 && /back to the start \(car \/ home\)/.test(res.turns[res.turns.length - 1]),
+    res.turns[res.turns.length - 1]);
+  check('route page: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
+}
+
+// =========================================================== 10. v=6: ▶ How to use tour
+{
+  const p = await openPage('', { wait: 4000 });
+  await dismissGuide(p);
+  await p.ev(`__ltot.map.setView([42.99,-81.20], 13, {animate:false}); __ltot.setLayer('events', false); __ltot.openTab('route')`); await sleep(300);
+  const before = await p.ev(`JSON.stringify({ls: Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]), layers: __ltot.state().layers,
+    c: __ltot.map.getCenter(), z: __ltot.map.getZoom(), tab: __ltot.state().tab, open: document.getElementById('sheet').dataset.open})`);
+  const zonesBefore = await p.ev(`document.querySelectorAll('path.zone').length`);
+  check('▶ button in the top bar, next to “?”', await p.ev(`document.getElementById('tourBtn').nextElementSibling.id==='helpBtn'`));
+  await p.click('#tourBtn'); await sleep(1000);
+  const r1 = await p.ev(`document.getElementById('tourRing').style.transform`);
+  check('tour starts: overlay, ring around the legend, caption, DEMO DATA tag', await p.ev(`!document.getElementById('tour').hidden && __ltot.tour.state().idx===0`) &&
+    /Glowing zones/.test(await p.ev(`document.getElementById('tourCap').textContent`)) && (await p.ev(`document.querySelectorAll('#tourBar i').length`)) === 7);
+  await p.shot('v6-tour-1.png');
+  await sleep(10500);                                           // into step 4
+  const mid = await p.ev(`JSON.stringify({ idx: __ltot.tour.state().idx, ring: document.getElementById('tourRing').style.transform, z: (__ltot.tourZones()||[]).map(z=>z.count+(z.isNew?'N':'')) })`);
+  const m = JSON.parse(mid);
+  check('spotlight moved between steps (auto-play, no input)', m.idx === 3 && m.ring !== r1, r1 + ' → ' + m.ring);
+  await sleep(4200);
+  const late = await p.ev(`(__ltot.tourZones()||[]).map(z=>z.count+(z.isNew?'N':''))`);
+  check('step 4: demo zone lights up with NEW and its count climbs to 5', late.includes('5N') && await p.ev(`document.querySelectorAll('.tour-drop').length`) === 3, mid + ' → ' + late.join(','));
+  await p.shot('v6-tour-4.png');
+  await p.click('#tourPause'); const i1 = await p.ev('__ltot.tour.state().idx'); await sleep(4000);
+  check('Pause holds the step; Resume continues', i1 === (await p.ev('__ltot.tour.state().idx')) && /Resume/.test(await p.ev(`document.getElementById('tourPause').textContent`)));
+  await p.click('#tourPause'); await sleep(200);
+  await p.click('#tourSkip'); await sleep(400);
+  const after = await p.ev(`JSON.stringify({ls: Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]), layers: __ltot.state().layers,
+    c: __ltot.map.getCenter(), z: __ltot.map.getZoom(), tab: __ltot.state().tab, open: document.getElementById('sheet').dataset.open})`);
+  check('Skip restores everything: localStorage, layers, view, zoom, open panel', after === before, after === before ? '' : before + ' ≠ ' + after);
+  check('…no demo zones or marks left on the map', !(await p.ev(`__ltot.tourZones()`)) && (await p.ev(`document.querySelectorAll('.tour-drop').length`)) === 0 &&
+    (await p.ev(`document.querySelectorAll('path.zone').length`)) === zonesBefore && await p.ev(`document.getElementById('tour').hidden`));
+  check('tour: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
+
+  const q = await openPage('?tour=1&tourStep=4&lang=zh', { wait: 4500 });
+  check('?tour=1&tourStep=4 jumps to step 4 and pauses there (zh caption)', await q.ev(`__ltot.tour.state().idx===3 && __ltot.tour.state().paused`) &&
+    /满 3 个/.test(await q.ev(`document.getElementById('tourCap').textContent`)), await q.ev(`document.getElementById('tourCap').textContent`));
+  await q.shot('v6-tour-4-zh.png');
+  const w = await openPage('?guide=1', { wait: 3500 });
+  check('first welcome card has “▶ How to use”', /▶ How to use/.test(await w.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+  await w.click('#guideTourBtn'); await sleep(800);
+  check('…and it starts the tour', await w.ev(`document.getElementById('guide').hidden && __ltot.tour.state().active`));
+  check('tour pages: no JS errors', [q, w].every((x) => realErrors(x).length === 0), [q, w].map(realErrors).flat().join(' | '));
 }
 
 function __dist(a, b) {

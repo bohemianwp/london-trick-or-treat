@@ -12,7 +12,7 @@
 
   // ==== constants ====
   var LONDON = [42.9849, -81.2453];
-  var FLAGS = LIB.parseUrlFlags(location.search);   // ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1
+  var FLAGS = LIB.parseUrlFlags(location.search);   // ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1, ?feedback=1, ?tour=1&tourStep=N
   var DEMO = FLAGS.demo;
   var DEMO_HOME = [42.9628, -81.2390];                // ?demo=1&near=1 centres "Near me" here (Old South, near Wortley Rd)
   var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
@@ -67,12 +67,7 @@
   function lsGet(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
   function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode / full */ } }
   function haversineKm(a, b) { return LIB.distM(a, b) / 1000; }
-  function bearingDeg(a, b) {
-    var r = Math.PI / 180;
-    var y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r);
-    var x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r);
-    return (Math.atan2(y, x) / r + 360) % 360;
-  }
+  var bearingDeg = LIB.bearingDeg;
   function dirName(deg) { return t('dirs')[Math.round(deg / 45) % 8]; }
   function fmtDist(km) { return km < 1 ? Math.round(km * 100) * 10 + (lang === 'zh' ? ' 米' : ' m') : km.toFixed(1) + (lang === 'zh' ? ' 公里' : ' km'); }
   function fmtMin(min) {
@@ -180,16 +175,15 @@
     renderLayerBar();
   }
   function renderLayerBar() {
-    var bar = $('layerbar');
-    bar.textContent = '';
+    var bar = $('layerbar'), nearChip = $('nearChip');      // the Near me chip is static (index.html); layer chips go before it
+    bar.querySelectorAll('[data-layer]').forEach(function (b) { b.remove(); });
     bar.setAttribute('aria-label', t('layers'));
     Object.keys(LAYER_ICONS).forEach(function (k) {
-      bar.appendChild(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
-        onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]));
+      bar.insertBefore(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
+        onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]), nearChip);
     });
-    bar.appendChild(el('button', { type: 'button', class: 'lchip lchip-near', id: 'nearChip', onclick: function () { openNear(); } },
-      [el('span', { class: 'li', text: '📍' }), t('layerNear')]));
   }
+  $('nearChip').addEventListener('click', function () { openNear(); });
   function setLayer(k, on) {
     layerOn[k] = on;
     lsSet(STORE.layers, layerOn);
@@ -564,7 +558,7 @@
     return backend.listZones(CFG.markWindowMin, grid.cell).then(function (zones) {
       data.zones = zones.filter(function (z) { return isCell(z.cell); });
       data.zonesAt = Date.now();
-      if (zoneLayer) zoneLayer.setData(data.zones);
+      if (zoneLayer && !tourZones) zoneLayer.setData(data.zones);
       renderMine();
       if (currentTab === 'near' && $('sheet').dataset.open === 'true') renderNear();
     }, function () { /* keep last */ });
@@ -623,8 +617,15 @@
 
   // ==== route planner ====
   var route = { start: null, startKind: null, startMarker: null, minutes: 60, age: '5-8', last: null, target: null };
-  segInit('timeSeg', function (v) { route.minutes = Number(v); });
-  segInit('ageSeg', function (v) { route.age = v; });
+  segInit('timeSeg', function (v) { route.minutes = Number(v); renderRouteHints(); });
+  segInit('ageSeg', function (v) { route.age = v; renderRouteHints(); });
+  // Stamina + start-time hints under the age picker (PACE above is unchanged).
+  function renderRouteHints() {
+    var h = LIB.staminaHint(route.age, route.minutes), box = $('routeHints');
+    box.textContent = '';
+    box.appendChild(el('div', { id: 'staminaHint', class: h.warn ? 'warn' : 'hint', text: (h.warn ? '⚠️ ' : '') + t(h.key) }));
+    box.appendChild(el('div', { id: 'startHint', class: 'hint', text: t(LIB.startTimeHintKey(route.age)) }));
+  }
   function setStart(ll, kind) {
     route.start = ll; route.startKind = kind;
     if (route.startMarker) map.removeLayer(route.startMarker);
@@ -666,18 +667,6 @@
     openTab('route');
     if (route.start) buildLoop(); else toast(t('needStart'));
   }
-  function buildCheckpoints(start, area, targetKm) {
-    var center = [area.lat, area.lng], dStart = haversineKm(start, center);
-    var drive = dStart > MAX_WALK_TO_AREA_KM, origin = drive ? center : start;
-    var loopKm = drive ? targetKm : Math.max(targetKm - 2 * dStart, 0.6);
-    var rKm = Math.min(Math.max(loopKm / (2 * Math.PI * 1.3), 0.12), area.r / 1000);
-    var n = 5, startAngle = drive ? 0 : bearingDeg(center, start), pts = [];
-    for (var i = 0; i < n; i++) {
-      var ang = (startAngle + i * 360 / n) * Math.PI / 180;
-      pts.push([center[0] + (rKm / 111.32) * Math.cos(ang), center[1] + (rKm / (111.32 * Math.cos(center[0] * Math.PI / 180))) * Math.sin(ang)]);
-    }
-    return { origin: origin, drive: drive, dStart: dStart, waypoints: [origin].concat(pts, [origin]) };
-  }
   function fetchWithTimeout(url, ms) {
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, ms);
@@ -711,7 +700,7 @@
   function buildLoop() {
     if (!route.start) { toast(t('needStart')); return; }
     var area = pickArea(route.start, route.age, $('areaSelect').value);
-    var cp = buildCheckpoints(route.start, area, PACE[route.age] * route.minutes / 60);
+    var cp = LIB.loopWaypoints(route.start, area, PACE[route.age] * route.minutes / 60, MAX_WALK_TO_AREA_KM);   // ends where it starts
     var btn = $('buildBtn'), seq = ++buildSeq;
     btn.disabled = true; btn.textContent = t('building');
     osrmRoute(cp.waypoints).then(function (r) {
@@ -725,6 +714,9 @@
       return { method: 'straight', line: cp.waypoints, km: km, steps: null };
     }).then(function (res) {
       if (seq !== buildSeq) return;
+      // Close the loop on the map: the router snaps to the nearest path, so join both ends to the real start (car / home).
+      if (LIB.distM(res.line[0], cp.origin) > 1) res.line.unshift(cp.origin.slice());
+      if (LIB.distM(res.line[res.line.length - 1], cp.origin) > 1) res.line.push(cp.origin.slice());
       res.area = area; res.cp = cp; res.age = route.age;
       route.last = res;
       drawRoute(res);
@@ -760,9 +752,11 @@
     box.appendChild(el('div', { class: 'stats' }, [
       el('div', { class: 'stat' }, [el('small', { text: t('resArea') }), el('b', { text: res.area.name[lang] })]),
       el('div', { class: 'stat' }, [el('small', { text: t('resDistance') }), el('b', { class: 'mono-num', text: fmtDist(res.km) })]),
-      el('div', { class: 'stat', style: 'grid-column: span 2' }, [el('small', { text: t('resTime') }),
-        el('b', { class: 'mono-num', text: '≈ ' + fmtMin(res.km / PACE[res.age] * 60) }), el('small', { text: t('inclStops') })])
+      el('div', { class: 'stat' }, [el('small', { text: t('resTime') }),
+        el('b', { class: 'mono-num', text: '≈ ' + fmtMin(res.km / PACE[res.age] * 60) }), el('small', { text: t('inclStops') })]),
+      el('div', { class: 'stat' }, [el('small', { text: t('resHouses') }), el('b', { id: 'housesEst', class: 'mono-num', text: t('housesEst', { n: LIB.estimateHouses(res.km) }) })])
     ]));
+    box.appendChild(el('p', { class: 'hint loop-note', text: (res.cp.drive ? '🅿️ ' : '🏁 ') + t('startFinish') }));
     if (res.cp.drive) box.appendChild(el('div', { class: 'warn', text: t('driveNote', { d: fmtDist(res.cp.dStart) }) }));
     box.appendChild(el('p', { class: 'hint', text: res.method === 'osrm' ? t('methodOsrm') : t('methodStraight') }));
     box.appendChild(el('div', { class: 'label', text: t('turnList') }));
@@ -913,7 +907,7 @@
   }, LOCAL_RECOUNT_MS);
   setInterval(function () {
     if (document.visibilityState === 'visible') refreshAll();
-    renderChips(); renderCountdown();
+    renderChips();
   }, CFG.pollSec * 1000);
   var changeTimer;
   backend.onChange(function () { clearTimeout(changeTimer); changeTimer = setTimeout(refreshAll, 250); });
@@ -925,21 +919,46 @@
     ul.textContent = '';
     t('tips').forEach(function (tip) { ul.appendChild(el('li', { text: tip })); });
   }
-  var NIGHT = { start: LIB.zonedToUtcMs('2026-10-31', '18:00'), end: LIB.zonedToUtcMs('2026-10-31', '21:30') };
+  // Countdown to Oct 31 5 PM Toronto with live seconds (top bar + Safety panel). The DOM is rebuilt only when the phase or
+  // language changes; each tick just swaps digits in fixed-width boxes. ?now=… shifts this clock (screenshots only).
+  var NOW_OFFSET = (function () { var n = LIB.parseNowParam(location.search); return n === null ? 0 : n - Date.now(); })();
+  function appNow() { return Date.now() + NOW_OFFSET; }
+  var cd = { key: '', nums: [], secs: [] };
   function renderCountdown() {
-    var now = Date.now(), box = $('countdown'), big = $('bigCountdown');
-    box.textContent = ''; big.textContent = '';
-    if (now >= NIGHT.start && now <= NIGHT.end) { box.textContent = t('cdNow'); big.textContent = t('cdNow'); return; }
-    if (now > NIGHT.end) { box.textContent = t('cdAfter'); big.textContent = t('cdAfter'); return; }
-    var p = LIB.countdownParts(NIGHT.start - now), u = t('cdUnits');
-    function pad(n) { return (n < 10 ? '0' : '') + n; }
-    var digits = (p.d ? p.d + u[0] + ' ' : '') + pad(p.h) + u[1] + ' ' + pad(p.m) + u[2];
-    [box, big].forEach(function (n) {
-      n.appendChild(el('span', { text: '🎃 ' + t('cdBefore') + ' ' }));
-      n.appendChild(el('span', { class: 'mono-num cd-digits', text: digits }));
-    });
-    big.appendChild(el('div', { class: 'cd-on', text: t('cdOn') }));
+    var now = appNow(), phase = LIB.countdownPhase(now);
+    if (cd.key !== phase + lang) {
+      cd.key = phase + lang; cd.nums = []; cd.secs = [];
+      [$('countdown'), $('bigCountdown')].forEach(function (n, i) {
+        n.textContent = '';
+        n.dataset.phase = phase;
+        if (phase !== 'before') { n.appendChild(el('span', { class: 'cd-msg', text: t(phase === 'on' ? 'cdNow' : 'cdAfter') })); return; }
+        n.appendChild(el('span', { class: 'cd-lbl', text: '🎃 ' + t('cdBefore') + ' ' }));
+        var digits = el('span', { class: 'cd-digits mono-num' });
+        t('cdUnits').forEach(function (u, k) {
+          var b = el('b', { class: k === 3 ? 'cd-n cd-s' : 'cd-n' });
+          cd.nums.push(b);
+          if (k === 3) cd.secs.push(b);
+          if (k) digits.appendChild(document.createTextNode(' '));
+          digits.appendChild(el('span', { class: 'cd-u' }, [b, el('i', { text: u })]));
+        });
+        n.appendChild(digits);
+        if (i === 1) n.appendChild(el('div', { class: 'cd-on', text: t('cdOn') }));
+      });
+    }
+    if (phase !== 'before') return;
+    var u = LIB.countdownUnits(LIB.HALLOWEEN.start - now, t('cdUnits')), odd = Math.floor(now / 1000) % 2 === 1;
+    cd.nums.forEach(function (b, i) { var v = u[i % 4][0]; if (b.textContent !== v) b.textContent = v; });
+    cd.secs.forEach(function (b) { b.classList.toggle('odd', odd); });   // swapping the animation name replays the flicker, no reflow
   }
+  // One interval, started on the next second boundary (+20 ms), stopped while the page is hidden.
+  var cdTimer = null, cdAlign = null;
+  function stopTicker() { clearTimeout(cdAlign); clearInterval(cdTimer); cdAlign = cdTimer = null; }
+  function startTicker() {
+    stopTicker();
+    renderCountdown();
+    cdAlign = setTimeout(function () { cdAlign = null; renderCountdown(); cdTimer = setInterval(renderCountdown, 1000); }, LIB.msToNextSecond(appNow()) + 20);
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') startTicker(); else stopTicker(); });
   function renderPrivacy() {
     var dl = $('privacyList');
     dl.textContent = '';
@@ -955,8 +974,8 @@
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
-  var PANELS = ['map', 'near', 'route', 'guide', 'board', 'safety', 'privacy'];
-  var TAB_OF = { near: 'map', board: 'guide', safety: 'guide', privacy: 'guide' };
+  var PANELS = ['map', 'near', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
+  var TAB_OF = { near: 'map', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
   function markCurrent() {
     var open = $('sheet').dataset.open === 'true', tab = TAB_OF[currentTab] || currentTab;
     document.querySelectorAll('.tabbar button').forEach(function (b) {
@@ -975,6 +994,7 @@
     setSheetOpen(true);
     $('sheet').scrollTop = 0;
     if (name === 'near') renderNear();
+    if (name === 'feedback') updateFeedback();
   }
   document.querySelector('.tabbar').addEventListener('click', function (e) {
     var b = e.target.closest('button');
@@ -1008,6 +1028,15 @@
     $('helpBtn').setAttribute('aria-label', t('helpAria')); $('helpBtn').title = t('helpAria');
     $('boardBtn').setAttribute('aria-label', t('boardAria')); $('boardBtn').title = t('boardAria');
     $('markCardClose').setAttribute('aria-label', t('close'));
+    $('tourBtn').setAttribute('aria-label', t('tourAria')); $('tourBtn').title = t('tourAria');
+    ['practiceChip', 'offlineChip'].forEach(function (id) {   // "🧪 Practice mode": the words hide on narrow screens, the icon stays
+      var s = t(id), i = s.indexOf(' '), b = $(id);
+      b.textContent = '';
+      b.appendChild(el('span', { 'aria-hidden': 'true', text: s.slice(0, i) }));
+      b.appendChild(el('span', { class: 'chip-txt', text: s.slice(i + 1) }));
+      b.setAttribute('aria-label', s.slice(i + 1)); b.title = s.slice(i + 1);
+    });
+    $('fbNameIn').placeholder = t('fbName');
     document.querySelectorAll('.ibtn').forEach(function (b) { b.setAttribute('aria-label', t('infoAria')); });
   }
   function renderAll() {
@@ -1016,12 +1045,13 @@
     renderAreaLayer(); renderCommunity(); renderAreaList(); renderEvents();
     areaOptions($('areaSelect'), 'auto', t('autoArea'), true, targetOption());
     areaOptions($('postArea'), '', t('noArea'), false);
-    renderStartStatus(); renderRouteResult();
+    renderStartStatus(); renderRouteResult(); renderRouteHints();
     renderPosts(); renderTips(); renderCountdown(); renderPrivacy(); renderHowto();
-    if (zoneLayer) zoneLayer.setData(data.zones);
+    if (zoneLayer) zoneLayer.setData(tourZones || data.zones);
     if (!$('guide').hidden) renderGuide();
     if (!$('markCard').hidden) { renderTagRow(); }
     if (currentTab === 'near') renderNear();
+    if (currentTab === 'feedback') updateFeedback();
     renderChips();
     updateCount('postBody', 'postCount');
     updateLocateBtn();
@@ -1034,6 +1064,119 @@
     map.closePopup();
     renderAll();
   });
+
+  // ==== 💬 Feedback (mailto + copy, no backend) and 🔗 Share ====
+  var FB_INPUTS = ['fbConfusingIn', 'fbLikedIn', 'fbMissingIn'];
+  function feedbackMail() {
+    return LIB.buildFeedbackMail({ confusing: $('fbConfusingIn').value, liked: $('fbLikedIn').value, missing: $('fbMissingIn').value,
+      name: $('fbNameIn').value, version: LIB.APP_VERSION, lang: lang, ua: navigator.userAgent, time: new Date().toISOString(),
+      screen: screen.width + '×' + screen.height + ' (window ' + window.innerWidth + '×' + window.innerHeight + ')' });
+  }
+  function fbEmpty() { return !FB_INPUTS.some(function (id) { return $(id).value.trim(); }); }
+  function updateFeedback() { $('fbSend').href = feedbackMail().href; }
+  FB_INPUTS.concat('fbNameIn').forEach(function (id) {
+    $(id).addEventListener('input', function () { updateFeedback(); showErr('fbErr', ''); $('fbCopied').hidden = true; });
+  });
+  $('fbSend').addEventListener('click', function (e) {
+    if (fbEmpty()) { e.preventDefault(); showErr('fbErr', t('fbEmpty')); return; }
+    this.href = feedbackMail().href;                       // fresh time stamp
+  });
+  // Clipboard API first; old browsers / http pages: a hidden textarea + execCommand('copy').
+  function copyText(text) {
+    function legacy() {
+      var ta = el('textarea', { readonly: '', style: 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0' });
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(function () { return true; }, legacy);
+    return Promise.resolve(legacy());
+  }
+  $('fbCopy').addEventListener('click', function () {
+    if (fbEmpty()) { showErr('fbErr', t('fbEmpty')); return; }
+    var text = feedbackMail().text;
+    copyText(text).then(function (ok) {
+      $('fbCopied').textContent = ok ? '✅ ' + t('fbCopied') : t('fbCopyFail');
+      $('fbCopied').hidden = false;
+      $('fbOut').hidden = ok;
+      if (!ok) { $('fbOut').value = text; $('fbOut').select(); }
+    });
+  });
+  $('feedbackBtn').addEventListener('click', function () { openTab('feedback'); });
+  $('shareAppBtn').addEventListener('click', function () {
+    var url = location.href.split(/[?#]/)[0];
+    if (navigator.share) { navigator.share({ title: t('appTitle'), text: t('shareText'), url: url }).catch(function () { /* cancelled */ }); return; }
+    copyText(url).then(function (ok) { toast(ok ? t('shareCopied') : url, 5000); });
+  });
+
+  // ==== ▶ How to use: auto-play tour (tour.js). Its demo zones live in this closure only (never localStorage);
+  // the real zones, layers, map view and panel come back when it ends. ====
+  var tourLayer = L.layerGroup().addTo(map), tourZones = null, tourStore = null;
+  var TOUR_VIEW = [42.9640, -81.2420], TOUR_SPOT = [42.9705, -81.2330];
+  var TOUR_BG = [[42.9655, -81.2470, 23, 'candy'], [42.9560, -81.2330, 9, 'decor'], [42.9590, -81.2560, 4, null]];
+  function tourZone(ll, n, tag, isNew, now) {
+    return { cell: grid.cell(ll[0], ll[1]), count: n, tags: {}, topTag: tag, firstLitAt: isNew ? now : now - 3600000,
+             isNew: isNew, bucket: LIB.zoneBucket(n) };
+  }
+  function tourDraw() {
+    var now = Date.now(), n = tourStore.marks.length;
+    tourZones = TOUR_BG.map(function (z) { return tourZone(z, z[2], z[3], false, now); });
+    if (n >= LIB.MIN_ZONE) tourZones.push(tourZone(TOUR_SPOT, n, null, true, now));   // 3+ rule applies to the demo too
+    if (zoneLayer) zoneLayer.setData(tourZones);
+  }
+  function tourReset() {
+    tourStore = { marks: [TOUR_SPOT.slice(), TOUR_SPOT.slice()] };   // 2 marks: not shown yet
+    tourLayer.clearLayers();
+    setSheetOpen(false);
+    map.setView(TOUR_VIEW, 14, { animate: false });
+    tourDraw();
+  }
+  var TOUR_ACTIONS = {
+    setup: function () {
+      map.closePopup(); closeMarkCard(); closeHints(null); setMode(null);
+      if (!$('guide').hidden) closeGuide('done');
+      layerOn.zones = true; applyLayers();                  // in memory only (setLayer would save it)
+      tourReset();
+    },
+    zones: tourReset,
+    markStart: tourReset,
+    map: function () { setSheetOpen(false); },
+    guide: function () { openTab('guide'); },
+    markDrop: function () {
+      var p = [TOUR_SPOT[0] + (Math.random() - 0.5) * 0.002, TOUR_SPOT[1] + (Math.random() - 0.5) * 0.003];
+      tourStore.marks.push(p);
+      L.marker(p, { interactive: false, icon: L.divIcon({ className: '', html: '<div class="tour-drop">✨</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) })
+        .addTo(tourLayer);
+      tourDraw();
+    }
+  };
+  function tourSnapshot() {
+    var c = map.getCenter();
+    return { center: [c.lat, c.lng], zoom: map.getZoom(), layers: Object.assign({}, layerOn), tab: currentTab, open: $('sheet').dataset.open === 'true' };
+  }
+  function tourRestore(snap) {
+    tourZones = tourStore = null;
+    tourLayer.clearLayers();
+    Object.keys(snap.layers).forEach(function (k) { layerOn[k] = snap.layers[k]; });
+    applyLayers();
+    map.setView(snap.center, snap.zoom, { animate: false });
+    if (zoneLayer) zoneLayer.setData(data.zones);
+    if (snap.open && snap.tab) openTab(snap.tab); else { currentTab = snap.tab; setSheetOpen(false); }
+  }
+  function tourRect(step) {                                 // step 4: ring around the demo zone instead of the whole map
+    if (step.target !== '#map') return null;
+    var p = map.latLngToContainerPoint(grid.center(grid.cell(TOUR_SPOT[0], TOUR_SPOT[1]))), m = map.getContainer().getBoundingClientRect();
+    return { left: m.left + p.x - 75, top: m.top + p.y - 75, width: 150, height: 150 };
+  }
+  var tour = window.TOT_TOUR ? window.TOT_TOUR.mount({ t: t, reduced: REDUCED, snapshot: tourSnapshot, restore: tourRestore, rect: tourRect,
+    run: function (name) { if (TOUR_ACTIONS[name]) TOUR_ACTIONS[name](); } }) : null;
+  function startTour(i, pause) { if (tour) tour.start(i || 0, pause); }
+  $('tourBtn').addEventListener('click', function () { startTour(); });
+  $('guideTour').addEventListener('click', function () { startTour(); });
 
   // ==== welcome guide, How-to panel, inline hints ====
   function safeLS() { try { return window.localStorage; } catch (e) { return null; } }
@@ -1051,6 +1194,8 @@
       if (i === 0) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
         return el('span', null, [el('i', { class: 'lg lg-' + k }), t(BUCKET_KEY[k])]);
       }))));
+      if (i === 0) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
+        onclick: function () { closeGuide('done'); startTour(); } }));
       if (i === 1) card.appendChild(el('div', { class: 'gbtn-demo', 'aria-hidden': 'true' }, [el('span', { text: '✨ ' + t('markBtn') })]));
       track.appendChild(card);
       dotBox.appendChild(el('button', { type: 'button', class: 'gdot', 'aria-label': t('guideDotAria', { n: i + 1 }), onclick: function () { guideGo(i); } }));
@@ -1163,13 +1308,18 @@
   // ?demo=1 loads demo.js (fake marks) first; normal visits never download it.
   (DEMO ? new Promise(function (resolve) {
     var sc = document.createElement('script');
-    sc.src = 'demo.js?v=5'; sc.onload = sc.onerror = resolve;
+    sc.src = 'demo.js?' + LIB.APP_VERSION; sc.onload = sc.onerror = resolve;
     document.head.appendChild(sc);
   }) : Promise.resolve()).then(function () {
     if (DEMO && window.TOT_DEMO) window.TOT_DEMO.seed(backend.local, grid);
     return refreshAll();
-  }).then(function () { if (FLAGS.near) openNear(); });
+  }).then(function () {
+    if (FLAGS.near) openNear();
+    if (FLAGS.tour) startTour(FLAGS.tourStep ? FLAGS.tourStep - 1 : 0, !!FLAGS.tourStep);
+  });
+  startTicker();
   if (FLAGS.howto) openTab('guide');
+  if (FLAGS.feedback) openTab('feedback');
   if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
 
   // Hook for automated checks (harmless in normal use).
@@ -1178,7 +1328,8 @@
     zonePerf: function () { return zoneLayer ? { ms: zoneLayer.lastDrawMs, drawn: zoneLayer.drawn, badges: zoneLayer.badges, zones: data.zones.length,
                                                  base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
     refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
-    openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
+    openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, tour: tour, startTour: startTour, appNow: appNow,
+    feedbackMail: feedbackMail, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
       return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
                  return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };

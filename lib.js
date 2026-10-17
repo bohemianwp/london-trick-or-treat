@@ -14,6 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
+  var APP_VERSION = 'v=6';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -371,10 +372,95 @@
     ms = Math.max(0, ms);
     return { d: Math.floor(ms / 864e5), h: Math.floor(ms / 36e5) % 24, m: Math.floor(ms / 6e4) % 60, s: Math.floor(ms / 1e3) % 60 };
   }
+  // Top-bar countdown: to Oct 31 5:00 PM Toronto, then "Halloween is ON!" until Nov 1 midnight (EDT both times), then "see you next year".
+  var HALLOWEEN = { start: zonedToUtcMs('2026-10-31', '17:00', TZ), end: zonedToUtcMs('2026-11-01', '00:00', TZ) };
+  function countdownPhase(nowMs) { return nowMs < HALLOWEEN.start ? 'before' : nowMs < HALLOWEEN.end ? 'on' : 'after'; }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  // -> [['14','d'], ['01','h'], ['05','m'], ['32','s']]; units = i18n cdUnits. Always 4 units, so the width never changes.
+  function countdownUnits(ms, units) {
+    var p = countdownParts(ms);
+    return [[pad2(p.d), units[0]], [pad2(p.h), units[1]], [pad2(p.m), units[2]], [pad2(p.s), units[3]]];
+  }
+  function formatCountdown(ms, units) { return countdownUnits(ms, units).map(function (u) { return u[0] + u[1]; }).join(' '); }
+  function msToNextSecond(nowMs) { return 1000 - (((nowMs % 1000) + 1000) % 1000); }
+  // ?now=2026-10-31T17:30:00-04:00 (screenshots only). Raw search string: parseUrlFlags lower-cases values. "+" may arrive as a space.
+  function parseNowParam(search) {
+    var m = /[?&]now=([^&]*)/.exec(String(search || ''));
+    if (!m) return null;
+    var v;
+    try { v = decodeURIComponent(m[1]).replace(/ /g, '+'); } catch (e) { return null; }
+    var ms = Date.parse(v);
+    return isFinite(ms) ? ms : null;
+  }
+
+  // ==== route helpers ====
+  var STAMINA = { 'u5': [30, 45], '5-8': [60, 90] };
+  // -> { key, warn }: i18n key of the hint and whether the chosen walk is longer than little legs usually manage.
+  function staminaHint(age, minutes) {
+    if (age === 'u5') return { key: minutes > STAMINA.u5[1] ? 'staminaU5Warn' : 'staminaU5', warn: minutes > STAMINA.u5[1] };
+    if (age === '5-8') return { key: 'stamina58', warn: false };
+    return { key: 'staminaOlder', warn: false };
+  }
+  function startTimeHintKey(age) { return age === 'u5' || age === '5-8' ? 'startEarly' : 'startLate'; }
+  // About 1 house per 15 m of street, 60 % with lights on: ≈ 40 per km.
+  function estimateHouses(km) { return Math.round(Math.max(0, km) * 1000 / 15 * 0.6); }
+  function bearingDeg(a, b) {
+    var r = Math.PI / 180;
+    var y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r);
+    var x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r);
+    return (Math.atan2(y, x) / r + 360) % 360;
+  }
+  // A loop of 5 checkpoints around the area centre. It starts and ends at the same point: home/my location,
+  // or the area centre when the area is too far to walk to (drive & park there). waypoints[0] === waypoints[last].
+  function loopWaypoints(start, area, targetKm, maxWalkKm) {
+    var center = [area.lat, area.lng], dStart = distM(start, center) / 1000;
+    var drive = dStart > maxWalkKm, origin = drive ? center : start;
+    var loopKm = drive ? targetKm : Math.max(targetKm - 2 * dStart, 0.6);
+    var rKm = Math.min(Math.max(loopKm / (2 * Math.PI * 1.3), 0.12), area.r / 1000);
+    var n = 5, startAngle = drive ? 0 : bearingDeg(center, start), pts = [];
+    for (var i = 0; i < n; i++) {
+      var ang = (startAngle + i * 360 / n) * Math.PI / 180;
+      pts.push([center[0] + (rKm / 111.32) * Math.cos(ang), center[1] + (rKm / (111.32 * Math.cos(center[0] * Math.PI / 180))) * Math.sin(ang)]);
+    }
+    return { origin: origin, drive: drive, dStart: dStart, waypoints: [origin].concat(pts, [origin]) };
+  }
+
+  // ==== feedback (mailto, no backend) ====
+  var FEEDBACK_TO = 'sisy+halloween@mail.grokbot.com', FEEDBACK_SUBJECT = 'Halloween map feedback';
+  var FEEDBACK_MAX = 500, MAILTO_MAX = 1800;
+  var FB_LABELS = [['confusing', 'What was confusing? / 哪里让你困惑？'], ['liked', 'What did you like? / 你喜欢什么？'],
+                   ['missing', "What's missing? / 还缺什么功能？"]];
+  function cut(s, n) { var a = Array.from(String(s || '').trim()); return a.length > n ? a.slice(0, Math.max(0, n - 1)).join('') + '…' : a.join(''); }
+  // o: { confusing, liked, missing, name, version, lang, screen, ua, time } -> { to, subject, body, href, text }.
+  // Answers are cut to 500 characters, then the longest is shortened until the whole mailto: link is ≤ 1800 characters.
+  function buildFeedbackMail(o) {
+    o = o || {};
+    var ans = {};
+    FB_LABELS.forEach(function (l) { ans[l[0]] = cut(o[l[0]], FEEDBACK_MAX); });
+    var ua = cut(o.ua, 200);
+    function body() {
+      return FB_LABELS.map(function (l) { return l[1] + '\n' + (ans[l[0]] || '-'); }).join('\n\n') +
+        '\n\nName / 名字: ' + (cut(o.name, 40) || '-') +
+        '\n---\nApp: ' + (o.version || '') + ' · lang: ' + (o.lang || '') + ' · screen: ' + (o.screen || '') +
+        '\nTime: ' + (o.time || '') + '\nUA: ' + ua;
+    }
+    function href() { return 'mailto:' + FEEDBACK_TO + '?subject=' + encodeURIComponent(FEEDBACK_SUBJECT) + '&body=' + encodeURIComponent(body()); }
+    for (var guard = 0; href().length > MAILTO_MAX && guard < 200; guard++) {
+      var longest = FB_LABELS.map(function (l) { return l[0]; }).sort(function (a, b) { return Array.from(ans[b]).length - Array.from(ans[a]).length; })[0];
+      var n = Array.from(ans[longest]).length;
+      if (n > 1) ans[longest] = cut(ans[longest], Math.floor(n * 0.85));
+      else if (ua.length > 1) ua = cut(ua, Math.floor(ua.length * 0.7));
+      else break;
+    }
+    var b = body();
+    return { to: FEEDBACK_TO, subject: FEEDBACK_SUBJECT, body: b, href: href(),
+             text: 'To: ' + FEEDBACK_TO + '\nSubject: ' + FEEDBACK_SUBJECT + '\n\n' + b };
+  }
 
   // ==== URL flags + first-visit guide ====
   // ?guide=1 forces the welcome cards, ?howto=1 opens the How-to panel, ?lang=zh|en picks the language for this load,
-  // ?demo=1 runs the demo, ?near=1 opens the "Near me" panel.
+  // ?demo=1 runs the demo, ?near=1 opens the "Near me" panel, ?feedback=1 opens Feedback, ?tour=1[&tourStep=N] plays the tour
+  // (N = 1-based step, paused there). ?now= is read separately by parseNowParam.
   var GUIDE_KEY = 'ltot.guideSeen.v2';
   function parseUrlFlags(search) {
     var q = {};
@@ -386,14 +472,18 @@
     });
     function on(v) { return v === '1' || v === 'true' || v === 'yes'; }
     var l = (q.lang || '').split(/[-_]/)[0];
-    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near) };
+    var step = parseInt(q.tourstep, 10);
+    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near),
+             feedback: on(q.feedback), tour: on(q.tour), tourStep: step >= 1 ? step : null };
   }
   function guideSeen(storage) { try { return !!(storage && storage.getItem(GUIDE_KEY)); } catch (e) { return false; } }
   function markGuideSeen(storage, how) {
     try { storage.setItem(GUIDE_KEY, how === 'skipped' ? 'skipped' : 'done'); return true; } catch (e) { return false; }
   }
   // First visit shows the cards; ?guide=1 always does; ?howto=1 or ?near=1 alone open their panel instead.
-  function shouldShowGuide(flags, seen) { return !!(flags && flags.guide) || (!seen && !(flags && (flags.howto || flags.near))); }
+  function shouldShowGuide(flags, seen) {
+    return !!(flags && flags.guide) || (!seen && !(flags && (flags.howto || flags.near || flags.feedback || flags.tour)));
+  }
 
   // ==== SHA-256 (edit-token hashes; crypto.subtle is missing on some file:// pages) ====
   var K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
@@ -446,7 +536,11 @@
     localCenter: localCenter, localBoundary: localBoundary, localDisk: localDisk,
     invertCrowd: invertCrowd, mapArea: mapArea, overall: overall, checkText: checkText, charCount: charCount,
     visiblePosts: visiblePosts, sortPosts: sortPosts, areaVoteTotals: areaVoteTotals, rateOk: rateOk,
-    countdownParts: countdownParts, sha256Hex: sha256Hex,
+    countdownParts: countdownParts, sha256Hex: sha256Hex, APP_VERSION: APP_VERSION,
+    HALLOWEEN: HALLOWEEN, countdownPhase: countdownPhase, countdownUnits: countdownUnits, formatCountdown: formatCountdown,
+    msToNextSecond: msToNextSecond, parseNowParam: parseNowParam,
+    staminaHint: staminaHint, startTimeHintKey: startTimeHintKey, estimateHouses: estimateHouses, bearingDeg: bearingDeg, loopWaypoints: loopWaypoints,
+    FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
     GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide
   };
 });

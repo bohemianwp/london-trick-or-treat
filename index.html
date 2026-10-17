@@ -11,26 +11,29 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <header class="topbar">
     <h1 class="brand">🎃 <span data-i18n="appTitle">Mark it! London</span></h1>
     <span id="demoChip" class="chip chip-demo" data-i18n="demoChip" hidden>DEMO</span>
-    <button id="practiceChip" class="chip chip-practice" type="button" data-i18n="practiceChip" hidden>Practice mode</button>
-    <button id="offlineChip" class="chip chip-off" type="button" data-i18n="offlineChip" hidden>📴 Offline mode</button>
+    <button id="practiceChip" class="chip chip-practice chip-split" type="button" hidden>🧪 Practice mode</button>
+    <button id="offlineChip" class="chip chip-off chip-split" type="button" hidden>📴 Offline mode</button>
     <button id="boardBtn" class="chip chip-icon" type="button" aria-controls="panel-board">🏆</button>
     <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">🦺 Safety</button>
+    <button id="tourBtn" class="chip chip-help chip-tour" type="button" aria-controls="tour">▶</button>
     <button id="helpBtn" class="chip chip-help" type="button" aria-label="How to use this map" aria-controls="panel-guide">?</button>
     <button id="langBtn" class="chip" type="button">中文</button>
   </header>
-  <div id="countdown" class="countdown" role="status"></div>
+  <div id="countdown" class="countdown" role="timer"></div>
 
   <div class="mapwrap">
     <main id="map" aria-label="Map of London, Ontario"></main>
     <div class="hud" aria-hidden="true"><div class="hud-grid"></div><div class="hud-sweep"></div></div>
 
-    <div id="layerbar" class="layerbar" role="group"></div>
+    <div id="layerbar" class="layerbar" role="group">
+      <button id="nearChip" class="lchip lchip-near" type="button"><span class="li">📍</span><span data-i18n="layerNear">Near me</span></button>
+    </div>
     <div id="legend" class="legend">
       <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
       <span><i class="lg lg-lively"></i><span data-i18n="legendLively">Lively</span></span>
@@ -125,6 +128,7 @@
             <button type="button" data-v="9-12" role="radio" data-i18n="age912">9–12</button>
             <button type="button" data-v="teen" role="radio" data-i18n="ageTeen">13+</button>
           </div>
+          <div id="routeHints" class="route-hints" aria-live="polite"></div>
         </div>
         <div class="field">
           <label class="label" for="areaSelect" data-i18n="area">Where to</label>
@@ -138,7 +142,12 @@
       <div class="panel" id="panel-guide" hidden>
         <h2 data-i18n="howtoTitle">How to use this map</h2>
         <p class="hint" data-i18n="howtoIntro"></p>
-        <button id="replayGuide" class="btn btn-primary btn-block" type="button" data-i18n="howtoReplay">▶ Show the welcome cards again</button>
+        <button id="guideTour" class="btn btn-primary btn-block" type="button" data-i18n="tourBtn">▶ How to use</button>
+        <div class="row">
+          <button id="feedbackBtn" class="btn" type="button" data-i18n="fbBtn">💬 Feedback</button>
+          <button id="shareAppBtn" class="btn" type="button" data-i18n="shareAppBtn">🔗 Share this map</button>
+        </div>
+        <button id="replayGuide" class="btn btn-block" type="button" data-i18n="howtoReplay">▶ Show the welcome cards again</button>
         <div class="row">
           <button id="guideBoard" class="btn" type="button" data-i18n="boardLink">🏆 Board</button>
           <button id="guideSafety" class="btn" type="button" data-i18n="safetyBtn">🦺 Safety</button>
@@ -181,6 +190,27 @@
         <ul id="tipList" class="tips"></ul>
         <p class="hint" data-i18n="safetySource"></p>
         <button class="btn btn-link privacy-link" type="button" data-i18n="privacyLink">Privacy</button>
+      </div>
+
+      <!-- FEEDBACK (mailto + copy, no backend) -->
+      <div class="panel" id="panel-feedback" hidden>
+        <h2 data-i18n="fbTitle">💬 Feedback</h2>
+        <p class="hint" data-i18n="fbIntro"></p>
+        <div class="warn" data-i18n="fbNoKids"></div>
+        <label class="label" for="fbConfusingIn" data-i18n="fbConfusing">What was confusing?</label>
+        <textarea id="fbConfusingIn" class="fb-in" maxlength="500" rows="2"></textarea>
+        <label class="label" for="fbLikedIn" data-i18n="fbLiked">What did you like?</label>
+        <textarea id="fbLikedIn" class="fb-in" maxlength="500" rows="2"></textarea>
+        <label class="label" for="fbMissingIn" data-i18n="fbMissing">What's missing?</label>
+        <textarea id="fbMissingIn" class="fb-in" maxlength="500" rows="2"></textarea>
+        <label class="label" for="fbNameIn" data-i18n="fbName">Name / nickname (optional)</label>
+        <input id="fbNameIn" class="select" type="text" maxlength="40" autocomplete="nickname">
+        <div id="fbErr" class="err" role="alert" hidden></div>
+        <a id="fbSend" class="btn btn-primary btn-block" href="mailto:sisy+halloween@mail.grokbot.com" data-i18n="fbSend">✉️ Send</a>
+        <button id="fbCopy" class="btn btn-block" type="button" data-i18n="fbCopy">📋 Copy text</button>
+        <p id="fbCopied" class="fb-ok" role="status" hidden></p>
+        <textarea id="fbOut" rows="6" readonly hidden></textarea>
+        <p class="hint" data-i18n="fbHow"></p>
       </div>
 
       <!-- PRIVACY -->
@@ -240,6 +270,23 @@
     </div>
   </div>
 
+  <!-- ▶ How to use: auto-play tour (tour.js) -->
+  <div id="tour" class="tour" hidden>
+    <div id="tourRing" class="tour-ring" aria-hidden="true"></div>
+    <div id="tourCard" class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourCap">
+      <div id="tourBar" class="tour-bar" aria-hidden="true"></div>
+      <div class="tour-top"><span class="tour-demo" data-i18n="tourDemo">DEMO DATA</span><span id="tourCount" class="mono-num"></span></div>
+      <p id="tourCap" class="tour-cap" aria-live="polite"></p>
+      <div class="tour-ctl">
+        <button id="tourBack" class="btn btn-small" type="button" hidden>Back</button>
+        <button id="tourPause" class="btn btn-small" type="button" aria-pressed="false">Pause</button>
+        <button id="tourReplay" class="btn btn-small" type="button">Replay</button>
+        <button id="tourNext" class="btn btn-small btn-primary" type="button" hidden>Next</button>
+        <button id="tourSkip" class="btn btn-small btn-ghost" type="button">Skip</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" hidden></div>
   <noscript><p class="noscript">This app needs JavaScript. 这个 app 需要开启 JavaScript。</p></noscript>
 
@@ -247,12 +294,13 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
           integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
-  <script defer src="config.js?v=5"></script>
-  <script defer src="lib.js?v=5"></script>
-  <script defer src="i18n.js?v=5"></script>
-  <script defer src="data/areas.js?v=5"></script>
-  <script defer src="backend.js?v=5"></script>
-  <script defer src="hex.js?v=5"></script>
-  <script defer src="app.js?v=5"></script>
+  <script defer src="config.js?v=6"></script>
+  <script defer src="lib.js?v=6"></script>
+  <script defer src="i18n.js?v=6"></script>
+  <script defer src="data/areas.js?v=6"></script>
+  <script defer src="backend.js?v=6"></script>
+  <script defer src="hex.js?v=6"></script>
+  <script defer src="tour.js?v=6"></script>
+  <script defer src="app.js?v=6"></script>
 </body>
 </html>
