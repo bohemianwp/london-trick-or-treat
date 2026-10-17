@@ -1,0 +1,428 @@
+{
+  "meta": {
+    "generated": "2026-10-17",
+    "label_en": "Based on local news and parent reports, 2026",
+    "label_zh": "根据本地新闻和家长反馈整理，2026",
+    "halloween": "Saturday, October 31, 2026",
+    "sunset": "6:18 PM EDT (civil twilight ends 6:47 PM); Daylight Saving Time ends the next morning, Nov 1",
+    "recommended_hours": "No City of London bylaw or official trick-or-treat hours. In practice (CBC 2024, Reddit 2025): little kids from 5:30-6 PM, peak about 6-8:30 PM, mostly done by 9 PM. Go to houses with porch lights or pumpkins.",
+    "weather": "Forecast not available yet (more than 2 weeks away). Normal late-October evenings in London are about 5-10 C; bring layers and rain covers.",
+    "city_safety": "City of London: reflective tape, glow sticks or a flashlight; stay in groups; use sidewalks (if none, walk facing traffic); cross at marked crossings and make eye contact with drivers; watch for construction zones.",
+    "street_closures": "No Halloween-night street closures announced. Baker St residents have suggested asking the City to close it, but nothing is confirmed.",
+    "scoring": "1-5, higher is better. crowd: 5 = comfortable/not crowded, 1 = very crowded.",
+    "events": [
+      {
+        "name": "Halloween in the Village (Wortley Village)",
+        "when": "Sat Oct 24 2026, carnival 1-5 PM, parade 5:30-7 PM",
+        "url": "https://www.hitv.ca/",
+        "name_en": "Halloween in the Village (Wortley Village)",
+        "id": "hitv",
+        "lat": 42.9722,
+        "lng": -81.2529,
+        "name_zh": "Wortley 村万圣节活动（HitV）",
+        "when_en": "Sat Oct 24, 2026 · carnival 1–5 PM, parade 5:30–7 PM",
+        "when_zh": "2026 年 10 月 24 日（周六）· 嘉年华 13:00–17:00，游行 17:30–19:00",
+        "map": true
+      },
+      {
+        "name": "Halloween in Argyle trick-or-treat (1815 Dundas St E)",
+        "when": "Sat Oct 17 2026, 11 AM-2 PM",
+        "url": "https://www.londontourism.ca/events/halloween-in-argyle",
+        "name_en": "Halloween in Argyle trick-or-treat (1815 Dundas St E)",
+        "id": "argyle",
+        "lat": null,
+        "lng": null,
+        "name_zh": "Argyle 商圈讨糖活动（Dundas 东街 1815 号）",
+        "when_en": "Sat Oct 17, 2026 · 11 AM–2 PM",
+        "when_zh": "2026 年 10 月 17 日（周六）· 11:00–14:00",
+        "map": false
+      },
+      {
+        "name": "Somerset Monster House (71 Somerset Cres)",
+        "when": "Oct 8-31 2026, donations",
+        "url": "https://www.todocanada.ca/city/london/halloween-haunts/",
+        "name_en": "Somerset Monster House (71 Somerset Cres)",
+        "id": "somerset",
+        "lat": 42.9429,
+        "lng": -81.3239,
+        "name_zh": "Somerset 怪物屋（Somerset 新月街 71 号）",
+        "when_en": "Oct 8–31, 2026 · donations welcome",
+        "when_zh": "2026 年 10 月 8–31 日 · 欢迎捐款",
+        "map": true
+      },
+      {
+        "name": "Camp Weathered display (65 Wethered St) and other big houses",
+        "when": "Halloween season",
+        "url": "https://www.cbc.ca/news/canada/london/here-s-a-halloween-map-of-the-biggest-scary-houses-to-visit-in-london-9.6944487",
+        "name_en": "Camp Weathered display (65 Wethered St) and other big houses",
+        "id": "camp-weathered",
+        "lat": 43.0091,
+        "lng": -81.2173,
+        "name_zh": "Camp Weathered 大型装饰（Wethered 街 65 号）",
+        "when_en": "Halloween season",
+        "when_zh": "万圣节期间",
+        "map": true
+      },
+      {
+        "name": "CTV London Halloween displays map 2026",
+        "when": "updated Oct 15 2026",
+        "url": "https://www.ctvnews.ca/london/article/halloween-displays-in-and-around-the-london-area-3/",
+        "name_en": "CTV London Halloween displays map 2026",
+        "id": "ctv-map",
+        "lat": null,
+        "lng": null,
+        "name_zh": "CTV 伦敦 2026 万圣节装饰地图",
+        "when_en": "updated Oct 15, 2026",
+        "when_zh": "2026 年 10 月 15 日更新",
+        "map": false
+      }
+    ],
+    "source_note": "Reddit pages block direct fetching from our servers; their content was confirmed through the search index. All news and City pages were fetched and checked.",
+    "source_window": "Only sources from Oct 2024 to Oct 2026 (Halloween 2024 and 2025 reports, plus 2026 event pages). Older sources dropped.",
+    "sources_general": [
+      {
+        "title": "City of London: Witching you a safe Halloween",
+        "url": "https://london.ca/newsroom/feature/witching-you-safe-halloween-londons-guide-spooky-weekend",
+        "date": "2025-10-29"
+      },
+      {
+        "title": "Sunrise and sunset, London ON, Oct 2026",
+        "url": "https://www.timeanddate.com/sun/canada/london?month=10&year=2026",
+        "date": "2026"
+      },
+      {
+        "title": "CTV London: Halloween displays map",
+        "url": "https://www.ctvnews.ca/london/article/halloween-displays-in-and-around-the-london-area-3/",
+        "date": "2026-10-15"
+      }
+    ],
+    "events_geocoded": "Event coordinates from OpenStreetMap Nominatim, 2026-10-17."
+  },
+  "areas": [
+    {
+      "id": "old-south-baker",
+      "name_en": "Old South / Wortley Village (Baker St)",
+      "name_zh": "老南区 / Wortley 村（Baker 街）",
+      "lat": 42.9668,
+      "lng": -81.2455,
+      "streets": [
+        "Baker St",
+        "Wortley Rd",
+        "Askin St",
+        "Bruce St",
+        "Cathcart St",
+        "Elmwood Ave"
+      ],
+      "scores": {
+        "candy": 5,
+        "decorations": 5,
+        "safety": 4,
+        "crowd": 1
+      },
+      "notes_en": "London's best-known Halloween street. CBC (Oct 2024) calls Baker St the 'epicenter of Halloween': 500+ kids, busy from 5:30 to 8:30 PM, one neighbour buys 1,200 candies. Old, closely spaced houses with sidewalks. Reddit parents (2024) also name Wortley for fun decorations. Halloween in the Village carnival and parade is Sat Oct 24, 2026.",
+      "notes_zh": "伦敦最有名的万圣节街区。CBC（2024 年 10 月）称 Baker 街是“万圣节中心”：500 多个孩子，5:30 到 8:30 最热闹，有邻居准备 1200 颗糖。老房子密集、人行道好走。10 月 24 日（周六）有 Wortley 村万圣节嘉年华和游行。",
+      "cautions": "Very crowded 5:30-8:30 PM; many families drive in, so park a few blocks away (e.g., off Wortley Rd) and walk. Watch for cars on Wortley Rd and Ridout St.",
+      "sources": [
+        {
+          "title": "CBC London: Baker St, 'epicenter of Halloween' (2024)",
+          "url": "https://www.cbc.ca/news/canada/london/inside-the-epicenter-of-halloween-in-one-london-neighbourhood-1.7363421",
+          "date": "2024-10-28"
+        },
+        {
+          "title": "Reddit r/londonontario: Best area to trick or treat (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1g9w83o/best_area_to_trick_or_treat/",
+          "date": "2024-10-22"
+        },
+        {
+          "title": "Halloween in the Village (HitV), Sat Oct 24 2026",
+          "url": "https://www.hitv.ca/",
+          "date": "2026 (event page, Oct 24 2026)"
+        },
+        {
+          "title": "Old South BA: Halloween in the Village 2026",
+          "url": "https://www.oldsouthba.com/halloweeninthevillage",
+          "date": "2026 (event page)"
+        },
+        {
+          "title": "London Free Press: Wortley Village Halloween photos (2025)",
+          "url": "https://lfpress.com/news/local-news/photos-londons-wortley-village-embraces-the-halloween-spirit",
+          "date": "2025-10-26"
+        }
+      ],
+      "radius_m": 650,
+      "cautions_zh": "5:30 到 8:30 非常挤；很多家庭开车来，建议停在几条街外（比如 Wortley 路旁边的小街）再走过去。注意 Wortley 路和 Ridout 街上的车。"
+    },
+    {
+      "id": "old-north",
+      "name_en": "Old North",
+      "name_zh": "老北区",
+      "lat": 42.999,
+      "lng": -81.2475,
+      "streets": [
+        "Grosvenor St",
+        "Victoria St",
+        "Sherwood Ave",
+        "St. James St",
+        "Wellington St (north of Oxford)"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 4,
+        "safety": 4,
+        "crowd": 3
+      },
+      "notes_en": "Older homes close together with sidewalks and mature trees. Reddit (Oct 2025): 'Try Old North, still lots of houses lit up!', recommended twice in that thread.",
+      "notes_zh": "老房子密集，有人行道，环境安静。Reddit（2025 年 10 月）：“去老北区，还有很多亮灯的房子！”",
+      "cautions": "Only one recent thread supports it, and turnout varies by street. Cross Oxford St and Richmond St only at lights.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Where to trick or treat (2025)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1oispgq/where_to_trick_or_treat/",
+          "date": "2025-10-29"
+        }
+      ],
+      "radius_m": 750,
+      "cautions_zh": "只有一个近期帖子推荐，而且不同街道人气差别大。过 Oxford 街和 Richmond 街请只在红绿灯路口过。"
+    },
+    {
+      "id": "baseline-highland",
+      "name_en": "Baseline Rd area (Ridout to Wharncliffe)",
+      "name_zh": "Baseline 路一带（Ridout 至 Wharncliffe）",
+      "lat": 42.9575,
+      "lng": -81.255,
+      "streets": [
+        "Baseline Rd W (Ridout St S to Wharncliffe Rd S)",
+        "side streets and private-drive townhouse complexes off Baseline"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 4,
+        "safety": 3,
+        "crowd": 3
+      },
+      "notes_en": "Just south of Old South. Reddit residents (2025) say lots of trick-or-treaters, annual decorators and good candy, plus hidden private-drive subdivisions that hand out candy.",
+      "notes_zh": "就在老南区南边。本地居民说这里讨糖的人多、每年装饰、糖好，还有不少隐蔽的私家小区也发糖。",
+      "cautions": "Baseline Rd itself is a busy road: walk the side streets and cross at signals. More walking between pockets.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Where to trick or treat (2025)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1oispgq/where_to_trick_or_treat/",
+          "date": "2025-10-29"
+        }
+      ],
+      "radius_m": 700,
+      "cautions_zh": "Baseline 路本身车多：走旁边的小街，在信号灯处过马路。几片住宅之间要多走些路。"
+    },
+    {
+      "id": "carling-heights",
+      "name_en": "Carling Heights (Cheapside St / Bellwood Park)",
+      "name_zh": "Carling Heights（Cheapside 街 / Bellwood 公园）",
+      "lat": 43.002,
+      "lng": -81.222,
+      "streets": [
+        "Cheapside St (Adelaide St N to Highbury Ave N)",
+        "streets around Carling Arena",
+        "streets around Bellwood Park"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 4,
+        "safety": 4,
+        "crowd": 3
+      },
+      "notes_en": "Reddit parents (2024, 2025) report 'lots of kids and decorated houses' on Cheapside between Adelaide and Highbury, and lots of participating homes near Carling Arena and Bellwood Park.",
+      "notes_zh": "Reddit 家长说 Cheapside 街（Adelaide 到 Highbury 段）孩子多、装饰多；Carling 冰场和 Bellwood 公园附近参与的人家也很多。",
+      "cautions": "Cheapside St carries traffic; use crosswalks. Fewer famous displays than Old South.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Best area to trick or treat (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1g9w83o/best_area_to_trick_or_treat/",
+          "date": "2024-10-22"
+        },
+        {
+          "title": "Reddit r/londonontario: Where to trick or treat (2025)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1oispgq/where_to_trick_or_treat/",
+          "date": "2025-10-29"
+        }
+      ],
+      "radius_m": 700,
+      "cautions_zh": "Cheapside 街车流较多，请走斑马线。有名的大型装饰比老南区少。"
+    },
+    {
+      "id": "ferndale-highview",
+      "name_en": "Ferndale / Highview (near Wharncliffe and Southdale)",
+      "name_zh": "Ferndale / Highview（Wharncliffe 与 Southdale 附近）",
+      "lat": 42.942,
+      "lng": -81.266,
+      "streets": [
+        "Ferndale Ave",
+        "Highview Ave area (west of Wharncliffe)",
+        "Lenore St",
+        "streets around Ferndale and Dundalk"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 4,
+        "safety": 4,
+        "crowd": 4
+      },
+      "notes_en": "Reddit (2025): 'Ferndale is a great street to trick or treat on! Lots of decorations and lights.' A few streets near Ferndale/Dundalk have big lawn displays good for photos; a couple of houses on Lenore were known for full-size bars.",
+      "notes_zh": "Reddit（2025）：“Ferndale 是讨糖的好街道，装饰和灯很多。”Ferndale/Dundalk 附近有大型草坪布置，适合拍照；Lenore 街曾有人家发整根巧克力。",
+      "cautions": "Wharncliffe Rd and Southdale Rd are busy; cross at signals. Families usually head out around 6 PM.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: First Halloween for 5 year old (2025)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1og7dh3/first_halloween_for_5_year_old/",
+          "date": "2025-10 (about Oct 26)"
+        }
+      ],
+      "radius_m": 650,
+      "cautions_zh": "Wharncliffe 路和 Southdale 路车多，在信号灯处过马路。家庭一般 6 点左右出门。"
+    },
+    {
+      "id": "pond-mills",
+      "name_en": "Pond Mills",
+      "name_zh": "Pond Mills",
+      "lat": 42.944,
+      "lng": -81.207,
+      "streets": [
+        "residential streets off Pond Mills Rd",
+        "streets north of Southdale Rd E"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 3,
+        "safety": 4,
+        "crowd": 3
+      },
+      "notes_en": "One of the highest door counts reported on Reddit's 2024 Halloween thread (about 225 trick-or-treaters at one house), which usually means many participating homes and other families out.",
+      "notes_zh": "2024 年 Reddit 讨论中，一户人家接待了约 225 个孩子，是报告数量最高的地区之一，说明参与的人家多。",
+      "cautions": "Fewer big displays; some streets are townhouse complexes. Pond Mills Rd is busy.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Halloween discussion thread (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1ghco3w/halloween_discussion_thread/",
+          "date": "2024-10/11 (Halloween 2024 night thread)"
+        }
+      ],
+      "radius_m": 700,
+      "cautions_zh": "大型装饰较少；有些街是联排别墅小区。Pond Mills 路车多。"
+    },
+    {
+      "id": "white-oaks",
+      "name_en": "White Oaks",
+      "name_zh": "White Oaks",
+      "lat": 42.931,
+      "lng": -81.238,
+      "streets": [
+        "Jalna Blvd area",
+        "residential streets off Bradley Ave"
+      ],
+      "scores": {
+        "candy": 3,
+        "decorations": 3,
+        "safety": 3,
+        "crowd": 4
+      },
+      "notes_en": "Busy family area: Halloween 2024 residents reported about 120-150 trick-or-treaters at their doors.",
+      "notes_zh": "家庭多，2024 年居民报告每晚约 120-150 个孩子。",
+      "cautions": "Mixed with apartments; one 2024 resident only saw about 35. Stick to streets with porch lights and pumpkins.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Halloween discussion thread (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1ghco3w/halloween_discussion_thread/",
+          "date": "2024-10/11 (Halloween 2024 night thread)"
+        }
+      ],
+      "radius_m": 750,
+      "cautions_zh": "和公寓楼混在一起；2024 年有位居民只迎来约 35 个孩子。挑门廊亮灯、摆南瓜的街走。"
+    },
+    {
+      "id": "east-wethered",
+      "name_en": "Wethered St, east London (Camp Weathered)",
+      "name_zh": "东区 Wethered 街（Camp Weathered）",
+      "lat": 43.0086,
+      "lng": -81.2168,
+      "streets": [
+        "Wethered St (Camp Weathered, 65 Wethered St)",
+        "nearby residential streets near Highbury Ave N"
+      ],
+      "scores": {
+        "candy": 3,
+        "decorations": 5,
+        "safety": 3,
+        "crowd": 3
+      },
+      "notes_en": "Camp Weathered is a free, family-friendly walk-through haunted summer camp (handmade animatronics, food bank donations); up to 300 visitors in one night (CBC, Oct 2025). Its owner keeps a map of dozens of other London displays, digitized by CBC.",
+      "notes_zh": "Camp Weathered 是免费的家庭友好型“鬼怪夏令营”步行展（手工动画道具，收集食物银行捐赠），一晚最多 300 人参观（CBC，2025 年 10 月）。CBC 还整理了全市几十个大型布置的地图。",
+      "cautions": "A destination display more than a dense candy street; Highbury Ave N is busy. Bring a non-perishable food donation. Centre corrected to the OpenStreetMap location of Wethered St.",
+      "sources": [
+        {
+          "title": "CBC London: map of big Halloween houses (2025)",
+          "url": "https://www.cbc.ca/news/canada/london/here-s-a-halloween-map-of-the-biggest-scary-houses-to-visit-in-london-9.6944487",
+          "date": "2025-10-20"
+        }
+      ],
+      "radius_m": 500,
+      "cautions_zh": "更像是专程去看的大型装饰，而不是糖果密集的街道；Highbury 大道和 Oxford 街车多。可以带一件不易变质的食品捐赠。"
+    },
+    {
+      "id": "byron-wickerson",
+      "name_en": "Byron / Wickerson (west end)",
+      "name_zh": "Byron / Wickerson（西区）",
+      "lat": 42.957,
+      "lng": -81.33,
+      "streets": [
+        "residential streets around Wickerson Rd",
+        "crescents off Boler Rd"
+      ],
+      "scores": {
+        "candy": 3,
+        "decorations": 3,
+        "safety": 4,
+        "crowd": 4
+      },
+      "notes_en": "Quieter west-end family area. On the Halloween 2024 Reddit thread a Wickerson resident counted 138 trick-or-treaters, a strong number for the suburbs.",
+      "notes_zh": "西边较安静的家庭社区。2024 年万圣节 Reddit 讨论中，Wickerson 一户人家接待了 138 个孩子。",
+      "cautions": "Only one recent report; houses more spread out than Old South. Commissioners Rd W and Boler Rd are busy.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Halloween discussion thread (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1ghco3w/halloween_discussion_thread/",
+          "date": "2024-10/11 (Halloween 2024 night thread)"
+        }
+      ],
+      "radius_m": 800,
+      "cautions_zh": "只有一条近期反馈；房子比老南区分散。Commissioners 西路和 Boler 路车多。"
+    },
+    {
+      "id": "oakridge",
+      "name_en": "Oakridge",
+      "name_zh": "Oakridge",
+      "lat": 42.988,
+      "lng": -81.315,
+      "streets": [
+        "Oakridge Dr area",
+        "Havenridge Cres"
+      ],
+      "scores": {
+        "candy": 4,
+        "decorations": 2,
+        "safety": 4,
+        "crowd": 4
+      },
+      "notes_en": "Reddit (Oct 2024): 'Oakridge. They give out full size bars!!!'",
+      "notes_zh": "Reddit（2024 年 10 月）：“Oakridge 发整根巧克力！”",
+      "cautions": "One person's report with a negative vote score, so treat it as a maybe. Bigger houses and lots mean more walking per door.",
+      "sources": [
+        {
+          "title": "Reddit r/londonontario: Best area to trick or treat (2024)",
+          "url": "https://www.reddit.com/r/londonontario/comments/1g9w83o/best_area_to_trick_or_treat/",
+          "date": "2024-10-22"
+        }
+      ],
+      "radius_m": 750,
+      "cautions_zh": "只有一个人的反馈，而且那条评论得分为负，当作“也许”看。房子大、地块大，每户之间要多走路。"
+    }
+  ]
+}

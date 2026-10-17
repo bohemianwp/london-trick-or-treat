@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07060d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Plan a happy, safe Halloween trick-or-treat night in London, Ontario.">
+  <title>London Trick-or-Treat Map</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">🎃 <span data-i18n="appTitle">London Trick-or-Treat Map</span></h1>
+    <span id="demoChip" class="chip chip-demo" data-i18n="demoChip" hidden>DEMO</span>
+    <button id="offlineChip" class="chip chip-off" type="button" data-i18n="offlineChip" hidden>📴 Offline mode</button>
+    <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">🦺 Safety</button>
+    <button id="langBtn" class="chip" type="button">中文</button>
+  </header>
+  <div id="countdown" class="countdown" role="status"></div>
+
+  <div class="mapwrap">
+    <main id="map" aria-label="Map of London, Ontario"></main>
+    <div class="hud" aria-hidden="true"><div class="hud-grid"></div><div class="hud-sweep"></div></div>
+
+    <div id="layerbar" class="layerbar" role="group"></div>
+    <div id="legend" class="legend" hidden>
+      <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
+      <span><i class="lg lg-busy"></i><span data-i18n="legendBusy">Busy</span></span>
+      <span><i class="lg lg-very"></i><span data-i18n="legendVery">Very busy</span></span>
+    </div>
+
+    <button id="locateBtn" class="fab" type="button">
+      <span class="fab-icon">📍</span><span id="locateLabel" data-i18n="showMyLocation">Show my location</span>
+    </button>
+
+    <div id="modeBanner" class="mode-banner" hidden>
+      <span id="modeText"></span>
+      <button id="modeCancel" class="btn btn-small" type="button" data-i18n="cancel">Cancel</button>
+    </div>
+
+    <section id="sheet" class="sheet" data-open="false" aria-live="polite">
+      <button id="sheetHandle" class="sheet-handle" type="button"><span></span></button>
+
+      <!-- AREAS -->
+      <div class="panel" id="panel-areas" hidden>
+        <div class="info" data-i18n="seedWarning"></div>
+        <h2 data-i18n="eventsTitle">Events</h2>
+        <div id="eventList" class="cards"></div>
+        <p class="hint" data-i18n="eventsNote"></p>
+        <div id="areaList" class="cards"></div>
+      </div>
+
+      <!-- ROUTE -->
+      <div class="panel" id="panel-route" hidden>
+        <h2 data-i18n="routeTitle">Plan a walking loop</h2>
+        <div class="field">
+          <div class="label" data-i18n="startPoint">Start point</div>
+          <div class="row">
+            <button id="startMyLoc" class="btn" type="button">📍 <span data-i18n="useMyLocation">My location</span></button>
+            <button id="startTap" class="btn" type="button">👆 <span data-i18n="tapMap">Tap on map</span></button>
+          </div>
+          <div id="startStatus" class="hint"></div>
+        </div>
+        <div class="field">
+          <div class="label" data-i18n="walkTime">Walk time</div>
+          <div class="seg" id="timeSeg" role="radiogroup">
+            <button type="button" data-v="30" role="radio"><b class="mono">30</b> <span data-i18n="min">min</span></button>
+            <button type="button" data-v="60" role="radio" aria-checked="true"><b class="mono">60</b> <span data-i18n="min">min</span></button>
+            <button type="button" data-v="90" role="radio"><b class="mono">90</b> <span data-i18n="min">min</span></button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="label" data-i18n="kidAge">Youngest kid's age</div>
+          <div class="seg" id="ageSeg" role="radiogroup">
+            <button type="button" data-v="u5" role="radio" data-i18n="ageU5">Under 5</button>
+            <button type="button" data-v="5-8" role="radio" aria-checked="true" data-i18n="age58">5–8</button>
+            <button type="button" data-v="9-12" role="radio" data-i18n="age912">9–12</button>
+            <button type="button" data-v="teen" role="radio" data-i18n="ageTeen">13+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="areaSelect" data-i18n="area">Neighbourhood</label>
+          <select id="areaSelect" class="select"></select>
+        </div>
+        <button id="buildBtn" class="btn btn-primary btn-block" type="button" data-i18n="buildLoop">Build my loop 🎃</button>
+        <div id="routeResult" class="result" hidden></div>
+      </div>
+
+      <!-- PINS / BOARD -->
+      <div class="panel" id="panel-pins" hidden>
+        <div class="seg seg-sub" id="pinsSub" role="tablist">
+          <button type="button" data-v="houses" role="tab" aria-checked="true" data-i18n="subHouses">Houses</button>
+          <button type="button" data-v="board" role="tab" data-i18n="subBoard">Board</button>
+        </div>
+
+        <div id="sub-houses">
+          <h2 data-i18n="housesTitle">Houses giving out treats</h2>
+          <p class="hint" data-i18n="houseHelp"></p>
+          <div class="warn" data-i18n="noNames"></div>
+          <div class="row">
+            <button id="addHouseBtn" class="btn btn-primary" type="button" data-i18n="addHouse">➕ Add my house</button>
+            <button id="shareBtn" class="btn" type="button" data-i18n="shareHouses">🔗 Share link</button>
+          </div>
+          <div id="sharedBanner" class="info" hidden>
+            <div id="sharedText"></div>
+            <div class="row">
+              <button id="saveShared" class="btn btn-primary" type="button" data-i18n="saveShared">Save</button>
+              <button id="hideShared" class="btn" type="button" data-i18n="hideShared">Hide</button>
+            </div>
+          </div>
+          <div class="label" data-i18n="filters">Filters</div>
+          <div id="filterChips" class="chips"></div>
+          <div id="shownN" class="hint mono-num"></div>
+          <div class="label" data-i18n="myHouses">My markers</div>
+          <ul id="myHouseList" class="pin-list"></ul>
+          <p class="hint" data-i18n="expiresNote"></p>
+          <p class="hint local-note" data-i18n="localModeNote"></p>
+        </div>
+
+        <div id="sub-board" hidden>
+          <h2 data-i18n="boardTitle">Parent board</h2>
+          <div class="seg" id="boardSeg" role="radiogroup">
+            <button type="button" data-v="fun" role="radio" aria-checked="true" data-i18n="bFun">Most fun neighbourhood</button>
+            <button type="button" data-v="decor" role="radio" data-i18n="bDecor">Best decorations</button>
+          </div>
+          <div class="compose">
+            <label class="label" for="postArea" data-i18n="areaOpt">Neighbourhood (optional)</label>
+            <select id="postArea" class="select"></select>
+            <textarea id="postBody" maxlength="140" rows="2"></textarea>
+            <div class="row row-tight">
+              <label class="check"><input type="checkbox" id="postLoc"> <span data-i18n="roughLoc">Add my rough location</span></label>
+              <span id="postCount" class="mono-num count"></span>
+            </div>
+            <div id="postErr" class="err" role="alert" hidden></div>
+            <button id="postBtn" class="btn btn-primary btn-block" type="button" data-i18n="post">Post</button>
+            <p class="hint" data-i18n="boardRules"></p>
+          </div>
+          <div class="seg seg-small" id="sortSeg" role="radiogroup">
+            <button type="button" data-v="top" role="radio" aria-checked="true" data-i18n="sortTop">Top</button>
+            <button type="button" data-v="new" role="radio" data-i18n="sortNew">New</button>
+          </div>
+          <ul id="postList" class="post-list"></ul>
+          <p class="hint local-note" data-i18n="localModeNote"></p>
+        </div>
+      </div>
+
+      <!-- LIVE -->
+      <div class="panel" id="panel-live" hidden>
+        <h2 data-i18n="hexTitle">Hotspot map</h2>
+        <label class="toggle"><input type="checkbox" id="hexToggle"> <span data-i18n="hexToggle">Show hotspot hexagons</span></label>
+        <div class="legend legend-inline">
+          <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
+          <span><i class="lg lg-busy"></i><span data-i18n="legendBusy">Busy</span></span>
+          <span><i class="lg lg-very"></i><span data-i18n="legendVery">Very busy</span></span>
+        </div>
+        <p id="hexMode" class="hint"></p>
+        <p id="hexUpdated" class="hint mono-num"></p>
+        <p id="hexFallback" class="hint" data-i18n="hexFallback" hidden></p>
+
+        <h2 data-i18n="dotsTitle">Anonymous family dots</h2>
+        <div id="demoNote" class="info" data-i18n="demoNote" hidden></div>
+        <div class="consent">
+          <p data-i18n="consent"></p>
+          <label class="switch">
+            <input type="checkbox" id="shareToggle" role="switch">
+            <span class="switch-ui" aria-hidden="true"></span>
+            <span data-i18n="shareToggle">Share my anonymous dot</span>
+          </label>
+          <div id="liveGate" class="gate"><b data-i18n="opensHalloween">Opens Halloween night</b> · <span class="mono-num" data-i18n="liveWhen"></span></div>
+        </div>
+        <div id="liveStatus" class="live-status mono-num" role="status"></div>
+        <div id="othersN" class="hint"></div>
+        <button class="btn btn-link privacy-link" type="button" data-i18n="privacyLink">Privacy</button>
+      </div>
+
+      <!-- SAFETY -->
+      <div class="panel" id="panel-safety" hidden>
+        <h2 data-i18n="safetyTitle">Safety tips</h2>
+        <div id="bigCountdown" class="big-countdown"></div>
+        <ul id="tipList" class="tips"></ul>
+        <p class="hint" data-i18n="safetySource"></p>
+        <button class="btn btn-link privacy-link" type="button" data-i18n="privacyLink">Privacy</button>
+      </div>
+
+      <!-- PRIVACY -->
+      <div class="panel" id="panel-privacy" hidden>
+        <h2 data-i18n="privacyTitle">Privacy</h2>
+        <p data-i18n="privacyIntro"></p>
+        <dl id="privacyList" class="privacy"></dl>
+      </div>
+    </section>
+  </div>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button type="button" data-tab="areas"><span class="ti">🏘️</span><span data-i18n="tabAreas">Areas</span></button>
+    <button type="button" data-tab="route"><span class="ti">🗺️</span><span data-i18n="tabRoute">Route</span></button>
+    <button type="button" data-tab="pins"><span class="ti">📌</span><span data-i18n="tabPins">Pins / Board</span></button>
+    <button type="button" data-tab="live"><span class="ti">📡</span><span data-i18n="tabLive">Live</span></button>
+  </nav>
+
+  <dialog id="locDialog" class="dialog">
+    <h2 data-i18n="locDialogTitle">Use your location?</h2>
+    <p data-i18n="locDialogBody"></p>
+    <p class="hint" data-i18n="locDialogIos"></p>
+    <div class="row">
+      <button id="locNo" class="btn" type="button" data-i18n="notNow">Not now</button>
+      <button id="locYes" class="btn btn-primary" type="button" data-i18n="continue">Continue</button>
+    </div>
+  </dialog>
+
+  <dialog id="houseDialog" class="dialog">
+    <h2 data-i18n="houseDialog">My house</h2>
+    <div class="label" data-i18n="houseTypes">What do you have?</div>
+    <div class="type-grid" id="typeGrid"></div>
+    <div class="label" data-i18n="houseStatus">Status</div>
+    <div class="seg" id="statusSeg" role="radiogroup"></div>
+    <div class="label" data-i18n="hours">Hours (optional)</div>
+    <div class="row row-tight">
+      <label class="time"><span data-i18n="hoursFrom">From</span> <input type="time" id="hStart" step="900"></label>
+      <label class="time"><span data-i18n="hoursTo">To</span> <input type="time" id="hEnd" step="900"></label>
+    </div>
+    <div class="label" data-i18n="quickNotes">Quick notes</div>
+    <div class="chips" id="tplChips"></div>
+    <label class="label" for="hNote" data-i18n="noteLabel">Note (optional)</label>
+    <textarea id="hNote" maxlength="140" rows="2"></textarea>
+    <div class="row row-tight"><span class="warn-inline" data-i18n="noNames"></span><span id="hCount" class="mono-num count"></span></div>
+    <div id="hErr" class="err" role="alert" hidden></div>
+    <div class="row">
+      <button id="hCancel" class="btn" type="button" data-i18n="cancel">Cancel</button>
+      <button id="hSave" class="btn btn-primary" type="button" data-i18n="saveHouse">Save marker</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><p class="noscript">This app needs JavaScript. 这个 app 需要开启 JavaScript。</p></noscript>
+
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
+          integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
+  <script defer src="config.js"></script>
+  <script defer src="lib.js"></script>
+  <script defer src="i18n.js"></script>
+  <script defer src="data/areas.js"></script>
+  <script defer src="backend.js"></script>
+  <script defer src="hex.js"></script>
+  <script defer src="app.js"></script>
+</body>
+</html>
