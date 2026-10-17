@@ -347,3 +347,6 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
   .pk-giving::after, .me-dot { animation: none; }
   .sheet { transition: none; }
 }
+
+/* dark Halloween look for OSM tiles */
+.leaflet-tile-pane .tiles-dark, .tiles-dark { filter: invert(1) hue-rotate(200deg) brightness(0.85) contrast(0.9) saturate(0.6); }

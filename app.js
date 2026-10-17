@@ -120,9 +120,9 @@
   }
   var map = L.map('map', { zoomControl: true, attributionControl: false, tap: true }).setView(LONDON, 12);
   L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, className: 'tiles-dark',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
 
   var grid = window.TOT_HEX ? window.TOT_HEX.makeGrid() : LIB.makeGrid(null);
