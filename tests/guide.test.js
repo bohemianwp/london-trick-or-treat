@@ -16,44 +16,36 @@ function fakeStorage(initial) {
 const throwing = { getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('QuotaExceededError'); } };
 
 test('guide / How-to / hint strings exist in both languages', () => {
-  const keys = ['helpAria', 'guideTitle', 'guideSkip', 'guideDone', 'guidePrev', 'guideNext', 'guideStep', 'guideDotAria', 'guideLegend',
-    'guideCards', 'howtoTitle', 'howtoIntro', 'howtoReplay', 'howtoSections', 'infoAria', 'hintMark', 'hintLegend', 'notOnMap'];
+  const keys = ['guideTitle', 'guideSkip', 'guideDone', 'guidePrev', 'guideNext', 'guideStep', 'guideDotAria',
+    'guideCards', 'howtoTitle', 'howtoIntro', 'howtoReplay', 'howtoSections', 'hintMark', 'hintLegend', 'notOnMap', 'tipHint', 'tipHintHover'];
   for (const k of keys) for (const l of ['en', 'zh']) assert.ok(I18N[l][k], `${l}.${k} missing`);
   for (const l of ['en', 'zh']) {
-    assert.equal(I18N[l].guideCards.length, 4, l + ': exactly 4 welcome cards (v13: phases first)');
-    assert.equal(I18N[l].howtoSections.length, 16, l + ': 16 How-to sections');
-    for (const c of I18N[l].guideCards) assert.ok(typeof c[0] === 'string' && c[1].length >= 2, l + ' card ' + c[0]);
+    assert.equal(I18N[l].guideCards.length, 3, l + ': v15 = 3 short welcome cards');
+    assert.equal(I18N[l].howtoSections.length, 9, l + ': 9 short How-to sections (+ Past favourites when the board is on)');
+    for (const c of I18N[l].guideCards) assert.ok(typeof c[0] === 'string' && c[1].length >= 2 && c[1].length <= 3, l + ' card ' + c[0]);
   }
 });
 
-test('welcome cards and How-to cover the new product (EN + 中文)', () => {
+test('welcome cards and How-to cover the product in a few words (EN + 中文)', () => {
   const cards = I18N.en.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(cards[1], /^See where it’s fun!/); assert.match(cards[1], /Glowing hexagons/); assert.match(cards[1], /3 or more/); assert.match(cards[1], /NEW/);
-  assert.match(cards[1], /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./);
-  assert.match(cards[2], /^Great street\? Share it with one tap!/); assert.match(cards[2], /Great street\? Share it!/); assert.match(cards[2], /While the kids knock on doors/);
-  assert.match(cards[2], /Lots of candy, Great decorations, Crowded/); assert.match(cards[2], /skip/);
-  assert.match(cards[3], /^Plan your walk & stay safe/); assert.match(cards[3], /Show my location/); assert.match(cards[3], /Route/);
-  assert.match(cards[3], /Safety/); assert.match(cards[3], /grown-up/); assert.match(cards[3], /50 m/);
-  assert.match(cards[0], /^Now: decorations · Oct 31: fun streets/); assert.match(cards[0], /Cool decorations here!/); assert.match(cards[0], /practice/); assert.match(cards[0], /14 days/);
+  assert.match(cards[0], /^Find the fun/); assert.match(cards[0], /Orange streets/); assert.match(cards[0], /Purple streets/); assert.match(cards[0], /Bubbles/);
+  assert.match(cards[1], /^Share in one tap/); assert.match(cards[1], /purple button/); assert.match(cards[1], /Oct 31 from 3 PM/); assert.match(cards[1], /practice/);
+  assert.match(cards[2], /^Safe & private/); assert.match(cards[2], /grown-up/); assert.match(cards[2], /Street level only/); assert.match(cards[2], /Nov 2/);
+  assert.match(cards[2], /Press and hold any button for a tip/);
   const zc = I18N.zh.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(zc[1], /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/);
-  assert.match(zc[2], /这条街不错？分享给大家！/); assert.match(zc[2], /孩子们敲门的时候/); assert.match(zc[2], /糖很多、装饰超棒、人很多/); assert.match(zc[3], /大人/);
-  assert.match(zc[0], /现在：装饰 · 10月31日：好玩的街/); assert.match(zc[0], /这里装饰很棒！/);
+  assert.match(zc[0], /橙色的街/); assert.match(zc[0], /紫色的街/); assert.match(zc[1], /紫色按钮/); assert.match(zc[1], /练习/);
+  assert.match(zc[2], /大人/); assert.match(zc[2], /11月2日/); assert.match(zc[2], /长按任意按钮查看提示/);
   const howto = I18N.en.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
-  for (const w of ['big button', 'Great street? Share it!', 'Street Scout', 'Tags', 'Teal = Quiet', 'Orange = Lively', 'Hot pink = Super hot', '🔥 23 marked',
-    '3 or more', 'Bottom tabs', 'Mark it!', 'Layer chips', 'Near me', 'Route', 'Suggest an area', 'Board', 'Safety', 'Privacy', '50 m', '2 hours',
-    'Your area isn’t on the map? Mark it! Once 3 people mark it, it lights up.']) {
-    assert.ok(howto.includes(w), 'How-to mentions ' + w);
-  }
-  for (const w of ['Add my house', 'Share link', 'Teal only', 'Giving now']) assert.ok(!howto.includes(w), 'house feature gone: ' + w);
+  for (const w of ['Decorations', 'Fun streets', 'Practice', 'Grey: quiet', 'Light orange: busy', 'Deep orange: very busy', 'NEW', '🔥 23 now', '🎃 14 likes',
+    '3+', 'More ▾', 'Route', 'Sounds', 'Privacy', '2 hours', 'Nov 2', '{win}']) assert.ok(howto.includes(w), 'How-to mentions ' + w);
+  for (const w of ['Add my house', 'Share link', 'Teal only', 'Giving now', 'Hot pink', 'decor marks', 'Zones']) assert.ok(!howto.includes(w), 'gone: ' + w);
   const zh = I18N.zh.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
-  for (const w of ['大按钮', '标签', '超级火爆', '🔥 23 人标记', '3 个人', '我附近', '推荐一个区域', '投票板', '50 米', '2 小时',
-    '你家附近不在地图上？标记它！3 个人标记后就会亮起来。']) assert.ok(zh.includes(w), 'zh How-to mentions ' + w);
+  for (const w of ['装饰', '好玩的街', '练习', '非常热闹', '🔥 现在 23', '🎃 14 个赞', '更多 ▾', '2 小时', '11月2日']) assert.ok(zh.includes(w), 'zh How-to mentions ' + w);
 });
 
 test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hints, guide dialog, all assets ?v=5', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  assert.match(html, /id="helpBtn"/);
+  assert.doesNotMatch(html, /id="helpBtn"/);             // v15: the Guide tab is the one way in
   assert.match(html, /id="guide" class="guide" role="dialog" aria-modal="true"/);
   assert.match(html, /id="panel-guide"/);
   assert.deepEqual([...html.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]), ['map', 'route', 'mark', 'guide']);
@@ -61,11 +53,12 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   assert.match(html, /id="markBtn" class="markbtn"/);
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.ok(Number(/\.markbtn \{[^}]*min-height: (\d+)px/.exec(css)[1]) >= 64, 'big button at least 64 px tall');
-  for (const id of ['hintMark', 'hintLegend']) assert.match(html, new RegExp(`aria-controls="${id}"`));
+  for (const id of ['hintMark', 'hintLegend', 'markHintBtn']) assert.doesNotMatch(html, new RegExp(`"${id}"`));   // v15: ⓘ replaced by tooltips
+  assert.match(html, /id="tip" class="tip" role="tooltip"/); assert.match(html, /id="tipHint"/);
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=14\.1$/, u));
+  own.forEach((u) => assert.match(u, /\?v=15$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 

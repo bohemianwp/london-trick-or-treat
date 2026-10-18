@@ -69,6 +69,7 @@ test('two accents: orange = fun streets, purple = decorations; tab bar and top b
   const tabbar = html.match(/<nav class="tabbar"[\s\S]*?<\/nav>/)[0];
   assert.equal((tabbar.match(/<svg class="ico"/g) || []).length, 4);
   assert.doesNotMatch(tabbar, /🗺️|🚶|✨|📖/);
-  assert.match(html, /id="boardBtn"[^>]*><svg class="ico"/);
+  assert.doesNotMatch(html, /id="boardBtn"|id="helpBtn"|id="tourBtn"/);       // v15: top bar = brand, status, Safety, 🔊, 中文
+  assert.match(html, /id="locateBtn"[^>]*>\s*<span class="fab-icon"><svg class="ico"/);
   assert.doesNotMatch(html, /🦺/);
 });

@@ -116,7 +116,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.shot('v9-chooser.png');
   await p.click('#langPick [data-pick="en"]'); await sleep(400);
   check('English → chooser closes, saved, English welcome cards appear', await p.ev(`document.getElementById('langPick').hidden && localStorage.getItem('ltot.lang')==='en' && !document.getElementById('guide').hidden`) &&
-    /Glowing hexagons/.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
+    /Find the fun/.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
   const p2 = await openPage('', { wait: 3000, rawLang: true });
   check('second visit: no chooser again', await p2.ev(`document.getElementById('langPick').hidden`));
   await p2.ev(`localStorage.clear()`);
@@ -139,12 +139,13 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
 {
   const p = await openPage('', { geo: [42.966812, -81.245533] });
   check('page loads with no JS errors (390×844)', realErrors(p).length === 0, realErrors(p).join(' | '));
-  check('first visit: welcome guide with 4 cards, card 1 = the two phases (v13)', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===4`) &&
-    /Now: decorations · Oct 31: fun streets/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
-  check('card 2 explains zones + “Your area isn’t on the map? Mark it!”', /Glowing hexagons/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
-    /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
+  check('first visit: v15 welcome = 3 short cards (Find the fun / Share in one tap / Safe & private)', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===3`) &&
+    /^01Find the fun/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+  check('card 2 shows both buttons; card 3 has safety, the tip hint and ▶ demo', /Share in one tap/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
+    await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].querySelectorAll('.gbtn-demo').length===2`) &&
+    /grown-up[\s\S]*Press and hold any button for a tip[\s\S]*25-second demo/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[2].textContent`)));
   await p.shot('v3-guide-en.png');
-  for (let i = 0; i < 3; i++) { await p.click('#guideNext'); await sleep(350); }
+  for (let i = 0; i < 2; i++) { await p.click('#guideNext'); await sleep(350); }
   check('Got it on the last card closes it and remembers ltot.guideSeen.v2', await p.ev(`!document.getElementById('guideDone').hidden`) &&
     (await p.click('#guideDone'), await sleep(200), await p.ev(`document.getElementById('guide').hidden && localStorage.getItem('ltot.guideSeen.v2')==='done'`)));
   const st = await p.ev('__ltot.state()');
@@ -156,33 +157,53 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     await p.ev(`[...document.querySelectorAll('.tabbar button')].map(b=>b.dataset.tab).join()==='map,route,mark,guide' && [...document.querySelectorAll('.tabbar button')].every(b=>b.getBoundingClientRect().height>=56) && document.querySelectorAll('.tabbar button')[2].classList.contains('tab-mark')`));
   const bh = await p.ev(`document.getElementById('markBtn').getBoundingClientRect().height`);
   check('big glowing button ≥ 64 px, visible on the map', bh >= 64 && await p.ev(`(function(){var r=document.getElementById('markBtn').getBoundingClientRect(); return r.bottom<=document.querySelector('.tabbar').getBoundingClientRect().top && r.top>0;})()`), bh + ' px');
-  check('first-time ⓘ hint next to the big button', await p.ev(`!document.getElementById('markHintBtn').hidden`));
+  await sleep(900);
+  check('v15: one-time “Press and hold any button for a tip” hint after the welcome, remembered', await p.ev(`!document.getElementById('tipHint').hidden && /Press and hold any button for a tip/.test(document.getElementById('tipHint').textContent) && localStorage.getItem('ltot.tipHintSeen')==='true'`));
+  check('v15: no ⓘ buttons left (tooltips instead)', await p.ev(`!document.querySelector('.ibtn') && !document.getElementById('markHintBtn')`));
   check('no house UI left', await p.ev(`!document.getElementById('addHouseBtn') && !document.getElementById('filterChips') && !document.querySelector('.pk')`));
   check('3 event markers on the map', (await p.ev('document.querySelectorAll(".ev-pin").length')) === 3);
   check('HUD overlay present and not clickable', await p.ev(`getComputedStyle(document.querySelector('.hud')).pointerEvents==='none' && getComputedStyle(document.querySelector('.hud')).display!=='none'`));
-  check('legend: Quiet / Lively / Super hot + ⓘ “3+” note', /Quiet[\s\S]*Lively[\s\S]*Super hot/.test(await p.ev(`document.getElementById('legend').textContent`)) &&
-    (await p.click('#legend .ibtn'), await sleep(150), /3 or more people marked it in the last 45 minutes/.test(await p.ev(`document.getElementById('hintLegend').textContent`)) && await p.ev(`!document.getElementById('hintLegend').hidden`)));
+  check('legend: Quiet / Busy / Very busy', /Quiet[\s\S]*Busy[\s\S]*Very busy/.test(await p.ev(`document.getElementById('legend').textContent`)));
   check('mark window text follows config.js (no raw {win} placeholders)', !(await p.ev(`document.body.textContent.includes('{win}')`)) &&
-    /last 45 minutes/.test(await p.ev(`document.getElementById('howtoList').textContent`)));
-  await p.click('#legend .ibtn');
+    /3\+ marks in 45 min/.test(await p.ev(`document.getElementById('howtoList').textContent`)));
+  // v15 tooltips: a real long-press (touch) shows the tip and does NOT run the action; auto-hides; aria-describedby while shown
+  const lp = async (sel) => { const r = await p.ev(`(function(){var b=document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();return [b.left+b.width/2,b.top+b.height/2];})()`);
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r[0], y: r[1] }] }, p.sessionId); await sleep(700);
+    const shown = await p.ev(`({tip:!document.getElementById('tip').hidden, txt:document.getElementById('tip').textContent, desc:document.querySelector(${JSON.stringify(sel)}).getAttribute('aria-describedby'),
+      tipR:document.getElementById('tip').getBoundingClientRect().toJSON(), elR:document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect().toJSON()})`);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, p.sessionId); await sleep(250);
+    return shown; };
+  const t1 = await lp('#safetyBtn');
+  const noOverlap = (a, b) => a.bottom <= b.top || a.top >= b.bottom || a.right <= b.left || a.left >= b.right;
+  check('long-press Safety → tip “Safety tips and emergency numbers”, panel NOT opened, tip not over the button, aria-describedby',
+    t1.tip && t1.txt === 'Safety tips and emergency numbers' && t1.desc === 'tip' && noOverlap(t1.tipR, t1.elR) && await p.ev(`document.getElementById('sheet').dataset.open!=='true'`), JSON.stringify(t1).slice(0, 160));
+  await sleep(2500);
+  check('…tip hides by itself after ~2.5 s (aria-describedby removed)', await p.ev(`document.getElementById('tip').hidden && !document.getElementById('safetyBtn').getAttribute('aria-describedby')`));
+  const t2 = await lp('.tabbar [data-tab="route"]');
+  check('long-press a tab → “Plan a walking loop”, tab not opened', t2.tip && t2.txt === 'Plan a walking loop' && await p.ev(`document.getElementById('panel-route').hidden`), t2.txt);
+  const t3 = await lp('#markBtn');
+  check('long-press the big button → tip, no mark made', t3.tip && /Share great decorations/.test(t3.txt) && (await p.ev('__ltot.state().marks')) === 0 && await p.ev(`document.getElementById('markCard').hidden`), t3.txt);
+  await p.click('#safetyBtn'); await sleep(200);
+  check('…a normal tap still works (Safety opens)', await p.ev(`!document.getElementById('panel-safety').hidden`));
+  await p.click('#safetyBtn'); await sleep(200);
   await p.shot('v3-map-practice.png');
 
   // v13: before Oct 31 3 PM the big button is purple (decorations); the fun-street mark is the small orange practice pill
-  check('v13 phase banner under the countdown: “Now: mark the best decorations · Oct 31: mark the most fun streets”',
-    await p.ev(`!document.getElementById('phaseBanner').hidden && /Now: mark (the best )?decorations( \\+ share past favourites 💬)? · 🔥 Oct 31: mark the most fun streets/.test(document.getElementById('phaseLine').textContent) && document.getElementById('phaseTestLine').hidden`));
+  check('v15 banner: one short line “🎃 Now: decorations · 🔥 Oct 31: fun streets”, one line high',
+    await p.ev(`!document.getElementById('phaseBanner').hidden && document.getElementById('phaseLine').textContent==='🎃 Now: decorations · 🔥 Oct 31: fun streets' && !document.getElementById('phaseTestLine') && document.getElementById('phaseLine').getBoundingClientRect().height < 26`));
   await p.click('#phaseBanner'); await sleep(250);
-  check('tapping the banner opens the explainer (now / Halloween night / 14 days; +past-years board item when on)', await p.ev(`!document.getElementById('phaseCard').hidden && document.querySelectorAll('#phaseList dt').length===(__ltot.state().favOn?5:4) && /14 days/.test(document.getElementById('phaseList').textContent)`));
+  check('tapping the banner opens the explainer: ≤ 4 bullets, details closed behind “More details” (+board item when on)', await p.ev(`!document.getElementById('phaseCard').hidden && document.querySelectorAll('#phaseBullets li').length===(__ltot.state().favOn?4:3) && !document.getElementById('phaseMore').open && document.querySelectorAll('#phaseList dt').length===(__ltot.state().favOn?5:4) && /14 days/.test(document.getElementById('phaseList').textContent)`));
   check('explainer shows the gift line', await p.ev(`/helps another family have a happier, more magical Halloween/.test(document.getElementById('phaseGift').textContent) && document.getElementById('phaseGift').offsetHeight>0`));
   await p.click('#phaseOk'); await sleep(150);
-  check('big button = purple decor button, small orange pill = “🧪 Practice: fun street”', await p.ev(`document.getElementById('markBtn').classList.contains('mb-decor') && /Cool decorations here!/.test(document.getElementById('markBtn').textContent) && /Practice: fun street/.test(document.getElementById('altBtn').textContent) && !document.getElementById('altBtn').hidden`));
+  check('big button = purple decor button, small orange pill = “🧪 Practice: fun street”', await p.ev(`document.getElementById('markBtn').classList.contains('mb-decor') && /Great decorations\\?/.test(document.getElementById('markBtn').textContent) && /Practice: fun street/.test(document.getElementById('altBtn').textContent) && !document.getElementById('altBtn').hidden`));
   // the fun-street pill creates a mark (one-shot location; first time explains, then asks)
   await p.click('#altBtn'); await sleep(500);
   await allowLoc(p); await sleep(1500);
   const m1 = await p.ev('__ltot.state()');
   check('big button → a mark is stored (practice, local)', m1.marks === 1 && m1.myMarks === 1, JSON.stringify({ marks: m1.marks, mine: m1.myMarks }));
   await sleep(300);
-  check('v10 “Shared! 🎉” card: thanks + practice line (not shared) + 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3 && !document.getElementById('markCardGift').hidden`) &&
-    /helped other families/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && /Practice: this mark stays on your phone/.test(await p.ev(`document.getElementById('markCardProg').textContent`)));
+  check('v15 “Shared! 🎉” card: short thanks + practice line + “Add a tag?” + 3 tags, no gift line, no timer bar', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3 && !document.getElementById('markCardGift') && document.getElementById('markCard').dataset.timer==='off' && getComputedStyle(document.querySelector('.mc-timerrow')).display==='none'`) &&
+    /Other families can see it now/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && /Practice: not shared/.test(await p.ev(`document.getElementById('markCardProg').textContent`)));
   check('celebration (particles + pulse) played once', (await p.ev('__ltot.state().celebrations')) === 1 && await p.ev(`document.getElementById('markBtn').classList.contains('pop')`));
   await p.shot('v3-marked.png');
   await p.click('#tagRow [data-tag="candy"]'); await sleep(400);
@@ -191,18 +212,23 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const dist = __dist([42.966812, -81.245533], [stored.lat, stored.lng]);
   check('stored mark is blurred (moved, < ~65 m), raw position not stored', dist > 0 && dist < 65 && !(await p.ev(`JSON.stringify(localStorage).includes('42.966812')`)), dist.toFixed(1) + ' m');
   check('1 mark → no zone shown (3+ rule)', (await p.ev('__ltot.state().zones.length')) === 0 && (await p.ev('document.querySelectorAll(".zbadge").length')) === 0);
+  await sleep(8500);
+  check('v15: the thank-you card does not close by itself (no surprise timer)', await p.ev(`!document.getElementById('markCard').hidden`));
   await p.click('#markCardDone'); await sleep(200);
-  check('ⓘ hint goes away after the first mark', await p.ev(`document.getElementById('markHintBtn').hidden`));
   await p.click('.tabbar [data-tab="mark"]'); await sleep(500);
   check('v11: before Oct 31 3 PM the centre “Mark it!” tab opens 🎃 Best decorations (purple button + lists)',
-    await p.ev(`!document.getElementById('panel-decor').hidden && document.getElementById('sheet').dataset.open==='true' && /Cool decorations here!/.test(document.getElementById('decorPanelBtn').textContent)`) &&
+    await p.ev(`!document.getElementById('panel-decor').hidden && document.getElementById('sheet').dataset.open==='true' && /Great decorations\\?/.test(document.getElementById('decorPanelBtn').textContent)`) &&
     await p.ev(`!document.getElementById('altBtn').hidden`));
   await p.click('.tabbar [data-tab="mark"]'); await sleep(300);
   await p.click('#altBtn'); await sleep(800);
-  check('big button again → friendly “Already shared” card (5-minute limit)', /share the next one in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
+  check('big button again → friendly “Already shared” card (5-minute limit)', /Next share in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
     await p.ev(`document.getElementById('markCardText').textContent`));
 
-  // layers
+  check('v15: a tap outside closes the card', (await p.tap(200, 270), await sleep(250), await p.ev(`document.getElementById('markCard').hidden`)));
+  // layers: before Oct 31 the main chips are Decorations + Past favourites; “More ▾” reveals the rest
+  check('v15 layer chips fit at 390 px: main chips + More, secondary hidden', await p.ev(`(function(){var bar=document.getElementById('layerbar');return bar.scrollWidth<=bar.clientWidth && !!document.querySelector('.lchip[data-layer="decor"]:not([hidden])') && document.querySelector('.lchip[data-layer="zones"]').hidden && document.getElementById('nearChip').hidden && document.getElementById('layerMore').getAttribute('aria-expanded')==='false';})()`));
+  await p.click('#layerMore'); await sleep(200);
+  check('…More ▾ reveals Fun streets, Suggested areas, Events, Near me', await p.ev(`document.getElementById('layerMore').getAttribute('aria-expanded')==='true' && ['zones','areas','events'].every(function(k){return !document.querySelector('.lchip[data-layer="'+k+'"]').hidden;}) && !document.getElementById('nearChip').hidden`));
   let layerOk = true;
   for (const k of ['zones', 'areas', 'events']) {
     await p.click(`.lchip[data-layer="${k}"]`); await sleep(150);
@@ -210,7 +236,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     await p.click(`.lchip[data-layer="${k}"]`); await sleep(150);
     if (!off || !(await p.ev(`__ltot.state().layers['${k}']`))) layerOk = false;
   }
-  check('layer chips Zones / Areas / Events toggle off and on (+ Near me chip)', layerOk && await p.ev(`!!document.getElementById('nearChip')`) && realErrors(p).length === 0);
+  check('layer chips Fun streets / Suggested areas / Events toggle off and on (+ Near me chip)', layerOk && await p.ev(`!!document.getElementById('nearChip')`) && realErrors(p).length === 0);
+  await p.click('#layerMore'); await sleep(150);
 
   // tabs
   let tabsOk = true;
@@ -219,9 +246,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = How-to (16 sections, v13 + phases + Oct 31; +board +sounds = 18 in v14) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === ((await p.ev('__ltot.state().favOn')) ? 18 : 17) && await p.ev(`!!document.getElementById('guideBoard')`));
-  await p.click('#guideBoard'); await sleep(200);
-  check('Board opens from the Guide tab (v14: past-years board when on, else parent board)', await p.ev(`__ltot.state().favOn ? !document.getElementById('panel-fav').hidden : !document.getElementById('panel-board').hidden`));
+  check('Guide tab = short How-to (9 sections, +Past favourites when on) + one primary ▶ demo, no Board/Safety duplicates', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === ((await p.ev('__ltot.state().favOn')) ? 10 : 9) &&
+    await p.ev(`!document.getElementById('guideBoard') && !document.getElementById('guideSafety') && document.querySelectorAll('#panel-guide .btn-primary').length===1`));
 
   // area popup = "Suggested" base layer
   const pop = await p.ev(`(function(){var c; __ltot.map.eachLayer(function(l){ if(!c && l.options && l.options.className==='area-circle') c=l; });
@@ -230,7 +256,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('researched areas drawn dashed with a muted fill', await p.ev(`(function(){var ok=false; __ltot.map.eachLayer(function(l){ if(l.options && l.options.className==='area-circle') ok = !!l.options.dashArray && l.options.fillOpacity<=0.08; }); return ok;})()`));
 
   // board
-  await p.click('#boardBtn'); await sleep(200);
+  await p.ev(`__ltot.openTab('board')`); await sleep(200);
   await p.ev(`document.getElementById('postBody').value='best street: www.spam.com'; document.getElementById('postBtn').click()`); await sleep(300);
   check('board rejects links', /Links/.test(await p.ev(`document.getElementById('postErr').textContent`)));
   await p.ev(`document.getElementById('postArea').value='old-north'; document.getElementById('postBody').value='Old North was so friendly!'; document.getElementById('postBtn').click()`); await sleep(600);
@@ -246,29 +272,29 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.ev(`document.getElementById('suggestReason').value='see www.x.com'; document.getElementById('suggestSend').click()`); await sleep(300);
   check('suggestion rejects links', /Links/.test(await p.ev(`document.getElementById('suggestErr').textContent`)));
   await p.ev(`document.getElementById('suggestReason').value='Lots of porch lights'; document.getElementById('suggestSend').click()`); await sleep(600);
-  check('suggestion saved (needs 3 to show)', !(await p.ev(`document.getElementById('suggestDialog').open`)) && /needs 3/.test(await p.ev(`document.getElementById('toast').textContent`)) && (await p.ev('__ltot.state().suggested')) === 0);
+  check('suggestion saved (needs 3 to show)', !(await p.ev(`document.getElementById('suggestDialog').open`)) && /after 3 suggestions/.test(await p.ev(`document.getElementById('toast').textContent`)) && (await p.ev('__ltot.state().suggested')) === 0);
 
   // language
   await p.click('#langBtn'); await sleep(400);
   const zh = await p.ev(`({ title: document.title, lang: document.documentElement.lang, tabs: [...document.querySelectorAll('.tabbar button')].map(b=>b.textContent).join('|'),
      btn: document.getElementById('markBtn').textContent, legend: document.getElementById('legend').textContent,
      leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n) })`);
-  check('one-tap Chinese: title, tabs (v14: line icons), big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '地图|路线|标记！|指南' && (await p.ev(`document.querySelectorAll('.tabbar .ti svg.ico').length`)) === 4 && /这里装饰很棒！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
+  check('one-tap Chinese: title, tabs (v14: line icons), big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '地图|路线|标记！|指南' && (await p.ev(`document.querySelectorAll('.tabbar .ti svg.ico').length`)) === 4 && /装饰很棒？/.test(zh.btn) && /非常热闹/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
   check('no untranslated i18n keys on screen', zh.leftovers.length === 0, zh.leftovers.join(','));
   await p.click('.tabbar [data-tab="map"]'); await sleep(200);
-  check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
+  check('Map panel (zh): “你的街没亮？分享它。”', /你的街没亮？分享它。3 个标记就会亮。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
   await p.shot('v3-map-panel-zh.png');
   await p.click('#safetyBtn'); await sleep(200);
   check('safety panel: 11 tips incl. “go with a grown-up” and Teal Pumpkin', (await p.ev('document.querySelectorAll("#tipList li").length')) === 11 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)) && /Teal Pumpkin/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 13 sections (+1 past-years board in v14 when on) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === ((await p.ev('__ltot.state().favOn')) ? 14 : 13) && /装饰标记/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh): 5-line summary + full notice (13 sections, +1 board) behind “完整隐私说明”, PIPEDA + contact', (await p.ev('document.querySelectorAll("#privacySummary li").length')) === 5 && !(await p.ev(`document.getElementById('privacyMore').open`)) && (await p.ev('document.querySelectorAll("#privacyList dt").length')) === ((await p.ev('__ltot.state().favOn')) ? 14 : 13) && /装饰标记/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
 
   // URL params on the same profile (guide already seen)
   const g = await openPage('?guide=1&lang=zh', { wait: 3000 });
-  check('?guide=1&lang=zh forces the welcome cards in Chinese', await g.ev(`!document.getElementById('guide').hidden && /看看哪里好玩/.test(document.getElementById('guideTrack').textContent)`));
+  check('?guide=1&lang=zh forces the welcome cards in Chinese', await g.ev(`!document.getElementById('guide').hidden && /看哪里好玩/.test(document.getElementById('guideTrack').textContent)`));
   await g.shot('v3-guide-zh.png');
   const h = await openPage('?howto=1', { wait: 3000 });
   check('?howto=1 opens the How-to (Guide) panel, no cards', await h.ev(`!document.getElementById('panel-guide').hidden && document.getElementById('guide').hidden`));
@@ -300,7 +326,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await a.shot('v3-demo-zones.png');
   await a.ev(`__ltot.map.setView([42.9655, -81.2440], 14, {animate:false})`); await sleep(800);
   const full = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
-  check('street zoom: full badge “🔥 23+ marked” (demo ticks up)', full.some((t) => /^🔥 2\d marked/.test(t)), full.join(' | '));
+  check('street zoom: full badge “🔥 23+ now”, decorations “🎃 n likes” (demo ticks up)', full.some((t) => /^🔥 2\d now/.test(t)) && full.some((t) => /^🎃 \d+ likes/.test(t)), full.join(' | '));
   await a.shot('v3-demo-street.png');
   await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(500);
   check('zones are SVG paths with CSS pulse classes (no per-frame JS)', await a.ev(`document.querySelectorAll('path.zone-hot').length>=1 && document.querySelectorAll('path.zone-lively').length>=1 && document.querySelectorAll('path.zone-quiet').length>=1 && getComputedStyle(document.querySelector('path.zone-hot')).animationName==='zflash'`));
@@ -316,7 +342,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const bMarks0 = await b.ev('__ltot.state().marks');
   await a.click('#altBtn'); await sleep(2000); await allowLoc(a); await sleep(1500);
   const myId = await a.ev(`(JSON.parse(localStorage.getItem('ltot.demo.mine.marks'))||[]).slice(-1).map(h=>h.id)[0]`);
-  check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /helped other families find a great street/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
+  check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /Other families can see it now/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
   await sleep(1200);
   check('the mark from tab A shows in tab B (BroadcastChannel + localStorage)', await b.ev(`__ltot.backend.local._get('marks',[]).some(m=>m.id===${JSON.stringify(myId)})`) && (await b.ev('__ltot.state().marks')) > bMarks0,
     `B marks ${bMarks0} → ${await b.ev('__ltot.state().marks')}`);
@@ -340,7 +366,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('Route button on a row plans a walk to that zone', await n.ev(`!document.getElementById('panel-route').hidden && document.getElementById('areaSelect').value==='target'`));
   const nz = await openPage('?demo=1&near=1&lang=zh', { wait: 5000 });
   await dismissGuide(nz);
-  check('Near me in Chinese', /我附近的热闹地方/.test(await nz.ev(`document.getElementById('panel-near').textContent`)) && /人标记/.test(await nz.ev(`document.getElementById('nearList').textContent`)));
+  check('Near me in Chinese', /我附近好玩的街/.test(await nz.ev(`document.getElementById('panel-near').textContent`)) && /现在 \d+/.test(await nz.ev(`document.getElementById('nearList').textContent`)));
   await nz.shot('v3-near-zh.png');
   await nz.ev(`__ltot.openTab(null); __ltot.map.setView([42.975, -81.27], 12, {animate:false})`); await sleep(900);
   await nz.shot('v3-demo-zones-zh.png');
@@ -352,8 +378,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const p = await openPage('?demo=1', { wait: 5000 });
   await dismissGuide(p);
   const st = await p.ev('__ltot.state()');
-  check('v14 board on in demo: 💬 Past best layer chip, banner mentions past favourites', st.favOn && st.favPins === 6 &&
-    await p.ev(`!!document.querySelector('[data-layer="fav"]') && /share past favourites/.test(document.getElementById('phaseLine').textContent)`), JSON.stringify({ favOn: st.favOn, n: st.favPins }));
+  check('v14 board on in demo: “Past favourites” is a main layer chip (v15)', st.favOn && st.favPins === 6 &&
+    await p.ev(`!!document.querySelector('[data-layer="fav"]:not([hidden])') && /Past favourites/.test(document.querySelector('[data-layer="fav"]').textContent)`), JSON.stringify({ favOn: st.favOn, n: st.favPins }));
   await p.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false})`); await sleep(700);
   const b16 = await p.ev(`[...document.querySelectorAll('.favb')].map(function(b){return {t:b.textContent, s:parseFloat(b.style.getPropertyValue('--s'))};})`);
   check('zoomed in: speech bubbles with tag icon, short note and 👍/❤️ counts; bigger with more likes', b16.length >= 5 && b16.some((b) => /^🏆Best street every year!…👍 14 ❤️ 9$/.test(b.t)) &&
@@ -373,7 +399,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.ev(`(function(){var i=document.querySelector('.fav-reply-in'); i.value='So much fun!'; document.querySelector('.fav-replyrow .btn').click();})()`); await sleep(700);
   check('short reply posts and shows', /So much fun!/.test(await p.ev(`document.querySelector('.fav-replies').textContent`)));
   await p.ev(`__ltot.map.closePopup(); __ltot.openTab('fav')`); await sleep(400);
-  check('🏆 panel: Best streets from past years + Most loved list', await p.ev(`!document.getElementById('panel-fav').hidden && document.querySelectorAll('#favList .fav-row').length===6`));
+  check('💬 panel: Past favourites + Most loved list, no gift line in the panel (v15)', await p.ev(`!document.getElementById('panel-fav').hidden && document.querySelectorAll('#favList .fav-row').length===6 && /Past favourites/.test(document.querySelector('#panel-fav h2').textContent) && !document.querySelector('#panel-fav .mc-gift')`));
   await p.ev(`__ltot.openFavForm([42.9601, -81.2410])`); await sleep(300);
   await p.click('#favSend'); await sleep(200);
   check('post form: a preset tag is required', /Pick one/.test(await p.ev(`document.getElementById('favErr').textContent`)));
@@ -387,7 +413,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#soundBtn'); await sleep(200);
   check('sound: tap → 🔇, remembered in localStorage, bilingual label', await p.ev(`document.getElementById('soundBtn').dataset.on==='0' && document.getElementById('soundBtn').getAttribute('aria-pressed')==='false' && localStorage.getItem('ltot.sound')==='0' && /Sound off/.test(document.getElementById('soundBtn').getAttribute('aria-label'))`));
   await p.click('#soundBtn'); await sleep(200);
-  check('How-to has the board and the sounds sections', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return /Best streets from past years/.test(t)&&/🔊 Sounds/.test(t);})()`));
+  check('How-to has the board and the sounds sections', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return /💬 Past favourites/.test(t)&&/🔊 Sounds/.test(t);})()`));
   check('privacy notice mentions the past-years board', /Past-years board/.test(await p.ev(`document.getElementById('privacyList').textContent`)));
   check('v14 board page: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
   const n = await openPage('?demo=1&now=2026-10-31T17:30:00-04:00&lang=zh', { wait: 5000 });
@@ -434,7 +460,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('prefers-reduced-motion: HUD off, zones and button glow do not animate', await p.ev(`getComputedStyle(document.querySelector('.hud')).display==='none' &&
     getComputedStyle(document.querySelector('.mb-glow')).animationName==='none' && [...document.querySelectorAll('path.zone')].every(z=>getComputedStyle(z).animationName==='none')`));
   check('prefers-reduced-motion: the seconds digit does not flicker', await p.ev(`getComputedStyle(document.querySelector('#countdown .cd-s')).animationName==='none'`));
-  await p.click('#tourBtn'); await sleep(900);
+  await p.ev(`__ltot.openTab('guide')`); await sleep(300); await p.click('#guideTour'); await sleep(900);
   const r1 = await p.ev(`document.getElementById('tourRing').style.transform`);
   await sleep(4500);
   const still = await p.ev(`__ltot.tour.state().idx===0 && !document.getElementById('tourNext').hidden && document.getElementById('tourPause').hidden`);
@@ -458,8 +484,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('…digits have a fixed width (no shifting between ticks)', Math.abs(w1 - w2) < 0.01, w1 + ' / ' + w2);
   check('…seconds digit has the CSS flicker, tabular-nums (v14: one font stack, no monospace)', await p.ev(`(function(){var s=getComputedStyle(document.querySelector('#countdown .cd-s')), d=getComputedStyle(document.querySelector('#countdown .cd-digits'));
     return /cd-tick-[ab]/.test(s.animationName) && d.fontVariantNumeric==='tabular-nums' && !/mono/i.test(d.fontFamily);})()`));
-  check('top bar fits at 390 px (practice chip shows its icon only)', await p.ev(`[...document.querySelectorAll('.topbar > *')].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().right<=390)`) &&
-    await p.ev(`getComputedStyle(document.querySelector('#practiceChip .chip-txt')).display==='none' && document.getElementById('practiceChip').getAttribute('aria-label')==='Practice mode'`));
+  check('v15 top bar fits at 390 px: brand, “🧪 Practice” (words visible), Safety, 🔊, 中文 only', await p.ev(`[...document.querySelectorAll('.topbar > *')].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().right<=390)`) &&
+    await p.ev(`document.getElementById('practiceChip').textContent==='🧪 Practice' && !document.getElementById('tourBtn') && !document.getElementById('helpBtn') && !document.getElementById('boardBtn')`));
   check('countdown is role="timer" (not announced every second)', await p.ev(`document.getElementById('countdown').getAttribute('role')==='timer'`));
   await p.shot('v6-countdown.png');
 
@@ -471,8 +497,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await dismissGuide(on);
   check('?now=Oct 31 5:30 PM → “Halloween is ON! 🎃” with a pulsing glow', (await on.ev(`document.getElementById('countdown').textContent`)) === 'Halloween is ON! 🎃' &&
     await on.ev(`getComputedStyle(document.querySelector('#countdown .cd-msg')).animationName==='cd-pulse'`));
-  check('v13 ?now=Oct 31 5:30 PM: banner “Halloween is ON! Mark the most fun streets 🔥”, big button orange fun-street, decor = small purple pill',
-    await on.ev(`document.getElementById('phaseLine').textContent==='Halloween is ON! Mark the most fun streets 🔥' && !document.getElementById('markBtn').classList.contains('mb-decor') && /Great street\\? Share it!/.test(document.getElementById('markBtn').textContent) && /Cool decorations here!/.test(document.getElementById('altBtn').textContent)`));
+  check('v15 ?now=Oct 31 5:30 PM: banner “🔥 Share fun streets until 11 PM” (no 2nd “Halloween is ON”), big orange button, decor = small pill, main chip = Fun streets',
+    await on.ev(`document.getElementById('phaseLine').textContent==='🔥 Share fun streets until 11 PM' && !document.getElementById('markBtn').classList.contains('mb-decor') && /Fun street\\? Share it/.test(document.getElementById('markBtn').textContent) && /Great decorations\\?/.test(document.getElementById('altBtn').textContent) && !document.querySelector('.lchip[data-layer="zones"]').hidden && document.querySelector('.lchip[data-layer="decor"]').hidden && !document.querySelector('.tab-mark').classList.contains('tab-decor')`));
   await on.shot('v6-halloween-on.png');
   const edge = await openPage('?now=2026-10-31T16:59:58-04:00&lang=zh', { wait: 600 });
   const e1 = await edge.ev(`document.getElementById('countdown').dataset.phase`);
@@ -494,7 +520,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D14.1') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D15') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');
@@ -529,11 +555,11 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const before = await p.ev(`JSON.stringify({ls: Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]), layers: __ltot.state().layers,
     c: __ltot.map.getCenter(), z: __ltot.map.getZoom(), tab: __ltot.state().tab, open: document.getElementById('sheet').dataset.open})`);
   const zonesBefore = await p.ev(`document.querySelectorAll('path.zone').length`);
-  check('▶ button in the top bar, next to “?”', await p.ev(`document.getElementById('tourBtn').nextElementSibling.id==='helpBtn'`));
-  await p.click('#tourBtn'); await sleep(1000);
+  check('v15: ▶ 25-second demo is the one primary button in the Guide tab (not in the top bar)', await p.ev(`!document.getElementById('tourBtn') && document.getElementById('guideTour').classList.contains('btn-primary')`));
+  await p.ev(`document.getElementById('guideTour').click()`); await sleep(1000);
   const r1 = await p.ev(`document.getElementById('tourRing').style.transform`);
   check('tour starts: overlay, ring around the legend, caption, DEMO DATA tag', await p.ev(`!document.getElementById('tour').hidden && __ltot.tour.state().idx===0`) &&
-    /Glowing zones/.test(await p.ev(`document.getElementById('tourCap').textContent`)) && (await p.ev(`document.querySelectorAll('#tourBar i').length`)) === 7);
+    /Orange streets show where kids/.test(await p.ev(`document.getElementById('tourCap').textContent`)) && (await p.ev(`document.querySelectorAll('#tourBar i').length`)) === 7);
   await p.shot('v6-tour-1.png');
   await sleep(10500);                                           // into step 4
   const mid = await p.ev(`JSON.stringify({ idx: __ltot.tour.state().idx, ring: document.getElementById('tourRing').style.transform, z: (__ltot.tourZones()||[]).map(z=>z.count+(z.isNew?'N':'')) })`);
@@ -559,7 +585,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     /满 3 个/.test(await q.ev(`document.getElementById('tourCap').textContent`)), await q.ev(`document.getElementById('tourCap').textContent`));
   await q.shot('v6-tour-4-zh.png');
   const w = await openPage('?guide=1', { wait: 3500 });
-  check('first welcome card has “▶ How to use”', /▶ How to use/.test(await w.ev(`document.getElementById('guideTrack').textContent`)));
+  check('welcome cards have “▶ 25-second demo”', /▶ 25-second demo/.test(await w.ev(`document.getElementById('guideTrack').textContent`)));
   await w.click('#guideTourBtn'); await sleep(800);
   check('…and it starts the tour', await w.ev(`document.getElementById('guide').hidden && __ltot.tour.state().active`));
   check('tour pages: no JS errors', [q, w].every((x) => realErrors(x).length === 0), [q, w].map(realErrors).flat().join(' | '));

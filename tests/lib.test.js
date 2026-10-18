@@ -217,14 +217,14 @@ test('nudge: only on live / test days (or demo), 20 min after the last mark and 
   assert.equal(L.shouldNudge('test', T - 20 * M, 0, T), true);
   assert.equal(L.shouldNudge('live', 0, T - 5 * M, T), false, 'no repeating hints');
 });
-test('v10 copy: parent-focused button, thank-you card, hint and guide tip (EN + ZH)', () => {
+test('v10/v15 copy: parent-focused button, thank-you card, hint and guide tip (EN + ZH)', () => {
   const I = require('../i18n.js');
-  assert.equal(I.en.markBtn, 'Great street? Share it! 🎁'); assert.equal(I.zh.markBtn, '这条街不错？分享给大家！🎁');
-  assert.equal(I.en.markSub, 'Help other families find the fun'); assert.equal(I.zh.markSub, '帮其他家庭找到好地方');
-  assert.equal(I.en.markedThanks, 'Thanks! You just helped other families find a great street 🎃');
-  assert.equal(I.zh.markedThanks, '谢谢！你刚帮其他家庭找到一条好街 🎃');
-  assert.equal(I.en.nudge, 'Waiting for the kids? Share this street. It takes 1 second.');
-  assert.ok(JSON.stringify(I.en.guideCards).includes('While the kids knock on doors, tap once to share the street. It takes 1 second.'));
-  assert.ok(JSON.stringify(I.zh.guideCards).includes('孩子们敲门的时候，点一下就能分享这条街，只要 1 秒。'));
+  assert.equal(I.en.markBtn, 'Fun street? Share it 🔥'); assert.equal(I.zh.markBtn, '这条街好玩？分享 🔥');
+  assert.equal(I.en.markSub, 'Helps other families'); assert.equal(I.zh.markSub, '帮其他家庭找到好地方');
+  assert.equal(I.en.markedThanks, 'Thanks! Other families can see it now.');
+  assert.equal(I.zh.markedThanks, '谢谢！其他家庭现在能看到了。');
+  assert.equal(I.en.nudge, 'Waiting for the kids? Share this street.');
+  assert.ok(JSON.stringify(I.en.guideCards).includes('orange button on fun streets'));
+  assert.ok(JSON.stringify(I.zh.guideCards).includes('在好玩的街点橙色按钮'));
   for (const l of ['en', 'zh']) assert.ok(!JSON.stringify(I[l]).includes(l === 'en' ? 'This spot is great' : '这里很热闹！'), 'old button wording gone: ' + l);
 });

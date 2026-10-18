@@ -135,7 +135,7 @@ test('bilingual board copy everywhere: tags, privacy, How-to, guide line, gift t
   for (const l of ['en', 'zh']) {
     for (const tag of L.FAV_TAGS) assert.ok(I[l]['ftag_' + tag], l + ' ' + tag);
     assert.ok(I[l].privacyFav[1].includes(l === 'en' ? 'Nov 2' : '11 月 2 日'), l);
-    assert.ok(I[l].howtoFav[1].length >= 4, l); assert.ok(I[l].guideFavLine, l);
+    assert.ok(I[l].howtoFav[1].length >= 3, l); assert.ok(I[l].guideFavLine, l);
     assert.ok(I[l].giftToasts.length >= 2 && I[l].giftToasts.length <= 3 && I[l].giftToasts.every((s) => Array.from(s).length <= 60), l + ' short toasts');
   }
   assert.deepEqual([I.en.ftag_festive, I.en.ftag_candy, I.en.ftag_littlekids, I.en.ftag_walking], ['Most festive', 'Lots of candy', 'Great for little kids', 'Easy walking']);
@@ -179,7 +179,7 @@ test('sounds: Web Audio only (no files), each under 1 s, quiet, only right after
   const src = read('sfx.js');
   assert.doesNotMatch(src, /\.(mp3|wav|ogg|m4a)\b|new Audio\(/, 'no audio files');
   const app = read('app.js'), html = read('index.html');
-  assert.match(html, /id="soundBtn"/); assert.match(html, /src="sfx\.js\?v=14\.1"/);
+  assert.match(html, /id="soundBtn"/); assert.match(html, /src="sfx\.js\?v=15"/);
   for (const [n, where] of [['boo', 'fun-street mark'], ['twinkle', 'decor mark'], ['chime', 'like/post/reply'], ['fanfare', 'badge']])
     assert.match(app, new RegExp("SFX\\.play\\('" + n + "'"), where);
   for (const l of ['en', 'zh']) { assert.ok(I[l].soundOnAria && I[l].soundOffAria && I[l].howtoSound[1].length >= 2 && I[l].guideSoundLine, l); }

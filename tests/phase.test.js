@@ -17,20 +17,26 @@ test('appPhase: decor until Oct 31 3 PM Toronto, night until Nov 1 00:00, then a
   assert.equal(L.decorPrimary(Date.parse('2026-10-31T19:00:00Z'), true), false, 'demo follows the calendar too');
 });
 
-test('banner + explainer copy (EN + ZH)', () => {
-  assert.equal(I.en.phasePre, '🎃 Now: mark the best decorations · 🔥 Oct 31: mark the most fun streets');
-  assert.equal(I.zh.phasePre, '🎃 现在：标记最棒的装饰 · 🔥 10月31日：标记最好玩的街');
-  assert.equal(I.en.phaseOn, 'Halloween is ON! Mark the most fun streets 🔥');
+test('banner + explainer copy (EN + ZH): one short line, 4 bullets, details behind More', () => {
+  assert.equal(I.en.phasePre, '🎃 Now: decorations · 🔥 Oct 31: fun streets');
+  assert.equal(I.zh.phasePre, '🎃 现在：装饰 · 🔥 10月31日：好玩的街');
+  assert.equal(I.en.phaseOn, '🔥 Share fun streets until 11 PM');
+  assert.ok(!/Halloween is ON/.test(I.en.phaseOn) && !/万圣节开始/.test(I.zh.phaseOn), 'v15: the countdown says it, the banner does not repeat it');
   for (const l of ['en', 'zh']) {
+    assert.equal(I[l].phaseBullets.length, 4);
     assert.equal(I[l].phaseItems.length, 4);
-    const all = I[l].phaseItems.map((x) => x.join(' ')).join(' ');
-    assert.match(all, l === 'en' ? /14 days.*deleted after Halloween/ : /14 天.*万圣节后/);
-    assert.ok(I[l].howtoSections[0][0].includes('🗓️'), l + ' How-to starts with the two phases');
+    const all = I[l].phaseItems.map((x) => [].concat(x[0], x[1]).join(' ')).join(' ');
+    assert.match(all, l === 'en' ? /14 days.*2 hours/ : /14 天.*2 小时/);
+    assert.ok(I[l].howtoSections[0][0].includes('🎃'), l + ' How-to starts with what to do now');
     const oct = I[l].phaseItems[1];
-    assert.match(oct[0], l === 'en' ? /What’s different on Oct 31/ : /31号有什么不同/);
-    assert.equal(oct[1].length, 5); assert.match(oct[1].join(' '), l === 'en' ? /3 PM.*\{win\} minutes.*2 hours.*3–11 PM.*Nov 2/ : /下午 3 点.*\{win\} 分钟.*2 小时.*11 月 2 日/);
-    assert.ok(I[l].howtoSections[1][0].includes(l === 'en' ? 'Oct 31' : '31号'));
+    assert.match(oct[0], l === 'en' ? /Oct 31, 3–11 PM/ : /10月31日 下午3–11点/);
+    assert.equal(oct[1].length, 3); assert.match(oct[1].join(' '), l === 'en' ? /orange.*\{win\} min.*2 hours/ : /橙色.*\{win\} 分钟.*2 小时/);
+    assert.match(I[l].phaseBullets.join(' '), l === 'en' ? /Nov 2/ : /11月2日/);
+    assert.ok(I[l].howtoSections[1][0].includes(l === 'en' ? 'Oct 31' : '10月31日'));
   }
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.match(html, /<details id="phaseMore" class="phasemore"><summary data-i18n="phaseMoreLbl">/);
+  assert.doesNotMatch(html, /id="phaseTestLine"/, 'test days live in the 🧪 chip, not a second banner line');
 });
 
 test('quiet zones get a non-fire emoji in the progress line', () => {
@@ -47,12 +53,11 @@ test('cards stay ~8 s, pause while touched, decor auto-share 8 s; Done/✕ kept'
   assert.match(html, /id="phaseBanner"/); assert.doesNotMatch(html, /id="testBanner"/);
 });
 
-test('"every action is a gift" line on the explainer and the thank-you cards (EN + ZH, exact copy)', () => {
+test('"every action is a gift" line: explainer + board toasts only (v15: off the thank-you cards and the board panel)', () => {
   const js = fs.readFileSync(path.join(root, 'app.js'), 'utf8'), html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.equal(I.en.giftLine, 'Every mark, like and comment helps another family have a happier, more magical Halloween 🎃');
   assert.equal(I.zh.giftLine, '你的每一次标记、点赞和留言，都在帮助另一个家庭和小朋友过一个更快乐、更难忘的万圣节 🎃');
   assert.match(html, /id="phaseGift"[^>]*data-i18n="giftLine"/);
-  assert.match(html, /id="markCardGift"[^>]*data-i18n="giftLine"/);
-  assert.equal((js.match(/\$\('markCardGift'\)\.hidden = false;/g) || []).length, 2, 'shown on the fun-street and decor thank-you cards');
-  assert.equal((js.match(/\$\('markCardGift'\)\.hidden = true;/g) || []).length, 3, 'hidden on rate / pending cards');
+  assert.equal((html.match(/data-i18n="giftLine"/g) || []).length, 1, 'one place in the page');
+  assert.doesNotMatch(html + js, /markCardGift/);
 });

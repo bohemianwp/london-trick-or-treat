@@ -115,14 +115,14 @@ test('SupabaseAdapter maps PGRST202 (function not found) to code "missing" and c
 });
 
 test('decor copy (EN + ZH), privacy notice, guide, and the SQL file', () => {
-  assert.equal(I18N.en.decorBtn, 'Cool decorations here! 🎃');
-  assert.equal(I18N.zh.decorBtn, '这里装饰很棒！🎃');
+  assert.equal(I18N.en.decorBtn, 'Great decorations? 🎃');   // v15: short question, one name ("Decorations")
+  assert.equal(I18N.zh.decorBtn, '装饰很棒？🎃');
   assert.deepEqual(L.DECOR_TAGS.map((t) => [I18N.en['dtag_' + t], I18N.zh['dtag_' + t], L.DECOR_ICON[t]]),
     [['Spooky', '吓人', '👻'], ['Funny', '搞笑俏皮', '😄'], ['Lights', '灯光', '✨'], ['Must-see', '必看', '🏆']]);
   for (const l of ['en', 'zh']) {
     const priv = I18N[l].privacyItems.map((x) => x.join(' ')).join(' ');
     assert.match(priv, l === 'en' ? /Decoration marks.*14 days.*Nov 2, 2026/ : /装饰标记.*14 天.*11 月 2 日/);
-    assert.ok(I18N[l].guideCards[0][1].some((b) => b.includes(I18N[l].decorBtn)), l + ' welcome card mentions decor');
+    assert.ok(I18N[l].guideCards[1][1].some((b) => b.includes(l === 'en' ? 'purple button at great decorations' : '看到好看的装饰，点紫色按钮')), l + ' welcome card mentions decor');
     assert.ok(I18N[l].howtoSections.some((s) => s[0].includes('🎃')), l + ' How-to decor section');
   }
   const sql = fs.readFileSync(path.join(root, 'supabase/v11_decor.sql'), 'utf8'), schema = fs.readFileSync(path.join(root, 'supabase/schema.sql'), 'utf8');

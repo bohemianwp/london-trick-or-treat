@@ -16,7 +16,7 @@
   var DEMO = FLAGS.demo;
   var DEMO_HOME = [42.9628, -81.2390];                // ?demo=1&near=1 centres "Near me" here (Old South, near Wortley Rd)
   var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
-  var STORE = { favTokens: P + 'mine.fav', favReports: P + 'mine.favReports', sound: 'ltot.sound', shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
+  var STORE = { favTokens: P + 'mine.fav', favReports: P + 'mine.favReports', sound: 'ltot.sound', shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen', tipHint: 'ltot.tipHintSeen',
                 session: P + 'session', markHist: P + 'mine.marks', suggestHist: P + 'mine.suggest',
                 postTokens: P + 'mine.posts', decorHist: P + 'mine.decor', votes: P + 'mine.votes', reports: P + 'mine.reports' };
   var PACE = { 'u5': 1.5, '5-8': 2.0, '9-12': 2.5, 'teen': 3.0 };   // km/h including door stops
@@ -165,7 +165,10 @@
   function renderChips() {
     $('offlineChip').hidden = backend.mode !== 'offline';
     $('demoChip').hidden = !DEMO;
-    $('practiceChip').hidden = markMode() !== 'practice';
+    var mm = markMode();                                   // v15: one status chip, words always visible: Practice / Test days
+    $('practiceChip').hidden = mm !== 'practice' && mm !== 'test';
+    $('practiceChip').textContent = t(mm === 'test' ? 'testChip' : 'practiceChip');
+    $('practiceChip').dataset.tipKey = mm === 'test' ? 'tip_test' : 'tip_practice';
     document.querySelector('.topbar').classList.toggle('crowded', !$('offlineChip').hidden && !$('practiceChip').hidden);   // v14: room for 🔊
     renderPhase();
     document.querySelectorAll('.local-note').forEach(function (n) { n.hidden = backend.mode === 'supabase'; });
@@ -174,7 +177,7 @@
   $('offlineChip').addEventListener('click', function () {
     toast(backend.reason === 'notConfigured' ? t('offlineWhy_notConfigured') : t('offlineWhy'), 7000);
   });
-  $('practiceChip').addEventListener('click', function () { toast(t('practiceWhy'), 7000); });
+  $('practiceChip').addEventListener('click', function () { toast(t(markMode() === 'test' ? 'testWhy' : 'practiceWhy'), 7000); });
   $('phaseBanner').addEventListener('click', openPhaseCard);
 
   // ==== layer chips ====
@@ -191,17 +194,28 @@
     $('legendDecor').hidden = !(layerOn.decor && decorLayerShown());
     renderLayerBar();
   }
+  // v15: two main chips that follow the phase + "More ▾" (the rest). Before Oct 31 3 PM: Decorations, Past favourites;
+  // on the night: Fun streets, Past favourites. Fits 390 px in EN and ZH; one primary layer per phase.
+  var layerMoreOpen = false;
+  function layerMain(k) { return k === 'fav' || (bigIsDecor() ? k === 'decor' : k === 'zones'); }
   function renderLayerBar() {
-    var bar = $('layerbar'), nearChip = $('nearChip');      // the Near me chip is static (index.html); layer chips go before it
+    var bar = $('layerbar'), nearChip = $('nearChip'), more = $('layerMore');   // More and Near me are static (index.html)
     bar.querySelectorAll('[data-layer]').forEach(function (b) { b.remove(); });
     bar.setAttribute('aria-label', t('layers'));
     Object.keys(LAYER_ICONS).forEach(function (k) {
       if (k === 'decor' && !decorLayerShown()) return;
       if (k === 'fav' && !favOn()) return;
-      bar.insertBefore(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
-        onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li li-' + k, 'aria-hidden': 'true' }), t(LAYER_KEYS[k])]), nearChip);
+      var main = layerMain(k);
+      var b = el('button', { type: 'button', class: 'lchip' + (main ? '' : ' lchip-sec'), 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
+        'data-tip-key': 'tip_layer_' + k, onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li li-' + k, 'aria-hidden': 'true' }), t(LAYER_KEYS[k])]);
+      b.hidden = !main && !layerMoreOpen;
+      bar.insertBefore(b, main ? more : nearChip);
     });
+    nearChip.hidden = !layerMoreOpen;
+    more.setAttribute('aria-expanded', String(layerMoreOpen));
+    more.querySelector('.lm-arrow').textContent = layerMoreOpen ? '▴' : '▾';
   }
+  $('layerMore').addEventListener('click', function () { layerMoreOpen = !layerMoreOpen; renderLayerBar(); });
   $('nearChip').addEventListener('click', function () { openNear(); });
   function setLayer(k, on) {
     layerOn[k] = on;
@@ -243,7 +257,7 @@
     layers.areas.eachLayer(function (l) { if (l !== baseLayer && l !== communityGroup) layers.areas.removeLayer(l); });
     AREAS.forEach(function (a) {
       // Dashed outline + muted fill: visually separate from live zones, and drawn under them.
-      L.circle([a.lat, a.lng], { radius: a.r, color: '#a78bfa', weight: 1.5, opacity: 0.6, fillColor: '#a78bfa', fillOpacity: 0.05,
+      L.circle([a.lat, a.lng], { radius: a.r, color: '#cbd5e1', weight: 1.5, opacity: 0.55, fillColor: '#cbd5e1', fillOpacity: 0.04,   // v15: grey, purple = decorations only
                                  dashArray: '5 7', bubblingMouseEvents: false, className: 'area-circle' })
         .bindTooltip(shortName(a) + ' · ' + t('suggestedTag'), { permanent: true, direction: 'center', className: 'area-label' })
         .on('click', function (e) {
@@ -257,8 +271,8 @@
     communityGroup.clearLayers();
     data.suggested.forEach(function (s) {
       var pts = isCell(s.cell) ? grid.boundary(s.cell) : grid.boundary(grid.cell(s.lat, s.lng));
-      L.polygon(pts, { color: '#c4b5fd', weight: 2, dashArray: '3 6', fillColor: '#7c3aed', fillOpacity: 0.12, className: 'community-hex', bubblingMouseEvents: false })
-        .bindTooltip('💜 ' + t('communityTag'), { permanent: true, direction: 'center', className: 'area-label community-label' })
+      L.polygon(pts, { color: '#cbd5e1', weight: 2, dashArray: '3 6', fillColor: '#cbd5e1', fillOpacity: 0.08, className: 'community-hex', bubblingMouseEvents: false })
+        .bindTooltip('📌 ' + t('communityTag'), { permanent: true, direction: 'center', className: 'area-label community-label' })
         .on('click', function (e) {
           if (mode) { handleMapTap(e.latlng); return; }
           L.popup({ maxWidth: 260, autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR }).setLatLng(e.latlng).setContent(el('div', { class: 'pop' }, [
@@ -489,7 +503,6 @@
       lsSet(STORE.markHist, markHist);
       lastMark = { id: res.id, token: token, tags: [], at: now };
       lsSet(STORE.markHint, true);
-      $('markHintBtn').hidden = true; $('hintMark').hidden = true;
       var mm = markMode(), badge = null;
       if (mm !== 'practice') {                         // badges count shared streets only (practice marks are not shared)
         var prevN = sharedCount();
@@ -542,8 +555,9 @@
   function buzz() {                                    // short buzz on Android (iPhone Safari has no vibrate); only after a real tap
     try { var ua = navigator.userActivation; if (navigator.vibrate && !REDUCED && (!ua || ua.hasBeenActive)) navigator.vibrate([30, 40, 60]); } catch (e) { /* not supported */ }
   }
-  // v13: cards stay ~8 s. The timer pauses while a finger / mouse / keyboard focus is on the card (e.g. picking a tag)
-  // and resumes when it leaves (at least 2.5 s left). Done / ✕ always close at once.
+  // v15: thank-you / rate cards no longer close by themselves (a shrinking bar that stops when touched looked like a bug):
+  // they close with Done, ✕ or a tap outside. Only the decoration card that SHARES by itself after 8 s keeps a timer, with
+  // words: "Shares in 5 s", and "⏸ Paused" + a dimmed bar while a finger / mouse / focus is on it (resumes with ≥ 2.5 s left).
   var CARD_MS = 8000;
   var cardT = { onEnd: null, ms: 0, left: 0, end: 0, paused: false, holds: 0 };
   function cardBar(frac, ms) {
@@ -557,6 +571,19 @@
     cardBar(cardT.left / cardT.ms, cardT.left);
     $('markCard').dataset.timer = 'running';
     openMarkCard.timer = setTimeout(function () { cardT.onEnd(); }, cardT.left);
+    cardLabel();
+  }
+  function cardLabel() {
+    clearInterval(cardLabel.iv);
+    var lbl = $('markCardTimer');
+    if (cardT.paused) { lbl.textContent = t('cardPaused'); return; }
+    var tick = function () { lbl.textContent = t('cardSharesIn', { s: Math.max(1, Math.ceil((cardT.end - Date.now()) / 1000)) }); };
+    tick(); cardLabel.iv = setInterval(tick, 250);
+  }
+  function stillCard() {                               // v15: no auto-close, no bar
+    clearTimeout(openMarkCard.timer); clearInterval(cardLabel.iv);
+    cardT.onEnd = null; cardT.paused = false;
+    $('markCard').dataset.timer = 'off';
   }
   function armCardTimer(onEnd, ms) {
     cardT.onEnd = onEnd || closeMarkCard; cardT.ms = cardT.left = ms || CARD_MS; cardT.holds = 0;
@@ -568,6 +595,7 @@
     cardT.paused = true; cardT.left = Math.max(0, cardT.end - Date.now());
     cardBar(cardT.left / cardT.ms, 0);
     $('markCard').dataset.timer = 'paused';
+    cardLabel();
   }
   function resumeCard() {
     if ($('markCard').hidden || !cardT.paused) return;
@@ -584,23 +612,22 @@
     b.hidden = !o.badge;
     if (o.badge) b.textContent = t('badgeNew', { icon: o.badge.icon, name: t(o.badge.key) });
     $('markCardTags').hidden = false;
-    $('markCardGift').hidden = false;
     $('markCardDone').textContent = t('done');
     renderTagRow();
     card.hidden = false;
-    armCardTimer();                                  // closes by itself after ~8 s so the family can keep walking
+    stillCard();                                     // v15: stays until Done / ✕ / a tap outside
   }
   function openRateCard(reason, waitMs) {
     var card = $('markCard');
     card.dataset.kind = 'rate';
     $('markCardTitle').textContent = t('rateTitle');
     $('markCardText').textContent = reason === 'zone' ? t('rateZoneFriendly') : t('rateDeviceFriendly', { m: waitText(waitMs) });
-    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardGift').hidden = true; $('markCardTags').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
     $('markCardDone').textContent = t('done');
     card.hidden = false;
-    armCardTimer();
+    stillCard();
   }
-  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); cardT.onEnd = null; cardT.paused = false; pendingDecor = null; }
+  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); clearInterval(cardLabel.iv); cardT.onEnd = null; cardT.paused = false; pendingDecor = null; }
   (function () {
     var card = $('markCard'), inCard = function (e) { return !e.target.closest('#markCardDone, #markCardClose'); };
     card.addEventListener('pointerdown', function (e) { if (inCard(e)) pauseCard(); });
@@ -610,6 +637,10 @@
     document.addEventListener('pointercancel', function () { setTimeout(resumeCard, 0); });
     card.addEventListener('focusin', function (e) { if (e.target.closest('.tagbtn')) pauseCard(); });
     card.addEventListener('focusout', function (e) { if (!card.contains(e.relatedTarget)) resumeCard(); });
+    document.addEventListener('pointerdown', function (e) {   // v15: a tap outside closes a card that has no timer
+      if (card.hidden || card.dataset.timer !== 'off' || card.contains(e.target)) return;
+      closeMarkCard();
+    });
   })();
 
   // ---- personal badges (this phone only; demo keeps its own count)
@@ -710,12 +741,13 @@
   function renderPhase() {
     var ph = LIB.appPhase(phaseNow()), test = markMode() === 'test', dec = bigIsDecor();
     var line = ph === 'decor' ? t(favOn() ? 'phasePreFav' : 'phasePre') : ph === 'night' ? t('phaseOn') : '';
-    $('phaseBanner').hidden = !line && !test;
+    $('phaseBanner').hidden = !line;                     // v15: one short line; test days live in the 🧪 chip
     $('phaseBanner').dataset.phase = ph;
     $('phaseLine').textContent = line; $('phaseLine').hidden = !line;
-    $('phaseTestLine').textContent = t('phaseTest'); $('phaseTestLine').hidden = !test;
     var b = $('markBtn');
     b.classList.toggle('mb-decor', dec);
+    document.querySelector('.tab-mark').classList.toggle('tab-decor', dec);
+    if (renderPhase.dec !== dec) { var first = renderPhase.dec === undefined; renderPhase.dec = dec; if (!first) renderLayerBar(); }   // 3 PM Oct 31: main chips swap   // v15: the Mark tab wears the big button's colour
     b.querySelector('.mb-icon').textContent = dec ? '🎃' : '✨';
     $('mbMain').textContent = dec ? t('decorMain') : t('markBtn');
     $('mbSub').textContent = dec ? t('decorSub') : t('markSub');
@@ -723,14 +755,17 @@
     alt.classList.toggle('fab-fun', dec);
     $('altLabel').textContent = dec ? t(test ? 'altFunTest' : 'altFunPractice') : t('decorBtn');
     alt.hidden = !!tourZones || (!dec && !decorOpen);
+    b.dataset.tipKey = dec ? 'tip_markDecor' : 'tip_markFun';
+    alt.dataset.tipKey = dec ? 'tip_altFun' : 'tip_altDecor';
     $('decorPanelBtn').disabled = !decorOpen;
   }
   function renderDecorBtn() { renderPhase(); }
   // The banner links to the "What's different on Oct 31" section: a jump button before Halloween, opened right there on the night.
+  // v15: 4 one-line bullets; the longer explanation sits behind "More details" (opened at the Oct 31 section on the night).
   function openPhaseCard() {
-    var list = $('phaseList'), win = String(CFG.markWindowMin || 45);
-    list.textContent = '';
-    list.appendChild(el('button', { type: 'button', class: 'btn btn-small phase-jump', text: t('phaseJump'), onclick: function () { jumpOct31(); } }));
+    var list = $('phaseList'), win = String(CFG.markWindowMin || 45), bl = $('phaseBullets');
+    list.textContent = ''; bl.textContent = '';
+    t('phaseBullets').forEach(function (x, i) { if (i !== 1 || favOn()) bl.appendChild(el('li', { text: x })); });
     var items = t('phaseItems').slice(), oct31 = items[1][0];
     if (favOn()) {                                      // v14: the past-years board, and what it does on Oct 31
       items[1] = [items[1][0], items[1][1].concat(t('phaseOct31Fav'))];
@@ -742,14 +777,17 @@
       list.appendChild(el('dd', null, [body]));
     });
     $('phaseDecor').hidden = !LIB.decorVisible(Date.now(), DEMO);
-    $('phaseFav').hidden = !favOn();
+    $('phaseFav').hidden = true;                        // v15: one primary action here; Past favourites is a layer chip
     closeMarkCard();
     $('phaseCard').hidden = false;
     $('phaseOk').focus();
-    if (LIB.appPhase(phaseNow()) !== 'decor') jumpOct31(); else $('phaseCard').scrollTop = 0;
+    var night = LIB.appPhase(phaseNow()) !== 'decor';
+    $('phaseMore').open = night;
+    if (night) jumpOct31(); else $('phaseCard').scrollTop = 0;
   }
   function jumpOct31() {
     var h = $('phaseOct31'); if (!h) return;
+    $('phaseMore').open = true;
     $('phaseCard').scrollTop = h.offsetTop - 8;
     h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash');
   }
@@ -778,10 +816,10 @@
     card.dataset.kind = 'rate';
     $('markCardTitle').textContent = t('rateTitle');
     $('markCardText').textContent = t(reason === 'day' ? 'decorRateDay' : 'decorRateZone');
-    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardGift').hidden = true; $('markCardTags').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
     $('markCardDone').textContent = t('done');
     card.hidden = false;
-    armCardTimer();
+    stillCard();
   }
   function pendDecor(pos) {
     if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('markOutside'), 6000); return; }
@@ -792,7 +830,7 @@
     card.dataset.kind = 'decorPending';
     $('markCardTitle').textContent = t('decorPendTitle');
     $('markCardText').textContent = t('decorPending');
-    $('markCardProg').textContent = ''; $('markCardProg').className = 'mc-prog'; $('markCardBadge').hidden = true; $('markCardGift').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardProg').className = 'mc-prog'; $('markCardBadge').hidden = true;
     $('markCardTags').hidden = false;
     $('markCardDone').textContent = t('decorShareNow');
     renderTagRow();
@@ -828,10 +866,9 @@
       $('markCardText').textContent = t('decorThanks');
       $('markCardProg').textContent = '…';
       $('markCardTags').hidden = true;
-      $('markCardGift').hidden = false;
       $('markCardDone').textContent = t('done');
       celebrate(); buzz(); SFX.play('twinkle');
-      armCardTimer();
+      stillCard();
       refreshDecor().then(function () { showDecorProgress(d.cell, before); });
     }, function (e) {
       $('markCardDone').disabled = false;
@@ -1112,9 +1149,10 @@
   $('buildBtn').addEventListener('click', buildLoop);
   function drawRoute(res) {
     routeLayer.clearLayers();
-    var line = L.polyline(res.line, { color: '#ff7a18', weight: 6, opacity: 0.95, className: 'route-line', dashArray: res.method === 'straight' ? '10 10' : null }).addTo(routeLayer);
+    var line = L.polyline(res.line, { color: '#eef2f8', weight: 5,   // v15: white route; orange = fun streets only
+      opacity: 0.95, className: 'route-line', dashArray: res.method === 'straight' ? '10 10' : null }).addTo(routeLayer);
     res.cp.waypoints.slice(1, -1).forEach(function (p, i) {
-      L.circleMarker(p, { radius: 9, color: '#fff', weight: 2, fillColor: '#a855f7', fillOpacity: 1 })
+      L.circleMarker(p, { radius: 9, color: '#0f1626', weight: 2, fillColor: '#eef2f8', fillOpacity: 1 })
         .bindTooltip(String(i + 1), { permanent: true, direction: 'center', className: 'area-label' }).addTo(routeLayer);
     });
     if (res.cp.drive) {
@@ -1566,6 +1604,8 @@
     var items = t('privacyItems').slice();
     if (favOn()) items.splice(6, 0, t('privacyFav'));   // v14: after "Decoration marks"
     items.forEach(function (it) { dl.appendChild(el('dt', { text: it[0] })); dl.appendChild(el('dd', { text: it[1] })); });
+    var sum = $('privacySummary'); sum.textContent = '';    // v15: 5-line summary; the full notice (unchanged) sits behind "Full privacy notice"
+    t('privacySummary').forEach(function (x) { sum.appendChild(el('li', { text: x })); });
   }
   document.querySelectorAll('.privacy-link').forEach(function (b) { b.addEventListener('click', function () { openTab('privacy'); }); });
   function toggleTab(name) { openTab(currentTab === name && $('sheet').dataset.open === 'true' ? null : name); }
@@ -1585,11 +1625,7 @@
     toast(t(on ? 'soundToastOn' : 'soundToastOff'), 1800);
     if (on) SFX.play('chime');                         // the tap itself is the user action
   });
-  $('helpBtn').addEventListener('click', function () { toggleTab('guide'); });
-  // v14: 🏆 opens "Best streets from past years" once the server has it (the parent board is linked from there)
-  $('boardBtn').addEventListener('click', function () { toggleTab(favOn() ? 'fav' : 'board'); });
-  $('guideBoard').addEventListener('click', function () { openTab(favOn() ? 'fav' : 'board'); });
-  $('guideSafety').addEventListener('click', function () { openTab('safety'); });
+  // v15: the top bar keeps brand, status chip, Safety, 🔊 and 中文. Demo / How-to live in the Guide tab; Past favourites is a layer chip.
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
@@ -1647,20 +1683,11 @@
     $('sheetHandle').setAttribute('aria-label', t('sheetToggle'));
     $('postBody').placeholder = t('composePh');
     $('suggestReason').placeholder = t('suggestPh');
-    $('helpBtn').setAttribute('aria-label', t('helpAria')); $('helpBtn').title = t('helpAria');
-    $('boardBtn').setAttribute('aria-label', t('boardAria')); $('boardBtn').title = t('boardAria');
     $('markCardClose').setAttribute('aria-label', t('close'));
     renderSoundBtn();
-    $('tourBtn').setAttribute('aria-label', t('tourAria')); $('tourBtn').title = t('tourAria');
-    ['practiceChip', 'offlineChip'].forEach(function (id) {   // "🧪 Practice mode": the words hide on narrow screens, the icon stays
-      var s = t(id), i = s.indexOf(' '), b = $(id);
-      b.textContent = '';
-      b.appendChild(el('span', { 'aria-hidden': 'true', text: s.slice(0, i) }));
-      b.appendChild(el('span', { class: 'chip-txt', text: s.slice(i + 1) }));
-      b.setAttribute('aria-label', s.slice(i + 1)); b.title = s.slice(i + 1);
-    });
+    $('offlineChip').textContent = t('offlineChip');      // v15: short words, always visible (no icon-only state)
+    renderChips();
     $('fbNameIn').placeholder = t('fbName');
-    document.querySelectorAll('.ibtn').forEach(function (b) { b.setAttribute('aria-label', t('infoAria')); });
   }
   function renderAll() {
     applyStaticText();
@@ -1768,7 +1795,7 @@
   }
   var TOUR_ACTIONS = {
     setup: function () {
-      map.closePopup(); closeMarkCard(); closeHints(null); setMode(null);
+      map.closePopup(); closeMarkCard(); hideTip(); setMode(null);
       if (!$('guide').hidden) closeGuide('done');
       layerOn.zones = true; applyLayers();                  // in memory only (setLayer would save it)
       tourReset();
@@ -1808,7 +1835,6 @@
   var tour = window.TOT_TOUR ? window.TOT_TOUR.mount({ t: t, reduced: REDUCED, snapshot: tourSnapshot, restore: tourRestore, rect: tourRect,
     run: function (name) { if (TOUR_ACTIONS[name]) TOUR_ACTIONS[name](); } }) : null;
   function startTour(i, pause) { if (tour) tour.start(i || 0, pause); }
-  $('tourBtn').addEventListener('click', function () { startTour(); });
   $('guideTour').addEventListener('click', function () { startTour(); });
 
   // ==== welcome guide, How-to panel, inline hints ====
@@ -1822,15 +1848,17 @@
       var card = el('section', { class: 'gcard', 'aria-labelledby': 'gcardH' + i }, [
         el('div', { class: 'gnum mono', text: '0' + (i + 1) }),
         el('h2', { id: 'gcardH' + i, text: c[0] }),
-        el('ul', { class: 'glist' }, (i === 0 && favOn() ? c[1].concat(t('guideFavLine')) : i === 3 ? c[1].concat(t('guideSoundLine')) : c[1]).map(function (line) { return el('li', { text: line }); }))
+        el('ul', { class: 'glist' }, c[1].map(function (line) { return el('li', { text: line }); }))
       ]);
-      if (i === 0) card.appendChild(el('div', { class: 'gbtn-demo gbtn-decor', 'aria-hidden': 'true' }, [el('span', { text: '🎃 ' + t('decorMain') })]));
-      if (i === 1) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
+      // v15: 3 cards. 1 = what the colours mean, 2 = the two buttons, 3 = safety + the 25-second demo.
+      if (i === 0) card.appendChild(el('div', { class: 'glegend', 'aria-hidden': 'true' }, ['quiet', 'lively', 'hot'].map(function (k) {
         return el('span', null, [el('i', { class: 'lg lg-' + k }), t(BUCKET_KEY[k])]);
-      }))));
-      if (i === 1) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
+      }).concat(el('span', null, [el('i', { class: 'lg lg-decor' }), t('legendDecor')]))));
+      if (i === 1) card.appendChild(el('div', { class: 'gbtn-pair', 'aria-hidden': 'true' }, [
+        el('div', { class: 'gbtn-demo gbtn-decor' }, [el('span', { text: t('decorMain') })]),
+        el('div', { class: 'gbtn-demo' }, [el('span', { text: t('markBtn') })])]));
+      if (i === 2) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
         onclick: function () { closeGuide('done'); startTour(); } }));
-      if (i === 2) card.appendChild(el('div', { class: 'gbtn-demo', 'aria-hidden': 'true' }, [el('span', { text: '✨ ' + t('markBtn') })]));
       track.appendChild(card);
       dotBox.appendChild(el('button', { type: 'button', class: 'gdot', 'aria-label': t('guideDotAria', { n: i + 1 }), onclick: function () { guideGo(i); } }));
     });
@@ -1869,6 +1897,7 @@
     if ($('guide').hidden) return;
     $('guide').hidden = true;
     LIB.markGuideSeen(safeLS(), how);
+    setTimeout(maybeTipHint, 600);                      // v15: the one-time "press and hold" hint comes right after the welcome
     if (guideReturn && guideReturn.focus && document.contains(guideReturn)) guideReturn.focus();
     guideReturn = null;
   }
@@ -1909,7 +1938,6 @@
       var di = secs.map(function (x) { return x[0]; }).findIndex(function (h) { return h.indexOf('🎃') === 0; });
       secs.splice(di + 1, 0, t('howtoFav'));
     }
-    secs.splice(secs.length - 1, 0, t('howtoSound'));   // v14 sounds, just before Privacy
     secs.forEach(function (sec) {
       box.appendChild(el('h3', { text: sec[0] }));
       box.appendChild(el('ul', null, sec[1].map(function (line) { return el('li', { text: line }); })));
@@ -1917,24 +1945,97 @@
   }
   $('replayGuide').addEventListener('click', openGuide);
 
-  // ⓘ hints: tap to show a one-line note, tap again (or Esc) to hide. The big-button hint shows until the first mark.
-  $('markHintBtn').hidden = !!lsGet(STORE.markHint, false);
-  function closeHints(except) {
-    document.querySelectorAll('.ibtn').forEach(function (b) {
-      if (b === except) return;
-      b.setAttribute('aria-expanded', 'false');
-      $(b.getAttribute('aria-controls')).hidden = true;
-    });
+  // ==== v15: tooltips on every clickable element ====
+  // Desktop: hover (~400 ms) or keyboard focus. Phones: press and hold ~500 ms shows the tip and does NOT act (the click
+  // that follows is swallowed). One line, EN/ZH, never over the element, gone after 2.5 s, linked with aria-describedby.
+  var TIP_IDS = { safetyBtn: 'tip_safety', langBtn: 'tip_lang', offlineChip: 'tip_offline', demoChip: 'tip_demo', phaseBanner: 'tip_banner',
+    nearChip: 'tip_near', layerMore: 'tip_more', locateBtn: 'tip_locate', sharedChip: 'tip_shared', legend: 'tip_legend', favPinBtn: 'tip_favPin',
+    guideTour: 'tip_tour', replayGuide: 'tip_replay', feedbackBtn: 'tip_feedback', shareAppBtn: 'tip_shareApp', phaseOk: 'tip_phaseOk',
+    markCardDone: 'tip_done', markCardClose: 'tip_close', phaseClose: 'tip_close' };
+  var TIP_SEL = 'button, a[href], summary, select, .legend, .leaflet-marker-icon, .leaflet-control-zoom a';
+  var TIP_MS = 2500, PRESS_MS = 500, HOVER_MS = 400;
+  var tipEl = $('tip'), tipFor = null, tipHide = null, pressT = null, pressAt = null, swallowClick = false, hoverT = null;
+  function tipTarget(n) { return n && n.closest ? n.closest(TIP_SEL) : null; }
+  function tipText(n) {
+    var win = String(CFG.markWindowMin || 45), k = null;
+    if (n.id === 'soundBtn') k = SFX.isOn() ? 'tip_soundOn' : 'tip_soundOff';
+    else if (n.dataset && n.dataset.tipKey) k = n.dataset.tipKey;
+    else if (TIP_IDS[n.id]) k = TIP_IDS[n.id];
+    else if (n.dataset && n.dataset.tab) k = 'tip_tab_' + n.dataset.tab;
+    else if (n.classList.contains('leaflet-control-zoom-in')) k = 'tip_zoomIn';
+    else if (n.classList.contains('leaflet-control-zoom-out')) k = 'tip_zoomOut';
+    else if (n.querySelector && n.querySelector('.favb-cluster')) k = 'tip_favCluster';
+    else if (n.querySelector && n.querySelector('.favb')) k = 'tip_fav';
+    else if (n.querySelector && n.querySelector('.zb-decor')) k = 'tip_decorBadge';
+    else if (n.querySelector && n.querySelector('.zbadge')) k = 'tip_zone';
+    if (k && I18N.en[k]) return t(k).replace('{win}', win);
+    return n.getAttribute('aria-label') || n.getAttribute('title') || (n.textContent || '').trim().slice(0, 60);   // text buttons: their own words
   }
-  document.querySelectorAll('.ibtn').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var open = b.getAttribute('aria-expanded') !== 'true';
-      closeHints(b);
-      b.setAttribute('aria-expanded', String(open));
-      $(b.getAttribute('aria-controls')).hidden = !open;
-    });
+  function showTip(n) {
+    var txt = tipText(n); if (!txt) return;
+    hideTip();
+    tipEl.textContent = txt; tipEl.hidden = false;
+    var r = n.getBoundingClientRect(), tw = tipEl.offsetWidth, th = tipEl.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    var top = r.top - th - 8;                            // above the element; below it if there is no room; never on top of it
+    if (top < 4) top = Math.min(r.bottom + 8, vh - th - 4);
+    var left = Math.max(6, Math.min(vw - tw - 6, r.left + r.width / 2 - tw / 2));
+    tipEl.style.top = Math.round(top) + 'px'; tipEl.style.left = Math.round(left) + 'px';
+    tipEl.classList.toggle('tip-below', top > r.top);
+    tipFor = n; n.setAttribute('aria-describedby', 'tip');
+    tipHide = setTimeout(hideTip, TIP_MS);
+  }
+  function hideTip() {
+    clearTimeout(tipHide); tipHide = null;
+    if (tipFor && tipFor.getAttribute('aria-describedby') === 'tip') tipFor.removeAttribute('aria-describedby');
+    tipFor = null; if (tipEl) tipEl.hidden = true;
+  }
+  function cancelPress() { clearTimeout(pressT); pressT = null; pressAt = null; }
+  document.addEventListener('pointerdown', function (e) {
+    hideTipHint();
+    if (e.pointerType === 'mouse') return;
+    var n = tipTarget(e.target); if (!n) return;
+    cancelPress(); pressAt = [e.clientX, e.clientY];
+    pressT = setTimeout(function () { pressT = null; swallowClick = true; showTip(n); buzz(); }, PRESS_MS);
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (pressAt && Math.hypot(e.clientX - pressAt[0], e.clientY - pressAt[1]) > 10) cancelPress();   // a drag/scroll, not a hold
+  }, true);
+  document.addEventListener('pointerup', cancelPress, true);
+  document.addEventListener('pointercancel', cancelPress, true);
+  document.addEventListener('click', function (e) {     // the click after a long-press only shows the tip
+    if (!swallowClick) return;
+    swallowClick = false; e.preventDefault(); e.stopPropagation();
+  }, true);
+  document.addEventListener('contextmenu', function (e) { if (tipTarget(e.target)) e.preventDefault(); });
+  document.addEventListener('pointerover', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    var n = tipTarget(e.target); if (!n || n === tipFor) return;
+    clearTimeout(hoverT); hoverT = setTimeout(function () { showTip(n); }, HOVER_MS);
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHints(null); closeMarkCard(); closePhaseCard(); } });
+  document.addEventListener('pointerout', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    var n = tipTarget(e.target); if (!n || (e.relatedTarget && n.contains(e.relatedTarget))) return;
+    clearTimeout(hoverT); if (tipFor === n) hideTip();
+  });
+  document.addEventListener('focusin', function (e) {
+    var n = tipTarget(e.target); if (!n) return;
+    try { if (!n.matches(':focus-visible')) return; } catch (x) { /* old browsers: show on focus */ }
+    showTip(n);
+  });
+  document.addEventListener('focusout', function (e) { if (tipFor && tipFor === tipTarget(e.target)) hideTip(); });
+  window.addEventListener('scroll', hideTip, true);
+  // One-time hint on the first visit (after the welcome cards): "Press and hold any button for a tip".
+  var tipHintT = null;
+  function hideTipHint() { var h = $('tipHint'); if (h && !h.hidden) { h.hidden = true; clearTimeout(tipHintT); } }
+  function maybeTipHint() {
+    if (lsGet(STORE.tipHint, false) || !$('guide').hidden || !$('tour').hidden) return;
+    lsSet(STORE.tipHint, true);
+    var hover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches, h = $('tipHint');
+    h.textContent = '👆 ' + t(hover ? 'tipHintHover' : 'tipHint'); h.hidden = false;
+    tipHintT = setTimeout(hideTipHint, 6000);
+  }
+
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { hideTip(); closeMarkCard(); closePhaseCard(); } });
 
   // ?demo=1: frame every visible demo zone (3+ marks) and suggestion so no hexagon or badge sits under the chips, legend or Mark button.
   function fitDemoZones() {
@@ -1996,7 +2097,7 @@
   langReady.then(function () {                          // welcome cards / deep links only after English / 中文 is chosen
     if (FLAGS.howto) openTab('guide');
     if (FLAGS.feedback) openTab('feedback');
-    if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide();
+    if (LIB.shouldShowGuide(FLAGS, LIB.guideSeen(safeLS()))) openGuide(); else setTimeout(maybeTipHint, 1500);
     if (DEMO && FLAGS.nudge) setTimeout(function () { checkNudge(true); }, 1500);   // ?demo=1&nudge=1 previews the hint
   });
 

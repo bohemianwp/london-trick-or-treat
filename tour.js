@@ -12,7 +12,7 @@
   // beats = [[at ms, action]] inside a step. Step 4: a mark drops in and the zone goes 2 → 3 (lights up, NEW) → 4 → 5.
   var TIMELINE = [
     { target: '#legend', cap: 'tour1', act: 'zones', ms: 4000 },
-    { target: '#nearChip', cap: 'tour2', act: 'map', ms: 3000 },
+    { target: '#locateBtn', cap: 'tour2', act: 'map', ms: 3000 },
     { target: '#markBtn', cap: 'tour3', act: 'map', ms: 3500 },
     { target: '#map', cap: 'tour4', act: 'markStart', ms: 6500, beats: [[700, 'markDrop'], [2600, 'markDrop'], [4400, 'markDrop']] },
     { target: '[data-tab="route"]', cap: 'tour5', act: 'map', ms: 3000 },

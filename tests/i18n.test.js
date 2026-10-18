@@ -63,22 +63,23 @@ test('no house / live-dot strings are left over from v2', () => {
   }
 });
 
-test('big kid-friendly wording from the spec, in both languages', () => {
-  assert.equal(I18N.en.markBtn, 'Great street? Share it! 🎁');
-  assert.equal(I18N.zh.markBtn, '这条街不错？分享给大家！🎁');
+test('big kid-friendly wording from the spec, in both languages (v15 short copy)', () => {
+  assert.equal(I18N.en.markBtn, 'Fun street? Share it 🔥');
+  assert.equal(I18N.zh.markBtn, '这条街好玩？分享 🔥');
   assert.deepEqual([I18N.en.tag_candy, I18N.en.tag_decor, I18N.en.tag_crowded], ['Lots of candy', 'Great decorations', 'Crowded']);
   assert.deepEqual([I18N.zh.tag_candy, I18N.zh.tag_decor, I18N.zh.tag_crowded], ['糖很多', '装饰超棒', '人很多']);
   assert.deepEqual([I18N.en.tabMap, I18N.en.tabRoute, I18N.en.tabMark, I18N.en.tabGuide], ['Map', 'Route', 'Mark it!', 'Guide']);
   assert.deepEqual([I18N.zh.tabMap, I18N.zh.tabRoute, I18N.zh.tabMark, I18N.zh.tabGuide], ['地图', '路线', '标记！', '指南']);
-  assert.deepEqual([I18N.en.legendQuiet, I18N.en.legendLively, I18N.en.legendHot], ['Quiet', 'Lively', 'Super hot']);
-  assert.deepEqual([I18N.zh.legendLively, I18N.zh.legendHot], ['很热闹', '超级火爆']);
-  assert.equal(I18N.en.zoneCount.replace('{n}', 23), '🔥 23 marked');
-  assert.equal(I18N.zh.zoneCount.replace('{n}', 23), '🔥 23 人标记');
+  assert.deepEqual([I18N.en.legendQuiet, I18N.en.legendLively, I18N.en.legendHot, I18N.en.legendDecor], ['Quiet', 'Busy', 'Very busy', 'Decorations']);
+  assert.deepEqual([I18N.zh.legendLively, I18N.zh.legendHot, I18N.zh.legendDecor], ['热闹', '非常热闹', '装饰']);
+  assert.equal(I18N.en.zoneCount.replace('{n}', 23), '🔥 23 now');
+  assert.equal(I18N.zh.zoneCount.replace('{n}', 23), '🔥 现在 23');
+  assert.equal(I18N.en.decorBadge.replace('{n}', 14), '🎃 14 likes'); assert.equal(I18N.zh.decorBadge.replace('{n}', 14), '🎃 14 个赞');
   assert.equal(I18N.en.newBadge, 'NEW'); assert.equal(I18N.zh.newBadge, '新发现');
-  assert.equal(I18N.en.practiceChip, '🧪 Practice mode'); assert.equal(I18N.zh.practiceChip, '🧪 练习模式');
+  assert.equal(I18N.en.practiceChip, '🧪 Practice'); assert.equal(I18N.zh.practiceChip, '🧪 练习');
+  assert.equal(I18N.en.testChip, '🧪 Test days'); assert.equal(I18N.zh.testChip, '🧪 试用期');
   assert.equal(I18N.en.nearBtn, '📍 Near me'); assert.equal(I18N.zh.layerNear, '我附近');
   assert.equal(I18N.en.suggestBtn, '📌 Suggest an area'); assert.equal(I18N.zh.suggestBtn, '📌 推荐一个区域');
   assert.equal(I18N.en.communityTag, 'Community suggested'); assert.equal(I18N.zh.communityTag, '社区推荐');
-  assert.equal(I18N.en.notOnMap, 'Your area isn’t on the map? Mark it! Once 3 people mark it, it lights up.');
-  assert.equal(I18N.zh.notOnMap, '你家附近不在地图上？标记它！3 个人标记后就会亮起来。');
+  assert.equal(I18N.en.notOnMap, 'Your street isn’t lit? Share it. 3 marks light it up.');
 });

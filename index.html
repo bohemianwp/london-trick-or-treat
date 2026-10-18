@@ -11,24 +11,21 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=14.1">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
   <header class="topbar">
     <h1 class="brand">🎃 <span data-i18n="appTitle">Mark it! London</span></h1>
     <span id="demoChip" class="chip chip-demo" data-i18n="demoChip" hidden>DEMO</span>
-    <button id="practiceChip" class="chip chip-practice chip-split" type="button" hidden>🧪 Practice mode</button>
-    <button id="offlineChip" class="chip chip-off chip-split" type="button" hidden>📴 Offline mode</button>
-    <button id="boardBtn" class="chip chip-icon" type="button" aria-controls="panel-board"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg></button>
+    <button id="practiceChip" class="chip chip-practice" type="button" hidden>🧪 Practice mode</button>
+    <button id="offlineChip" class="chip chip-off" type="button" hidden>📴 Offline mode</button>
     <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">Safety</button>
-    <button id="tourBtn" class="chip chip-help chip-tour" type="button" aria-controls="tour"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor" stroke="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
-    <button id="helpBtn" class="chip chip-help" type="button" aria-label="How to use this map" aria-controls="panel-guide">?</button>
     <button id="soundBtn" class="chip chip-icon chip-sound" type="button" aria-pressed="true"></button>
     <button id="langBtn" class="chip" type="button">中文</button>
   </header>
   <div id="countdown" class="countdown" role="timer"></div>
   <button id="phaseBanner" class="phasebanner" type="button" aria-haspopup="dialog" aria-controls="phaseCard" hidden>
-    <span id="phaseLine" class="pb-line"></span><span id="phaseTestLine" class="pb-test" hidden></span>
+    <span id="phaseLine" class="pb-line"></span>
   </button>
 
   <div class="mapwrap">
@@ -36,19 +33,18 @@
     <div class="hud" aria-hidden="true"><div class="hud-grid"></div><div class="hud-sweep"></div></div>
 
     <div id="layerbar" class="layerbar" role="group">
-      <button id="nearChip" class="lchip lchip-near" type="button"><span class="li li-near" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span data-i18n="layerNear">Near me</span></button>
+      <button id="layerMore" class="lchip lchip-more" type="button" aria-expanded="false" aria-controls="layerbar"><span data-i18n="layerMore">More</span> <span class="lm-arrow" aria-hidden="true">▾</span></button>
+      <button id="nearChip" class="lchip lchip-near lchip-sec" type="button" hidden><span class="li li-near" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span data-i18n="layerNear">Near me</span></button>
     </div>
     <div id="legend" class="legend">
       <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
       <span><i class="lg lg-lively"></i><span data-i18n="legendLively">Lively</span></span>
       <span><i class="lg lg-hot"></i><span data-i18n="legendHot">Super hot</span></span>
       <span id="legendDecor" hidden><i class="lg lg-decor"></i><span data-i18n="legendDecor">Decor</span></span>
-      <button class="ibtn" type="button" aria-expanded="false" aria-controls="hintLegend" aria-label="What is this?">i</button>
-      <p id="hintLegend" class="hint-pop legend-pop" role="note" data-i18n="hintLegend" hidden></p>
     </div>
 
-    <button id="locateBtn" class="fab" type="button">
-      <span class="fab-icon"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span id="locateLabel" data-i18n="showMyLocation">Show my location</span>
+    <button id="locateBtn" class="fab fab-round" type="button">
+      <span class="fab-icon"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span id="locateLabel" class="sr-only" data-i18n="showMyLocation">Show my location</span>
     </button>
     <button id="altBtn" class="fab fab-decor" type="button" hidden><span id="altLabel">Cool decorations here! 🎃</span></button>
 
@@ -59,8 +55,6 @@
       </button>
       <button id="sharedChip" class="sharedchip" type="button" hidden></button>
       <p id="nudge" class="nudge" role="status" hidden></p>
-      <button id="markHintBtn" class="ibtn ibtn-mark" type="button" aria-expanded="false" aria-controls="hintMark" aria-label="What is this?" hidden>i</button>
-      <p id="hintMark" class="hint-pop mark-pop" role="note" data-i18n="hintMark" hidden></p>
     </div>
 
     <div id="markCard" class="markcard" role="dialog" aria-labelledby="markCardTitle" hidden>
@@ -69,12 +63,11 @@
       <p id="markCardText" class="mc-text"></p>
       <p id="markCardProg" class="mc-prog" aria-live="polite"></p>
       <p id="markCardBadge" class="mc-badge" hidden></p>
-      <p id="markCardGift" class="mc-gift" data-i18n="giftLine" hidden></p>
       <div id="markCardTags">
         <div class="mc-label" data-i18n="tagsAsk">Optional: anything special?</div>
         <div id="tagRow" class="tagrow"></div>
       </div>
-      <div class="mc-timer" aria-hidden="true"><i id="markCardBar"></i></div>
+      <div class="mc-timerrow"><div class="mc-timer" aria-hidden="true"><i id="markCardBar"></i></div><span id="markCardTimer" class="mc-timerlbl"></span></div>
       <button id="markCardDone" class="btn btn-primary btn-block" type="button" data-i18n="done">Done</button>
     </div>
     <div id="burst" class="burst" aria-hidden="true"></div>
@@ -82,7 +75,8 @@
     <div id="phaseCard" class="markcard phasecard" role="dialog" aria-labelledby="phaseTitle" hidden>
       <div class="mc-top"><b id="phaseTitle" data-i18n="phaseTitle">Two ways to help</b>
         <button id="phaseClose" class="mc-x" type="button" aria-label="Close">✕</button></div>
-      <dl id="phaseList" class="phaselist"></dl>
+      <ul id="phaseBullets" class="phasebullets"></ul>
+      <details id="phaseMore" class="phasemore"><summary data-i18n="phaseMoreLbl">More details</summary><dl id="phaseList" class="phaselist"></dl></details>
       <p id="phaseGift" class="mc-gift" data-i18n="giftLine"></p>
       <div class="row row-tight">
         <button id="phaseDecor" class="btn btn-decor" type="button" data-i18n="phaseSeeDecor">🎃 See Best decorations</button>
@@ -144,14 +138,13 @@
 
       <!-- BEST STREETS FROM PAST YEARS (v14) -->
       <div class="panel" id="panel-fav" hidden>
-        <h2 data-i18n="favTitle">💬 Best streets from past years</h2>
+        <h2 data-i18n="favTitle">💬 Past favourites</h2>
         <p class="hint" data-i18n="favIntro"></p>
         <button id="favPinBtn" class="btn btn-primary btn-block" type="button" data-i18n="favPinBtn">📍 Pin a favourite street</button>
         <p id="favStatus" class="info" hidden></p>
         <h3 data-i18n="favTop">Most loved</h3>
         <ul id="favList" class="near-list"></ul>
         <p class="hint" data-i18n="favRules"></p>
-        <p class="hint mc-gift" data-i18n="giftLine"></p>
         <button id="favBoardLink" class="btn btn-small btn-ghost" type="button" data-i18n="favBoardLink">🏆 Parent board (text posts)</button>
       </div>
 
@@ -197,14 +190,10 @@
         <h2 data-i18n="howtoTitle">How to use this map</h2>
         <p class="hint" data-i18n="howtoIntro"></p>
         <button id="guideTour" class="btn btn-primary btn-block" type="button" data-i18n="tourBtn">▶ How to use</button>
-        <div class="row">
+        <div class="row row-tight">
+          <button id="replayGuide" class="btn" type="button" data-i18n="howtoReplay">Welcome cards</button>
           <button id="feedbackBtn" class="btn" type="button" data-i18n="fbBtn">💬 Feedback</button>
-          <button id="shareAppBtn" class="btn" type="button" data-i18n="shareAppBtn">🔗 Share this map</button>
-        </div>
-        <button id="replayGuide" class="btn btn-block" type="button" data-i18n="howtoReplay">▶ Show the welcome cards again</button>
-        <div class="row">
-          <button id="guideBoard" class="btn" type="button" data-i18n="boardLink">🏆 Board</button>
-          <button id="guideSafety" class="btn" type="button" data-i18n="safetyBtn">Safety</button>
+          <button id="shareAppBtn" class="btn" type="button" data-i18n="shareAppBtn">🔗 Share</button>
         </div>
         <div id="howtoList" class="howto"></div>
         <button class="btn btn-link privacy-link" type="button" data-i18n="privacyLink">Privacy</button>
@@ -271,7 +260,8 @@
       <div class="panel" id="panel-privacy" hidden>
         <h2 data-i18n="privacyTitle">Privacy</h2>
         <p data-i18n="privacyIntro"></p>
-        <dl id="privacyList" class="privacy"></dl>
+        <ul id="privacySummary" class="privacy-sum"></ul>
+        <details id="privacyMore" class="phasemore"><summary data-i18n="privacyFull">Full privacy notice</summary><dl id="privacyList" class="privacy"></dl></details>
       </div>
     </section>
   </div>
@@ -368,6 +358,8 @@
     </div>
   </div>
 
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+  <div id="tipHint" class="tiphint" role="status" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <noscript><p class="noscript">This app needs JavaScript. 这个 app 需要开启 JavaScript。</p></noscript>
 
@@ -375,14 +367,14 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
           integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
-  <script defer src="config.js?v=14.1"></script>
-  <script defer src="lib.js?v=14.1"></script>
-  <script defer src="i18n.js?v=14.1"></script>
-  <script defer src="data/areas.js?v=14.1"></script>
-  <script defer src="backend.js?v=14.1"></script>
-  <script defer src="hex.js?v=14.1"></script>
-  <script defer src="sfx.js?v=14.1"></script>
-  <script defer src="tour.js?v=14.1"></script>
-  <script defer src="app.js?v=14.1"></script>
+  <script defer src="config.js?v=15"></script>
+  <script defer src="lib.js?v=15"></script>
+  <script defer src="i18n.js?v=15"></script>
+  <script defer src="data/areas.js?v=15"></script>
+  <script defer src="backend.js?v=15"></script>
+  <script defer src="hex.js?v=15"></script>
+  <script defer src="sfx.js?v=15"></script>
+  <script defer src="tour.js?v=15"></script>
+  <script defer src="app.js?v=15"></script>
 </body>
 </html>

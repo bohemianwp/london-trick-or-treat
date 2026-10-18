@@ -153,7 +153,7 @@ test('tour: every target selector exists in index.html', () => {
     if (id) assert.match(html, new RegExp(`id="${id[1]}"`), s.target);
     else assert.ok(html.includes(`${attr[1]}="${attr[2]}"`), s.target);
   }
-  for (const id of ['tour', 'tourRing', 'tourCard', 'tourBar', 'tourCap', 'tourPause', 'tourSkip', 'tourReplay', 'tourNext', 'tourBack', 'tourBtn', 'guideTour'])
+  for (const id of ['tour', 'tourRing', 'tourCard', 'tourBar', 'tourCap', 'tourPause', 'tourSkip', 'tourReplay', 'tourNext', 'tourBack', 'guideTour'])
     assert.match(html, new RegExp(`id="${id}"`), id);
 });
 
@@ -253,5 +253,6 @@ test('app version matches every ?v= in index.html', () => {
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css))\?([^"]+)"/g)];
   assert.ok(own.length >= 9);
   own.forEach((m) => assert.equal(m[2], L.APP_VERSION, m[1]));
-  assert.match(html, /src="tour\.js\?v=14\.1"/);
+  assert.match(html, /src="tour\.js\?v=15"/);
+  assert.doesNotMatch(html, /id="tourBtn"/, 'v15: the demo lives in the Guide tab only');
 });

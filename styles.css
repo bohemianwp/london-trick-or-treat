@@ -871,3 +871,68 @@ textarea:focus, .select:focus, input:focus { border-color: var(--purple-2); box-
 .fav-row b { flex: none; white-space: nowrap; min-width: 0; }
 .leaflet-container a.leaflet-popup-close-button { font-size: 22px; font-weight: var(--fw); width: 40px; height: 40px; line-height: 40px; top: 4px; right: 4px; color: var(--muted); }
 .leaflet-container a.leaflet-popup-close-button:hover { color: var(--text); }
+
+/* ===== v15: less text, fewer controls, tooltips ===== */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+#locateBtn.fab-round { width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 50%; }
+#locateBtn.fab-round .fab-icon .ico { width: 22px; height: 22px; color: var(--text); }
+#locateBtn.fab-round.on { border-color: var(--orange); }
+.chip-practice, .chip-off { padding: 0 12px; font-size: var(--fs-s); font-weight: var(--fw-b); white-space: nowrap; }
+.lchip-more { color: var(--muted); }
+.lchip-more[aria-expanded="true"] { color: var(--text); border-color: #56647e; }
+.lchip[hidden] { display: none; }
+.phasebullets, .privacy-sum { list-style: none; margin: 8px 0 12px; padding: 0; }
+.phasebullets li, .privacy-sum li { font-size: var(--fs-m); line-height: 1.4; padding: 6px 0; color: var(--text); border-bottom: 1px solid var(--line); }
+.phasebullets li:last-child, .privacy-sum li:last-child { border-bottom: 0; }
+.phasemore { margin: 0 0 12px; }
+.phasemore > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--muted); font-size: var(--fs-s); font-weight: var(--fw-b); list-style: none; }
+.phasemore > summary::-webkit-details-marker { display: none; }
+.phasemore > summary::after { content: "▾"; }
+.phasemore[open] > summary::after { content: "▴"; }
+.gbtn-pair { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 16px; }
+.gbtn-pair .gbtn-demo { margin: 0; padding: 12px 20px; font-size: var(--fs-s); }
+.glegend { gap: 8px 12px; font-size: var(--fs-s); }
+.tip { position: fixed; z-index: 4000; max-width: min(80vw, 300px); padding: 8px 12px; border-radius: var(--r-m); border: 1px solid #56647e;
+  background: var(--surface-3); color: var(--text); font-size: var(--fs-s); font-weight: var(--fw-b); line-height: 1.35; box-shadow: var(--elev); pointer-events: none; }
+.tip[hidden], .tiphint[hidden] { display: none; }
+.tiphint { position: fixed; z-index: 3900; left: 50%; top: 132px; transform: translateX(-50%); max-width: min(88vw, 340px); padding: 8px 16px; border-radius: 999px;
+  border: 1px solid var(--purple); background: var(--panel); color: var(--text); font-size: var(--fs-s); font-weight: var(--fw-b); text-align: center; box-shadow: var(--elev); pointer-events: none; }
+button, summary, .lchip, .leaflet-marker-icon, .legend { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* v15 colour meanings: orange = fun streets (Oct 31), purple = decorations, cream = past favourites, grey/white = everything else */
+.btn-primary { background: var(--text); border-color: var(--text); color: var(--bg); }
+.btn.active, .vote.voted, .fav-rx.on, .fchip[aria-pressed="true"] { border-color: #c9d2e0; background: var(--surface-3); }
+.tagbtn-fav[aria-pressed="true"] { border-color: #fde7d3; background: #2e2a26; }
+.seg button[aria-checked="true"] { box-shadow: inset 0 -2px 0 var(--text); }
+.tabbar button[aria-current="page"] { box-shadow: inset 0 2px 0 var(--text); }
+.tabbar .tab-mark.tab-decor, .tabbar .tab-mark.tab-decor[aria-current="page"] { background: var(--purple-btn); color: #fff; }
+.gnum { color: var(--muted); }
+.gdot[aria-current="step"]::before { background: var(--text); }
+.tour-ring { box-shadow: 0 0 0 200vmax rgba(8,12,22,.74), 0 0 0 2px var(--text); }
+.mode-banner { background: var(--surface-3); color: var(--text); border: 1px solid #56647e; }
+.start-pin { background: var(--text); border-color: var(--bg); }
+.dots { color: var(--muted); }
+.cd-s { color: var(--text); }
+.zb-hot { border-color: var(--orange-deep); }
+a, .btn-link { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+:focus-visible { outline-color: var(--text); }
+textarea:focus, .select:focus, input:focus { border-color: var(--text); box-shadow: 0 0 0 2px rgba(238,242,248,.2); }
+.leaflet-tooltip.community-label { border-color: #56647e; }
+.ev-pin { border-color: #56647e; }
+.ev-when { color: var(--muted); }
+.langpick-btn, .langpick-btn:first-of-type, .langpick-zh { border-color: #56647e; }
+.langpick-title, .langpick-title span + span { color: var(--text); }
+#locateBtn.fab-round.on { border-color: var(--text); }
+.tiphint { border-color: #56647e; }
+.mc-timerrow { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.mc-timerrow .mc-timer { flex: 1; margin-top: 0; }
+.mc-timerlbl { flex: none; font-size: var(--fs-s); color: var(--muted); font-weight: var(--fw-b); }
+.markcard[data-timer="off"] .mc-timerrow { display: none; }
+.markcard[data-timer="paused"] .mc-timer i { opacity: .35; }
+.markcard[data-timer="paused"] .mc-timerlbl { color: var(--text); }
+.lchip .li-fav { background: #fff7e8; }
+.tagbtn-fav[aria-pressed="true"] { border-color: #fff7e8; }
+.tiphint { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 184px); }
+.pop-sub.fav-mem { color: #fff7e8; }                          /* past favourites = cream */
+.btn.fav-tonight { background: var(--orange); border-color: var(--orange); color: var(--on-accent); }   /* leads into the Oct 31 fun-street mark */
+#panel-guide .row-tight { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#panel-guide .row-tight .btn { font-size: var(--fs-s); padding: 0 8px; }
