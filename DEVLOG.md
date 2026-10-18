@@ -233,7 +233,7 @@ Peng: "too complex, too much text, users can't read it all." The user is a paren
   - 3 reports.
 - **Unchanged:** safety tips, emergency numbers, Teal Pumpkin, all limits and filters, the 3+ privacy floor, deletion dates, OSM attribution.
 
-### v=15.1: easy to find, plain words (Oct 18 morning, COMMIT_LINK)
+### v=15.1: easy to find, plain words (Oct 18, 8:01 AM, [917f0ca](https://github.com/bohemianwp/london-trick-or-treat/commit/917f0ca))
 - **Share a past favourite (7:18 AM).**
   - Why: v15 hid the explainer's "Share a past favourite" button (one primary action per card), and the Past favourites chip only shows or hides the layer. That left the Past favourites panel (with its pin button) reachable only through the `?fav=1` link. It was a regression.
   - Change: a cream secondary button under the big button, "💬 Loved a street in past years? Share it / 💬 往年哪条街最好玩？来分享". It shows whenever the board is on and open, including Oct 31 under the orange button. One tap opens pin mode with "Tap the street…"; the second tap on the street opens the form.
