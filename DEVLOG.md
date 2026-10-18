@@ -255,7 +255,7 @@ Peng: "too complex, too much text, users can't read it all." The user is a paren
   - The other answers (practice, colours, numbers, reports, map tools, route, sounds, privacy) are 8 one-sentence answers behind "More answers ▾".
 - Tests: unit + headless cover the entry (visible at 390 px, no overlap, 2-tap flow, popup and explainer links), the orange dots and contrast, one sentence per line, the cards and Show me.
 
-### v=15.2: two details from my own v15.1 review (Oct 18 morning, COMMIT_LINK)
+### v=15.2: two details from my own v15.1 review (Oct 18, 8:20 AM, [7a00c68](https://github.com/bohemianwp/london-trick-or-treat/commit/7a00c68))
 Found while reviewing the v15.1 screenshots myself, under Peng's rule that every detail is checked (not a new request from Peng).
 - **Pin prompt:** the Chinese "取消" (Cancel) button wrapped onto two lines at 390 px. The button no longer shrinks (`white-space: nowrap`, `min-width: 64px`) and the prompt text takes the remaining width. The headless test checks one line of text in EN and ZH.
 - **Welcome card 2:** its middle line names the cream button, but the card only showed purple and orange sample buttons. It now shows the cream "💬 Loved a street in past years? Share it" sample too, in the same order as the lines (purple, cream, orange).
