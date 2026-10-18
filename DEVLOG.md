@@ -314,6 +314,7 @@ Found while testing v15.6 (the far-away toast check never got a location fix). N
 - **Verified live:** the page loads `app.js?v=15.5.1`, which contains `drawMeDot`. Headless against the live URL passed 192/192. A 390 px live screenshot with a London location (Wortley Village) shows the blue dot: `halloween_app/screenshots/v1551-medot-live.png`.
 - **Guard (in v15.6, branch `stats`):** a unit test fails if two function declarations in `app.js` share a name, and the headless test checks the blue dot appears after a location fix.
 ### v=15.6: usage stats only the developer can see, a London-only note, and the "you are here" dot (Oct 18, 12:30 PM, branch `stats`, not pushed)
+- **Live:** Oct 18, 12:30 PM (Toronto). Peng approved it, and `main` was fast-forwarded to `stats`: [10e6425](https://github.com/bohemianwp/london-trick-or-treat/commit/10e6425). Live checks: all assets at `?v=15.6`, the GoatCounter tag is present, live headless passed 203/203, and the page-load and `ev-lang-en`/`ev-lang-zh` pings went to `ltot-london.goatcounter.com` (headless Chrome is flagged as a bot with `b=153`, so those test hits should not count).
 Peng, 11:04–11:46 AM: "哪里可以分析用户得使用情况吗" … "仅仅开发者我能看" ("Where can I analyze how users use it?" … "Only I, the developer, can see it.")
 - **Private usage report.**
   - `supabase/v155_usage_stats.sql` adds `public.usage_stats(p_token, p_since)`. It returns aggregate counts only:
