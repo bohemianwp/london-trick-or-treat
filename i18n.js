@@ -81,6 +81,10 @@
     favIntro: 'Streets you loved on past Halloweens. Others can 👍 / ❤️.',
     favPinBtn: '📍 Pin a favourite street',
     favTapMap: 'Tap the street. The pin snaps to the street, never a house.',
+    favShareBtn: '💬 Loved a street in past years? Share it',
+    favShareYours: '💬 Share yours',
+    tip_favShare: 'Pin a street you loved in past years',
+    scoreOf: '{n} of 5',
     favFormTitle: 'Past favourite street',
     favTagLabel: 'What made it great?',
     ftag_festive: 'Most festive',
@@ -109,7 +113,7 @@
     favTonightAsk: '🔥 How is it tonight? Tap to share!',
     favTonightLit: '🔥 Tonight: {n} marks, {bucket} {icon}',
     favBubbleAsk: 'Tonight?',
-    favBubbleNow: '{n} now',
+    favBubbleNow: '{n} marks',
     favTop: 'Most loved',
     favEmpty: 'No pins yet. Be the first!',
     favClosed: 'The board is closed for new posts. Everything is deleted on Nov 2.',
@@ -124,11 +128,7 @@
     phasePreFav: '🎃 Now: decorations · 🔥 Oct 31: fun streets',
     phaseFavItem: ['💬 Past favourites', 'Pin a street (never a house) and pick a tag. Others can 👍 / ❤️ and reply. Deleted Nov 2.'],
     phaseOct31Fav: 'Past favourites stay on the map. Tap one to share how it is tonight.',
-    guideFavLine: '💬 Loved a street in past years? Pin it under Past favourites.',
-    howtoFav: [
-      '💬 Past favourites',
-      ['Pin a street you loved; pick a tag.', '👍 / ❤️ once each; reply in 60 characters.', '⚑ 3 reports hide a pin.']
-    ],
+    guideFavLine: '💬 Loved a street in past years? Tap 💬 under the big button.',
     privacyFav: [
       'Past-years board',
       'Only if you pin a street: the spot moved to a ~50 m street grid (never a house), one preset tag, an optional note (80 characters) and short replies (60). No names, photos or accounts. Text with phone numbers, emails, links, addresses or house numbers is refused. Your phone’s random ID is stored only as a one-way hash so it can like once and keep to the limits. 3 reports hide a pin. “Families who remember” is a total only, shown from 3. Everything is deleted on Nov 2, 2026.'
@@ -160,7 +160,7 @@
     legendDecor: 'Decorations',
     decorTitle: '🎃 Decorations',
     decorListBtn: '🎃 Decorations',
-    decorIntro: 'Streets with 3+ likes in the last 14 days.',
+    decorIntro: 'These streets got 3 or more likes for their decorations in the last 14 days.',
     decorWhen: 'Once per street per day. Street level only.',
     decorNearH: 'Near me',
     decorCityH: 'Top in London',
@@ -168,7 +168,7 @@
     decorNearNone: 'None within 2 km yet.',
     decorNone: 'No streets yet. Tap “Great decorations? 🎃” when you pass one.',
     decorBadge: '🎃 {n} likes',
-    decorInfo: '{n} likes in the last 14 days',
+    decorInfo: 'Families liked these decorations {n} times in the last 14 days.',
     decorZoneTitle: '🎃 Great decorations',
     decorRow: '🎃 {n} likes',
     decorSoon: 'Coming soon',
@@ -203,9 +203,9 @@
     legendLively: 'Busy',
     legendHot: 'Very busy',
     hintLegend: 'Shows at 3+ marks in {win} min. Grey to orange = busier.',
-    zoneCount: '🔥 {n} now',
+    zoneCount: '🔥 {n} marks',
     newBadge: 'NEW',
-    zoneInfo: '{n} marks in the last {m} min',
+    zoneInfo: 'Families marked this street {n} times in the last {m} minutes.',
     routeThere: '🚶 Walk there',
     routeBtn: '🚶 Route',
     zoneTarget: 'Fun street ({n} marks)',
@@ -422,64 +422,96 @@
     guideCards: [
       [
         'Find the fun',
-        ['🔥 Orange streets: families out now (Oct 31).', '🎃 Purple streets: great decorations.', '💬 Bubbles: favourite streets from past years.']
+        [
+          '🔥 On Oct 31, orange streets are where families are having fun right now.',
+          '🎃 Purple streets are where families say the decorations are great.',
+          '💬 Cream bubbles are streets families loved in past years.'
+        ]
       ],
       [
         'Share in one tap',
         [
-          '🎃 Now: purple button at great decorations.',
-          '🔥 Oct 31 from 3 PM: orange button on fun streets.',
-          '🧪 Before that, the small orange button is practice or test.'
+          '🎃 When you see great decorations, tap the purple button on that street.',
+          '💬 If you loved a street in past years, tap the cream button, then the street.',
+          '🔥 On Oct 31 from 3 PM, tap the orange button when you are on a fun street.'
         ]
       ],
       [
         'Safe & private',
         [
-          '👨‍👩‍👧 Always with a grown-up. Safety tips: top right.',
-          '🔒 Street level only, no names. Deleted by Nov 2.',
-          '👆 Press and hold any button for a tip.'
+          '👨‍👩‍👧 Always go with a grown-up; safety tips are under Safety at the top.',
+          '🔒 We only save the street, never your name, and delete it all by Nov 2.',
+          '👆 Press and hold any button to see what it does.'
         ]
       ]
     ],
+    hcWhereLbl: 'Where it is',
+    hcShowMe: '👀 Show me',
+    tip_showMe: 'Close this and point to the real button',
+    hcMoreLbl: 'More answers',
+    hcDecor: [  '🎃 Share great decorations',    'How: stand on the street and tap the purple button.',    'Why: other families can find the best decorations to visit.'   ],
+    hcFav: [  '💬 Share a past favourite',    'How: tap the cream button, then tap the street.',    'Why: new families can find the streets you loved.'   ],
+    hcFun: [  '🔥 Mark a fun street (Oct 31)',    'How: Oct 31, 3–11 PM, tap the orange button on a fun street.',    'Why: streets light up live, so families know where to go.'   ],
+    hcLike: [  '👍 Like or reply',    'How: tap a cream bubble, then tap 👍 / ❤️ or write a reply.',    'Why: well-loved streets grow bigger on the map.'   ],
+    hcNotNow: 'This is not available right now.',
     howtoTitle: 'How to use',
-    howtoIntro: 'Short answers. Press and hold any button for a tip.',
+    howtoIntro: 'Each card shows where the button is, how to use it and why.',
     howtoReplay: 'Welcome cards',
     howtoSections: [
       [
-        '🎃 Decorations (now)',
-        ['Purple button: share great decorations.', 'Streets turn purple at 3+ likes in 14 days.']
-      ],
-      [
-        '🔥 Fun streets (Oct 31)',
-        ['3–11 PM: tap the orange button.', 'Lights up at 3+ marks in {win} min.', 'Marks vanish after 2 hours.']
-      ],
-      [
         '🧪 Practice',
-        ['Before Oct 31: the small orange button.', 'Test days Oct 17–20: shared with testers.']
+        [
+          'Before Oct 31, try the small “Practice: fun street” button; practice marks stay on your phone.',
+          'On test days (Oct 17–20) it says “Test”, and test marks are shared with testers, then wiped.'
+        ]
       ],
       [
         '🎨 Colours',
-        ['Grey: quiet · Light orange: busy', 'Deep orange: very busy · NEW: just lit up']
+        [
+          'On Oct 31, in the last {win} min: grey = 3–5 marks, light orange = 6–14, deep orange = 15 or more.',
+          'NEW means the street lit up in the last 30 minutes.',
+          'Purple streets have great decorations, and cream bubbles are past favourites.'
+        ]
       ],
       [
         '🔢 Numbers',
-        ['🔥 23 now: marks in the last {win} min.', '🎃 14 likes: in the last 14 days.']
+        [
+          '🔥 23 marks means families marked this street 23 times in the last {win} minutes.',
+          '🎃 14 likes means families liked these decorations 14 times in the last 14 days.',
+          '🏆 12 means 12 families pinned this past favourite or gave it a 👍 or ❤️.'
+        ]
+      ],
+      [
+        '⚑ Reports',
+        [
+          'If 3 different people report a pin or a reply, it is hidden.',
+          'Each phone can 👍 and ❤️ once, and replies are up to 60 characters.'
+        ]
       ],
       [
         '🗺️ Map tools',
-        ['⌖ Show my location.', 'More ▾: areas, events, near me.']
+        [
+          'The round ⌖ button on the right shows where you are.',
+          'More ▾ shows suggested areas, events and streets near you.'
+        ]
       ],
       [
         '🚶 Route',
-        ['Pick start, time and kid’s age.', 'Get a loop back to the start.']
+        [
+          'In Route, pick a start, how long to walk and your kid’s age to get a loop back to the start.'
+        ]
       ],
       [
         '🔊 Sounds',
-        ['Soft sounds, only when you tap.', 'Tap 🔊 at the top to mute.']
+        [
+          'Soft sounds play only when you tap; tap 🔊 at the top to mute them.'
+        ]
       ],
       [
         '🔒 Privacy',
-        ['No login, no names.', 'Street level only, deleted by Nov 2.']
+        [
+          'No login and no names; we only save the street and delete it all by Nov 2.'
+        ]
       ]
     ],
     infoAria: 'What is this?',
@@ -576,9 +608,9 @@
     tip_tab_route: 'Plan a walking loop',
     tip_tab_mark: 'Share this street',
     tip_tab_guide: 'How to use, feedback, privacy',
-    tip_zone: 'Fun street: marks in the last {win} min',
-    tip_decorBadge: 'Decorations: likes in the last 14 days',
-    tip_fav: 'Past favourite: tap to 👍 / ❤️ or reply',
+    tip_zone: 'How many times families marked this street in the last {win} min',
+    tip_decorBadge: 'How many likes these decorations got in the last 14 days',
+    tip_fav: 'A street families loved in past years: tap to like it or reply',
     tip_favCluster: 'Several pins: tap to zoom in',
     tip_legend: 'Colours show how busy a street is',
     tip_zoomIn: 'Zoom in',
@@ -673,6 +705,10 @@
     favIntro: '往年万圣节最爱的街。其他家庭可以点 👍 / ❤️。',
     favPinBtn: '📍 标记一条往年最爱的街',
     favTapMap: '点那条街。标记会挪到街上，不会落在某一户。',
+    favShareBtn: '💬 往年哪条街最好玩？来分享',
+    favShareYours: '💬 分享你的',
+    tip_favShare: '标记一条你往年最喜欢的街',
+    scoreOf: '{n}/5 分',
     favFormTitle: '往年最爱的街',
     favTagLabel: '好在哪里？',
     ftag_festive: '最有氛围',
@@ -701,7 +737,7 @@
     favTonightAsk: '🔥 今晚怎么样？点一下分享！',
     favTonightLit: '🔥 今晚：{n} 个标记，{bucket} {icon}',
     favBubbleAsk: '今晚？',
-    favBubbleNow: '现在 {n}',
+    favBubbleNow: '{n} 个标记',
     favTop: '最受喜爱',
     favEmpty: '还没有标记，来做第一个吧！',
     favClosed: '留言板已停止发布。所有内容 11 月 2 日删除。',
@@ -716,11 +752,7 @@
     phasePreFav: '🎃 现在：装饰 · 🔥 10月31日：好玩的街',
     phaseFavItem: ['💬 往年最爱', '标记一条街（不会落在某一户），选个标签。其他人可以 👍 / ❤️ 和回复。11月2日删除。'],
     phaseOct31Fav: '往年最爱会留在地图上。点一下，分享它今晚怎么样。',
-    guideFavLine: '💬 往年喜欢哪条街？在「往年最爱」里标记。',
-    howtoFav: [
-      '💬 往年最爱',
-      ['标记一条喜欢的街，选个标签。', '👍 / ❤️ 各一次；回复最多 60 字。', '⚑ 被举报 3 次就隐藏。']
-    ],
+    guideFavLine: '💬 往年喜欢哪条街？点大按钮下面的 💬。',
     privacyFav: [
       '往年最佳街区留言板',
       '只有你标记街道时才会保存：挪到约 50 米街道网格上的位置（不会落在某一户）、一个预设标签、可选的一句话（80 字）和简短回复（60 字）。不要名字、照片或账号。含电话、邮箱、链接、地址或门牌号的文字会被拒绝。你手机的随机 ID 只以单向哈希保存，用来保证只能赞一次和限制次数。被举报 3 次会隐藏。「记得这里的家庭数」只是总数，满 3 才显示。所有内容 2026 年 11 月 2 日删除。'
@@ -752,7 +784,7 @@
     legendDecor: '装饰',
     decorTitle: '🎃 装饰',
     decorListBtn: '🎃 装饰',
-    decorIntro: '最近 14 天有 3 个以上赞的街。',
+    decorIntro: '这些街最近 14 天里，装饰得到了 3 个或更多赞。',
     decorWhen: '每条街每天一次，只记录街区。',
     decorNearH: '我附近',
     decorCityH: '全城最佳',
@@ -760,7 +792,7 @@
     decorNearNone: '2 公里内还没有。',
     decorNone: '还没有。路过好看的装饰时，点「装饰很棒？🎃」。',
     decorBadge: '🎃 {n} 个赞',
-    decorInfo: '最近 14 天 {n} 个赞',
+    decorInfo: '最近 14 天里，家庭们给这里的装饰点了 {n} 次赞。',
     decorZoneTitle: '🎃 装饰很棒',
     decorRow: '🎃 {n} 个赞',
     decorSoon: '即将开放',
@@ -795,9 +827,9 @@
     legendLively: '热闹',
     legendHot: '非常热闹',
     hintLegend: '{win} 分钟内满 3 个标记才显示。灰到橙 = 越来越热闹。',
-    zoneCount: '🔥 现在 {n}',
+    zoneCount: '🔥 {n} 个标记',
     newBadge: '新发现',
-    zoneInfo: '最近 {m} 分钟有 {n} 个标记',
+    zoneInfo: '最近 {m} 分钟里，家庭们把这条街标记了 {n} 次。',
     routeThere: '🚶 走过去',
     routeBtn: '🚶 路线',
     zoneTarget: '好玩的街（{n} 个标记）',
@@ -1014,56 +1046,96 @@
     guideCards: [
       [
         '看哪里好玩',
-        ['🔥 橙色的街：现在有家庭在玩（10月31日）。', '🎃 紫色的街：装饰很棒。', '💬 气泡：往年最爱的街。']
+        [
+          '🔥 10月31日，橙色的街就是现在很多家庭在玩的地方。',
+          '🎃 紫色的街，是大家说装饰很棒的地方。',
+          '💬 奶白色气泡，是往年大家最喜欢的街。'
+        ]
       ],
       [
         '一点就分享',
-        ['🎃 现在：看到好看的装饰，点紫色按钮。', '🔥 10月31日下午3点起：在好玩的街点橙色按钮。', '🧪 在那之前，橙色小按钮是练习或试用。']
+        [
+          '🎃 看到好看的装饰，就在那条街上点紫色按钮。',
+          '💬 往年喜欢哪条街，就点奶白色按钮，再点那条街。',
+          '🔥 10月31日下午3点起，在好玩的街上点橙色按钮。'
+        ]
       ],
       [
         '安全、保护隐私',
-        ['👨‍👩‍👧 一定要有大人陪同。安全提示在右上角。', '🔒 只记录街区，不要名字。11月2日前删除。', '👆 长按任意按钮查看提示。']
+        [
+          '👨‍👩‍👧 一定要有大人陪同；安全提示在顶部「安全」里。',
+          '🔒 只保存街区，不保存名字，11月2日前全部删除。',
+          '👆 长按任意按钮，就能看到它是做什么的。'
+        ]
       ]
     ],
+    hcWhereLbl: '在哪里',
+    hcShowMe: '👀 指给我看',
+    tip_showMe: '关闭说明，指出真正的按钮在哪',
+    hcMoreLbl: '更多说明',
+    hcDecor: [  '🎃 分享好看的装饰',    '怎么做：站在那条街上，点紫色按钮。',    '为什么：让其他家庭找到最值得看的装饰。'   ],
+    hcFav: [  '💬 分享往年最爱',    '怎么做：点奶白色按钮，再点那条街。',    '为什么：帮新来的家庭找到你喜欢的街。'   ],
+    hcFun: [  '🔥 标记好玩的街（10月31日）',    '怎么做：10月31日下午3–11点，在好玩的街上点橙色按钮。',    '为什么：街道实时亮起来，大家就知道去哪里。'   ],
+    hcLike: [  '👍 点赞或回复',    '怎么做：点奶白色气泡，再点 👍 / ❤️ 或写回复。',    '为什么：大家喜欢的街，在地图上会变得更大。'   ],
+    hcNotNow: '现在还不能用。',
     howtoTitle: '怎么用',
-    howtoIntro: '简短说明。长按任意按钮查看提示。',
+    howtoIntro: '每张卡片告诉你：按钮在哪、怎么用、为什么用。',
     howtoReplay: '欢迎卡片',
     howtoSections: [
       [
-        '🎃 装饰（现在）',
-        ['紫色按钮：分享好看的装饰。', '14 天内 3 个以上赞，这条街变紫色。']
-      ],
-      [
-        '🔥 好玩的街（10月31日）',
-        ['下午3–11点：点橙色按钮。', '{win} 分钟内 3 个标记就亮。', '标记 2 小时后消失。']
-      ],
-      [
         '🧪 练习',
-        ['10月31日前：橙色小按钮。', '试用期 10月17–20日：和试用者共享。']
+        [
+          '10月31日之前，可以用「练习：好玩的街」小按钮试一试；练习标记只留在你的手机上。',
+          '试用期（10月17–20日）按钮显示「试用」，试用标记会和试用者共享，之后清除。'
+        ]
       ],
       [
         '🎨 颜色',
-        ['灰色：安静 · 浅橙：热闹', '深橙：非常热闹 · 新发现：刚亮起']
+        [
+          '10月31日最近 {win} 分钟：灰色 3–5 个标记，浅橙 6–14 个，深橙 15+ 个。',
+          '「新发现」表示这条街在最近 30 分钟内刚亮起来。',
+          '紫色的街装饰很棒，奶白色气泡是往年最爱。'
+        ]
       ],
       [
         '🔢 数字',
-        ['🔥 现在 23：最近 {win} 分钟的标记。', '🎃 14 个赞：最近 14 天。']
+        [
+          '🔥 23 个标记：最近 {win} 分钟里，家庭们把这条街标记了 23 次。',
+          '🎃 14 个赞：最近 14 天里，家庭们给这里的装饰点了 14 次赞。',
+          '🏆 12：有 12 个家庭发布过这条往年最爱，或给它点过 👍 或 ❤️。'
+        ]
+      ],
+      [
+        '⚑ 举报',
+        [
+          '如果有 3 个不同的人举报一个标记或回复，它就会被隐藏。',
+          '每台手机 👍 和 ❤️ 各能点一次，回复最多 60 字。'
+        ]
       ],
       [
         '🗺️ 地图工具',
-        ['⌖ 显示我的位置。', '更多 ▾：推荐区、活动、我附近。']
+        [
+          '右边的圆形 ⌖ 按钮会显示你在哪里。',
+          '「更多 ▾」会显示推荐区、活动和你附近的街。'
+        ]
       ],
       [
         '🚶 路线',
-        ['选起点、时间和孩子年龄。', '规划一个回到起点的环线。']
+        [
+          '在「路线」里选起点、走多久和孩子年龄，就能得到一条回到起点的环线。'
+        ]
       ],
       [
         '🔊 声音',
-        ['只在点击时有轻柔的声音。', '点顶部 🔊 静音。']
+        [
+          '只有点按时才有轻柔的声音；点顶部 🔊 可以静音。'
+        ]
       ],
       [
         '🔒 隐私',
-        ['不用登录，不要名字。', '只记录街区，11月2日前删除。']
+        [
+          '不用登录，不要名字；只保存街区，11月2日前全部删除。'
+        ]
       ]
     ],
     infoAria: '这是什么？',
@@ -1125,9 +1197,9 @@
     tip_tab_route: '规划步行环线',
     tip_tab_mark: '分享这条街',
     tip_tab_guide: '怎么用、反馈、隐私',
-    tip_zone: '好玩的街：最近 {win} 分钟的标记',
-    tip_decorBadge: '装饰：最近 14 天的赞',
-    tip_fav: '往年最爱：点一下 👍 / ❤️ 或回复',
+    tip_zone: '最近 {win} 分钟里，家庭们标记这条街的次数',
+    tip_decorBadge: '最近 14 天里，这里的装饰得到的赞数',
+    tip_fav: '往年大家喜欢的街：点一下可以点赞或回复',
     tip_favCluster: '好几个标记：点一下放大',
     tip_legend: '颜色表示街上有多热闹',
     tip_zoomIn: '放大',

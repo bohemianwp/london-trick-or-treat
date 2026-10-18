@@ -73,6 +73,12 @@ Between 3:31 and 3:52 PM the Mac went offline mid-build. The build finished at a
   - Peng saw the mark card's shrinking timer bar stop and thought it was a bug (it was the touch-pause);
   - also audit colour meanings, every EN/ZH string pair, and that instructions match behaviour.
 - **10:34 PM:** turn the full transcript into this final DEVLOG.
+- **v15.1, Oct 18 morning (Peng's words, quoted verbatim):**
+  - **7:18 AM**: "我现在就想在这个上面分享往年我知道的最好玩的地方，是在那个入口进行分享呢？我不能一眼就抓到这个需求" ("I want to share the most fun places I know from past years right now. Where do I share it? I can't spot it at a glance.")
+  - **7:20 AM**: "还有对于每个街区的评分，还是用万圣节的主题色，进行配色，灰色太不明显了" ("For each area's score, use Halloween theme colours. The grey is too hard to see.")
+  - **7:25 AM**: "在指南里面的，文字表述，装饰（现在），往年最爱，被举报，45分钟内3个标记就亮， 练习：橙色小按钮，数字：现在23，14赞最近14天，这些表述有些模糊，我是用户，我第一次看到不明白什么意思" ("In the Guide, the wording 'Decorations (now)', 'Past favourites', 'reported', 'lights up with 3 marks in 45 min', 'Practice: small orange button', and numbers like 'now 23' and '14 likes in the last 14 days' is vague. As a first-time user I don't understand them.")
+  - **7:26 AM**: "在怎么用里面一定直观的让用户一眼就知道这个功能的入口在哪，怎么使用，使用的目的是什么，简单明了，吸引眼球" ("In How to use, users must see at a glance where each feature's entry is, how to use it, and what it's for. Simple, clear and eye-catching.")
+  - See **v=15.1** below.
 
 ### Cancelled
 - **Promo QR / video v4:** cancelled before any work. `qr.png` was never touched. Earlier promo video drafts (v1–v3) are kept in `halloween_app/` and were never published.
@@ -168,7 +174,7 @@ Peng said the colours and fonts didn't look clean. With no behaviour change:
 - 1080×1920 (WeChat/RedNote) and 1080×1080 (X/LinkedIn), bilingual, in the new style, with a real app screenshot (sample data, labelled as such).
 - The QR code decodes to the plain link. Rendered with Noto Sans CJK SC and checked glyph by glyph.
 
-### v=15: simpler, shorter, tooltips (about 11:30 PM)
+### v=15: simpler, shorter, tooltips (Oct 17, 11:17 PM, [81e32eb](https://github.com/bohemianwp/london-trick-or-treat/commit/81e32eb))
 Peng: "too complex, too much text, users can't read it all." The user is a parent holding a phone at night, giving it a few seconds. The full audit (problem → change → why) is `halloween_app/ux/UX_AUDIT_v15.md`.
 - **Text:** the visible copy (banner, welcome, How-to, explainer, big button, cards, privacy) is about 80% shorter in EN and ZH. A unit test guards ≥ 50% against v14.1.
 - **One name per thing (EN / ZH):**
@@ -227,6 +233,28 @@ Peng: "too complex, too much text, users can't read it all." The user is a paren
   - 3 reports.
 - **Unchanged:** safety tips, emergency numbers, Teal Pumpkin, all limits and filters, the 3+ privacy floor, deletion dates, OSM attribution.
 
+### v=15.1: easy to find, plain words (Oct 18 morning, COMMIT_LINK)
+- **Share a past favourite (7:18 AM).**
+  - Why: v15 hid the explainer's "Share a past favourite" button (one primary action per card), and the Past favourites chip only shows or hides the layer. That left the Past favourites panel (with its pin button) reachable only through the `?fav=1` link. It was a regression.
+  - Change: a cream secondary button under the big button, "💬 Loved a street in past years? Share it / 💬 往年哪条街最好玩？来分享". It shows whenever the board is on and open, including Oct 31 under the orange button. One tap opens pin mode with "Tap the street…"; the second tap on the street opens the form.
+  - Also: a past-favourite popup has "💬 Share yours / 💬 分享你的", and the explainer bullet "💬 Mark past favourite streets" is now a link to the same flow. The tooltip is `tip_favShare`.
+  - The legend and the mark card move up when the button shows, so nothing overlaps (checked in the headless test at 390 px, EN + ZH).
+- **Area scores (7:20 AM).** The suggested-area score dots were grey (the v15 colour pass made them neutral). They are now Halloween orange: filled dots in `--orange` (7.0:1 on the popup navy), empty dots as a dim orange ring `#b0683a` (3.8:1; AA non-text needs 3:1). Each row has a spoken label ("4 of 5"). The colour rules now read "orange = fun streets and area scores". There is still no yellow anywhere.
+- **Plain words (7:25 AM).** Every welcome and How-to line is now one complete sentence that says what the thing is and what to do. The numbers were checked against the code before rewriting:
+  - "🔥 23 now" → "🔥 23 marks / 🔥 23 个标记". The number is the count of marks on that street in the last 45 min (SQL `count(*)`). A phone can mark the same street again after 30 min, so it counts *marks*, not families. The popup says "Families marked this street 23 times in the last 45 minutes."
+  - "🎃 14 likes" stays on the badge. The popup now says "Families liked these decorations 14 times in the last 14 days" (one like per phone per street per day).
+  - "🏆 12" = different phones that pinned or liked that past favourite (shown from 3).
+  - "Reported" → "If 3 different people report a pin or a reply, it is hidden" (one report per phone).
+  - "Practice: small orange button" → "Before Oct 31, try the small “Practice: fun street” button; practice marks stay on your phone." Test days are explained in their own sentence.
+  - The colours sentence gives the real thresholds: grey 3–5, light orange 6–14, deep orange 15+ marks in the last 45 min; NEW = lit up in the last 30 min.
+  - The tooltips for zone badges, decoration badges and bubbles say what the number counts.
+- **How to use = one card per feature (7:26 AM).**
+  - Cards: share decorations · share a past favourite · mark a fun street on Oct 31 · like or reply. On the night, fun streets come first.
+  - Each card has: a mini phone with the real button ringed where it sits; the real button in its real colour (purple / cream / orange, and a cream bubble); one "How:" line; one "Why:" line; and "👀 Show me".
+  - "Show me" closes the guide and rings the real button on the map for 2 s (a neutral white ring, static with reduced motion).
+  - The other answers (practice, colours, numbers, reports, map tools, route, sounds, privacy) are 8 one-sentence answers behind "More answers ▾".
+- Tests: unit + headless cover the entry (visible at 390 px, no overlap, 2-tap flow, popup and explainer links), the orange dots and contrast, one sentence per line, the cards and Show me.
+
 ## Issues and fixes
 - **4:51 PM:** the map said "API key required" → OSM tiles with a dark filter.
 - **Mac offline mid-build (3:31–3:52 PM):** the build was resumed after it came back. Later builds ran on the box.
@@ -240,6 +268,7 @@ Peng: "too complex, too much text, users can't read it all." The user is a paren
   - EN layer chips needed 466 px on a 390 px phone → phase-aware main chips + More.
   - The one-time hint covered the chips → moved above the big button.
   - A removed helper (`closeHints`) was still called on the language chooser → fixed and covered by the headless check.
+- **v15.1:** the v15 cleanup hid the only visible "share a past favourite" entry (regression, reported by Peng at 7:18 AM) → a permanent cream button under the big button, plus links from the popup and the explainer.
 
 ## Safety & privacy principles (kept throughout)
 - **Street level only:** never a house, no names, photos or accounts. Privacy floors of 3 for every public count.

@@ -224,7 +224,7 @@ test('v10/v15 copy: parent-focused button, thank-you card, hint and guide tip (E
   assert.equal(I.en.markedThanks, 'Thanks! Other families can see it now.');
   assert.equal(I.zh.markedThanks, '谢谢！其他家庭现在能看到了。');
   assert.equal(I.en.nudge, 'Waiting for the kids? Share this street.');
-  assert.ok(JSON.stringify(I.en.guideCards).includes('orange button on fun streets'));
-  assert.ok(JSON.stringify(I.zh.guideCards).includes('在好玩的街点橙色按钮'));
+  assert.ok(JSON.stringify(I.en.guideCards).includes('tap the orange button when you are on a fun street'));
+  assert.ok(JSON.stringify(I.zh.guideCards).includes('在好玩的街上点橙色按钮'));
   for (const l of ['en', 'zh']) assert.ok(!JSON.stringify(I[l]).includes(l === 'en' ? 'This spot is great' : '这里很热闹！'), 'old button wording gone: ' + l);
 });

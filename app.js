@@ -88,9 +88,10 @@
     if (m < 1440) return t('agoH', { n: Math.floor(m / 60) });
     return t('agoD', { n: Math.floor(m / 1440) });
   }
+  // v15.1: Halloween-orange filled dots, dim orange rings for the rest (both ≥ 3:1 on the popup navy)
   function dots(n) {
-    var span = el('span', { class: 'dots' });
-    for (var i = 1; i <= 5; i++) span.appendChild(i <= n ? document.createTextNode('●') : el('span', { class: 'off', text: '●' }));
+    var span = el('span', { class: 'dots', role: 'img', 'aria-label': t('scoreOf', { n: n }) });
+    for (var i = 1; i <= 5; i++) span.appendChild(el('span', { class: i <= n ? 'dot' : 'dot off', 'aria-hidden': 'true' }));
     return span;
   }
   function narrow() { return window.innerWidth < 760; }
@@ -758,14 +759,31 @@
     b.dataset.tipKey = dec ? 'tip_markDecor' : 'tip_markFun';
     alt.dataset.tipKey = dec ? 'tip_altFun' : 'tip_altDecor';
     $('decorPanelBtn').disabled = !decorOpen;
+    renderFavShare();
   }
+  // v15.1: the past-favourites entry under the big button (2 taps: this button, then the street)
+  function renderFavShare() {
+    var show = favOn() && LIB.isFavOpen(Date.now(), DEMO) && !tourZones;
+    $('favShareBtn').hidden = !show;
+    document.body.classList.toggle('has-favshare', show);
+  }
+  function startFavPin() {
+    if (!LIB.isFavOpen(Date.now(), DEMO)) { toast(t('favClosed'), 5000); return; }
+    map.closePopup(); closeMarkCard();
+    if (!layerOn.fav) setLayer('fav', true);
+    openTab('fav'); setMode('fav');
+  }
+  $('favShareBtn').addEventListener('click', startFavPin);
   function renderDecorBtn() { renderPhase(); }
   // The banner links to the "What's different on Oct 31" section: a jump button before Halloween, opened right there on the night.
   // v15: 4 one-line bullets; the longer explanation sits behind "More details" (opened at the Oct 31 section on the night).
   function openPhaseCard() {
     var list = $('phaseList'), win = String(CFG.markWindowMin || 45), bl = $('phaseBullets');
     list.textContent = ''; bl.textContent = '';
-    t('phaseBullets').forEach(function (x, i) { if (i !== 1 || favOn()) bl.appendChild(el('li', { text: x })); });
+    t('phaseBullets').forEach(function (x, i) {
+      if (i === 1 && favOn()) bl.appendChild(el('li', null, [el('button', { type: 'button', class: 'linkbtn pb-fav', text: x, onclick: function () { closePhaseCard(); startFavPin(); } })]));   // v15.1: tappable
+      else if (i !== 1) bl.appendChild(el('li', { text: x }));
+    });
     var items = t('phaseItems').slice(), oct31 = items[1][0];
     if (favOn()) {                                      // v14: the past-years board, and what it does on Oct 31
       items[1] = [items[1][0], items[1][1].concat(t('phaseOct31Fav'))];
@@ -1370,7 +1388,8 @@
             if (!window.confirm(t('favConfirmDel'))) return;
             backend.favDelete('pin', p.id, favTokens[p.id]).then(function () { delete favTokens[p.id]; lsSet(STORE.favTokens, favTokens); map.closePopup(); refreshFav(); }, function (e) { toast(favErrText(e), 4000); });
           } })
-        : el('button', { type: 'button', class: 'btn btn-small btn-ghost', text: t('favReport'), onclick: function () { doFavReport('pin', p.id, function () { map.closePopup(); refreshFav(); }); } })])
+        : el('button', { type: 'button', class: 'btn btn-small btn-ghost', text: t('favReport'), onclick: function () { doFavReport('pin', p.id, function () { map.closePopup(); refreshFav(); }); } }),
+        LIB.isFavOpen(Date.now(), DEMO) ? el('button', { type: 'button', class: 'btn btn-small btn-fav-share', text: t('favShareYours'), 'data-tip-key': 'tip_favShare', onclick: startFavPin }) : null])   // v15.1
     ]);
     L.popup({ maxWidth: 290, minWidth: 250, className: 'fav-popup', autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR })
       .setLatLng([p.lat, p.lng]).setContent(box).openOn(map);
@@ -1414,10 +1433,7 @@
   }
   map.on('zoomend', renderFavLayer);
   // posting: tap the button, then the street; pick one tag (required) and an optional note
-  $('favPinBtn').addEventListener('click', function () {
-    if (!LIB.isFavOpen(Date.now(), DEMO)) { toast(t('favClosed'), 5000); return; }
-    map.closePopup(); setMode('fav');
-  });
+  $('favPinBtn').addEventListener('click', startFavPin);
   function openFavForm(pos) {
     if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('err_outside'), 5000); return; }
     pendingFav = LIB.favSnap(pos[0], pos[1]); favTag = null;
@@ -1930,14 +1946,83 @@
     if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) guideGo(guideIdx + (dx < 0 ? 1 : -1));
   }, { passive: true });
 
+  // v15.1: one card per feature (Peng: "see at a glance where the entry is, how to use it and why").
+  // Each card: a mini phone with the real button highlighted where it sits, the real button in its real colour,
+  // one "How" line, one "Why" line, and "Show me" (closes the guide and rings the real button for 2 s).
+  function hcPhone(kind) {
+    var tgt = function (k) { return kind === k ? ' hp-target' : ''; }, night = !bigIsDecor();
+    var big = kind === 'fun' || (kind !== 'decor' && night) ? 'hp-orange' : 'hp-purple';
+    return el('div', { class: 'hc-phone', 'aria-hidden': 'true' }, [
+      el('i', { class: 'hp-top' }),
+      el('i', { class: 'hp-map' }, kind === 'like' ? [el('b', { class: 'hp-bubble hp-target', text: '💬' }), el('b', { class: 'hp-point hp-point-up', text: '👆' })] : null),
+      el('i', { class: 'hp-big ' + big + ((kind === 'decor' || kind === 'fun') ? ' hp-target' : '') }),
+      kind === 'decor' || kind === 'fun' ? el('b', { class: 'hp-point', text: '👈' }) : null,
+      el('i', { class: 'hp-cream' + tgt('fav') }),
+      kind === 'fav' ? el('b', { class: 'hp-point hp-point-low', text: '👈' }) : null,
+      el('i', { class: 'hp-tabs' })
+    ]);
+  }
+  function hcReplica(kind) {
+    if (kind === 'decor') return el('span', { class: 'hc-rep rep-purple', text: t('decorMain') });
+    if (kind === 'fun') return el('span', { class: 'hc-rep rep-orange', text: t('markBtn') });
+    if (kind === 'fav') return el('span', { class: 'hc-rep rep-cream', text: t('favShareBtn') });
+    return el('span', { class: 'hc-rep rep-bubble', text: '🏆 👍 14  ❤️ 9' });
+  }
+  var HC_KEY = { decor: 'hcDecor', fav: 'hcFav', fun: 'hcFun', like: 'hcLike' };
+  function renderHowtoCards() {
+    var box = $('howtoCards'); if (!box) return;
+    box.textContent = '';
+    var kinds = bigIsDecor() ? ['decor', 'fav', 'fun', 'like'] : ['fun', 'fav', 'like', 'decor'];
+    kinds.filter(function (k) {
+      if (k === 'decor') return LIB.isDecorOpen(Date.now(), DEMO);
+      if (k === 'fav' || k === 'like') return favOn();
+      return true;
+    }).forEach(function (k) {
+      var c = t(HC_KEY[k]);
+      box.appendChild(el('section', { class: 'hcard hc-' + k, 'data-kind': k }, [
+        el('h3', { class: 'hc-title', text: c[0] }),
+        el('div', { class: 'hc-body' }, [hcPhone(k), el('div', { class: 'hc-text' }, [
+          hcReplica(k),
+          el('p', { class: 'hc-how', text: c[1] }),
+          el('p', { class: 'hc-why', text: c[2] }),
+          el('button', { type: 'button', class: 'btn btn-small hc-show', 'data-tip-key': 'tip_showMe', text: t('hcShowMe'), onclick: function () { showMe(k); } })
+        ])])
+      ]));
+    });
+  }
+  function showMeTarget(kind) {
+    if (kind === 'decor') return bigIsDecor() ? $('markBtn') : $('altBtn');
+    if (kind === 'fun') return bigIsDecor() ? $('altBtn') : $('markBtn');
+    if (kind === 'fav') return $('favShareBtn');
+    var mc = map.getContainer().getBoundingClientRect(), cx = mc.left + mc.width / 2, cy = mc.top + mc.height / 2, best = null, bd = 1e9;
+    document.querySelectorAll('.favb').forEach(function (b) {
+      var r = b.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
+      if (r.width && d < bd) { bd = d; best = b; }
+    });
+    return best;
+  }
+  function showMe(kind) {
+    setSheetOpen(false);
+    if (kind === 'like' && favPins.length) {
+      if (!layerOn.fav) setLayer('fav', true);
+      var c = map.getCenter(), p = favPins.slice().sort(function (a, b) { return map.distance(c, [a.lat, a.lng]) - map.distance(c, [b.lat, b.lng]); })[0];
+      map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16), { animate: false });
+    }
+    setTimeout(function () {
+      var tg = showMeTarget(kind);
+      if (!tg || tg.hidden || !tg.getClientRects().length) { toast(t('hcNotNow'), 3000); return; }
+      var r = tg.getBoundingClientRect(), ring = el('div', { class: 'showme-ring', 'aria-hidden': 'true' });
+      ring.style.left = (r.left - 6) + 'px'; ring.style.top = (r.top - 6) + 'px';
+      ring.style.width = (r.width + 12) + 'px'; ring.style.height = (r.height + 12) + 'px';
+      document.body.appendChild(ring);
+      setTimeout(function () { ring.remove(); }, 2000);
+    }, 350);
+  }
   function renderHowto() {
+    renderHowtoCards();
     var box = $('howtoList');
     box.textContent = '';
-    var secs = t('howtoSections').slice();
-    if (favOn()) {                                      // v14 section right after "Best decorations"
-      var di = secs.map(function (x) { return x[0]; }).findIndex(function (h) { return h.indexOf('🎃') === 0; });
-      secs.splice(di + 1, 0, t('howtoFav'));
-    }
+    var secs = t('howtoSections').slice();   // v15.1: plain one-sentence answers; past favourites live in the cards above
     secs.forEach(function (sec) {
       box.appendChild(el('h3', { text: sec[0] }));
       box.appendChild(el('ul', null, sec[1].map(function (line) { return el('li', { text: line }); })));
@@ -1949,7 +2034,7 @@
   // Desktop: hover (~400 ms) or keyboard focus. Phones: press and hold ~500 ms shows the tip and does NOT act (the click
   // that follows is swallowed). One line, EN/ZH, never over the element, gone after 2.5 s, linked with aria-describedby.
   var TIP_IDS = { safetyBtn: 'tip_safety', langBtn: 'tip_lang', offlineChip: 'tip_offline', demoChip: 'tip_demo', phaseBanner: 'tip_banner',
-    nearChip: 'tip_near', layerMore: 'tip_more', locateBtn: 'tip_locate', sharedChip: 'tip_shared', legend: 'tip_legend', favPinBtn: 'tip_favPin',
+    nearChip: 'tip_near', layerMore: 'tip_more', locateBtn: 'tip_locate', sharedChip: 'tip_shared', legend: 'tip_legend', favPinBtn: 'tip_favPin', favShareBtn: 'tip_favShare',
     guideTour: 'tip_tour', replayGuide: 'tip_replay', feedbackBtn: 'tip_feedback', shareAppBtn: 'tip_shareApp', phaseOk: 'tip_phaseOk',
     markCardDone: 'tip_done', markCardClose: 'tip_close', phaseClose: 'tip_close' };
   var TIP_SEL = 'button, a[href], summary, select, .legend, .leaflet-marker-icon, .leaflet-control-zoom a';
@@ -2108,7 +2193,7 @@
                                                  base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
     refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
     openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, tour: tour, startTour: startTour, appNow: appNow,
-    feedbackMail: feedbackMail, openPhaseCard: openPhaseCard, pauseCard: pauseCard, resumeCard: resumeCard, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshFav: refreshFav, favPopup: favPopup, openFavForm: openFavForm, favPins: function () { return favPins; }, renderFavLayer: renderFavLayer, SFX: SFX, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
+    feedbackMail: feedbackMail, showMe: showMe, openPhaseCard: openPhaseCard, pauseCard: pauseCard, resumeCard: resumeCard, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshFav: refreshFav, favPopup: favPopup, openFavForm: openFavForm, favPins: function () { return favPins; }, renderFavLayer: renderFavLayer, SFX: SFX, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
       return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
                  return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };

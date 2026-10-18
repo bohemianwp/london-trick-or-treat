@@ -27,12 +27,12 @@ test('banner + explainer copy (EN + ZH): one short line, 4 bullets, details behi
     assert.equal(I[l].phaseItems.length, 4);
     const all = I[l].phaseItems.map((x) => [].concat(x[0], x[1]).join(' ')).join(' ');
     assert.match(all, l === 'en' ? /14 days.*2 hours/ : /14 天.*2 小时/);
-    assert.ok(I[l].howtoSections[0][0].includes('🎃'), l + ' How-to starts with what to do now');
+    assert.ok(I[l].hcDecor[0].includes('🎃'), l + ' How-to decor card');
     const oct = I[l].phaseItems[1];
     assert.match(oct[0], l === 'en' ? /Oct 31, 3–11 PM/ : /10月31日 下午3–11点/);
     assert.equal(oct[1].length, 3); assert.match(oct[1].join(' '), l === 'en' ? /orange.*\{win\} min.*2 hours/ : /橙色.*\{win\} 分钟.*2 小时/);
     assert.match(I[l].phaseBullets.join(' '), l === 'en' ? /Nov 2/ : /11月2日/);
-    assert.ok(I[l].howtoSections[1][0].includes(l === 'en' ? 'Oct 31' : '10月31日'));
+    assert.ok(I[l].hcFun[0].includes(l === 'en' ? 'Oct 31' : '10月31日'));
   }
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /<details id="phaseMore" class="phasemore"><summary data-i18n="phaseMoreLbl">/);

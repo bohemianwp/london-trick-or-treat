@@ -20,12 +20,15 @@ test('banner: one short line (EN ≤ 52, ZH ≤ 26 characters); no second test-d
 
 test('welcome ≤ 3 cards × ≤ 3 lines; How-to ≤ 10 short sections; explainer ≤ 4 bullets', () => {
   for (const l of ['en', 'zh']) {
-    const max = l === 'en' ? 60 : 30;
+    // v15.1 (Peng): every line is ONE plain, complete sentence (no fragments), still short
+    const oneSentence = (x) => (x.match(l === 'en' ? /[.?!](\s|$)/g : /[。？！]/g) || []).length === 1 && /[.?!。？！]$/.test(x);
+    const max = l === 'en' ? 80 : 32;
     assert.ok(I[l].guideCards.length <= 3);
-    for (const c of I[l].guideCards) { assert.ok(c[1].length <= 3); for (const x of c[1]) assert.ok(len(x) <= max, l + ' card line: ' + x); }
-    const secs = I[l].howtoSections.concat([I[l].howtoFav]);
+    for (const c of I[l].guideCards) { assert.ok(c[1].length <= 3); for (const x of c[1]) assert.ok(len(x) <= max && oneSentence(x), l + ' card line: ' + x); }
+    const secs = I[l].howtoSections;
     assert.ok(secs.length <= 10, l + ' How-to sections ' + secs.length);
-    for (const s of secs) { assert.ok(s[1].length <= 3, s[0]); for (const x of s[1]) assert.ok(len(x) <= (l === 'en' ? 48 : 24), l + ' How-to line: ' + x); }
+    for (const s of secs) { assert.ok(s[1].length <= 3, s[0]); for (const x of s[1]) assert.ok(len(x) <= (l === 'en' ? 100 : 48) && oneSentence(x), l + ' How-to line: ' + x); }
+    for (const k of ['hcDecor', 'hcFav', 'hcFun', 'hcLike']) for (const x of I[l][k].slice(1)) assert.ok(len(x) <= (l === 'en' ? 64 : 30) && oneSentence(x), l + ' card: ' + x);
     assert.ok(I[l].phaseBullets.length <= 4);
     for (const x of I[l].phaseBullets) assert.ok(len(x) <= (l === 'en' ? 70 : 34), l + ' bullet: ' + x);
     for (const k of ['markBtn', 'decorMain', 'markSub', 'decorSub', 'markedThanks', 'decorThanks', 'tagsAsk', 'progNeed', 'decorProgNeed'])
@@ -38,7 +41,7 @@ test('visible copy is at least 50% shorter than v14.1 (measured: banner, welcome
   const V141 = { en: 12372, zh: 5108 };
   for (const l of ['en', 'zh']) {
     const L = I[l];
-    const now = len(flat([L.phasePre, L.phaseOn, L.phaseTest, L.guideCards, L.howtoIntro, L.howtoSections, L.howtoFav, L.phaseTitle, L.phaseBullets,
+    const now = len(flat([L.phasePre, L.phaseOn, L.phaseTest, L.guideCards, L.howtoIntro, L.howtoSections, L.hcDecor, L.hcFav, L.hcFun, L.hcLike, L.phaseTitle, L.phaseBullets,
       L.markBtn, L.markSub, L.decorMain, L.decorSub, L.markedLive, L.progNeed, L.tagsAsk, L.decorThanks, L.decorProgNeed, L.decorTagsAsk, L.progPractice,
       L.privacyIntro, L.privacySummary]));
     assert.ok(now <= V141[l] * 0.5, l + ': ' + now + ' vs ' + V141[l]);
@@ -50,7 +53,7 @@ test('one name per thing (EN + ZH): Fun streets, Decorations, Past favourites, S
     ['Fun streets', 'Decorations', 'Past favourites', 'Suggested areas', 'Events', 'Near me', 'More']);
   assert.deepEqual([I.zh.layerZones, I.zh.layerDecor, I.zh.layerFav, I.zh.layerAreas, I.zh.layerEvents, I.zh.layerNear, I.zh.layerMore],
     ['好玩的街', '装饰', '往年最爱', '推荐区', '活动', '我附近', '更多']);
-  const surfaces = (l) => flat([I[l].guideCards, I[l].howtoSections, I[l].howtoFav, I[l].phaseBullets, I[l].phaseItems, I[l].phaseFavItem,
+  const surfaces = (l) => flat([I[l].guideCards, I[l].howtoSections, I[l].hcFav, I[l].phaseBullets, I[l].phaseItems, I[l].phaseFavItem,
     I[l].favTitle, I[l].decorTitle, I[l].nearTitle, I[l].areasTitle, I[l].phasePre, I[l].phaseOn]);
   for (const old of ['Zones', 'hot spot', 'Best decorations', 'decor marks', 'Best streets from past years', 'Past best', 'Lively', 'Super hot'])
     assert.ok(!surfaces('en').includes(old), 'EN still says ' + old);
@@ -145,9 +148,67 @@ test('instructions match behaviour: windows, thresholds, expiry', () => {
   assert.deepEqual([C.testWindow.from, C.testWindow.to], ['2026-10-17', '2026-10-20']);
   assert.equal(L.MIN_ZONE, 3); assert.equal(L.MARK_KEEP_MS, 2 * 3600000); assert.equal(L.DECOR_KEEP_MS, 14 * 864e5);
   assert.equal(L.RATE_DEVICE_MS, 5 * 60000); assert.equal(L.FAV_HIDE_AT, 3); assert.equal(L.FAV_REPLY_MAX, 60);
-  const en = flat([I.en.howtoSections, I.en.phaseItems, I.en.phaseBullets, I.en.guideCards, I.en.howtoFav, I.en.testWhy, I.en.practiceWhy]);
-  for (const w of ['3–11 PM', '{win} min', '3+ marks', '2 hours', '14 days', 'Oct 17–20', 'Nov 2', '60 characters', '3 reports']) assert.ok(en.includes(w), w);
-  const zh = flat([I.zh.howtoSections, I.zh.phaseItems, I.zh.phaseBullets, I.zh.guideCards, I.zh.howtoFav, I.zh.testWhy, I.zh.practiceWhy]);
+  const en = flat([I.en.howtoSections, I.en.phaseItems, I.en.phaseBullets, I.en.guideCards, I.en.hcFav, I.en.testWhy, I.en.practiceWhy]);
+  for (const w of ['3–11 PM', '{win} min', '3+ marks', '2 hours', '14 days', 'Oct 17–20', 'Nov 2', '60 characters', '3 different people report']) assert.ok(en.includes(w), w);
+  const zh = flat([I.zh.howtoSections, I.zh.phaseItems, I.zh.phaseBullets, I.zh.guideCards, I.zh.hcFav, I.zh.testWhy, I.zh.practiceWhy]);
   for (const w of ['下午3–11点', '{win} 分钟', '3 个标记', '2 小时', '14 天', '10月17–20日', '11月2日', '60 字', '3 次']) assert.ok(zh.includes(w), w);
   assert.equal(L.TOUR ? 1 : 1, 1);
+});
+
+// v15.1: Peng could not find where to share a past favourite (v15 had hidden the entry). Make it visible, 2 taps.
+test('v15.1 past-favourites entry: visible button under the big button, popup + explainer links, tooltip', () => {
+  assert.equal(I.en.favShareBtn, '💬 Loved a street in past years? Share it');
+  assert.equal(I.zh.favShareBtn, '💬 往年哪条街最好玩？来分享');
+  assert.ok(I.en.favShareYours && I.zh.favShareYours && I.en.tip_favShare && I.zh.tip_favShare);
+  assert.match(html, /<div class="markwrap">[\s\S]*id="markBtn"[\s\S]*id="favShareBtn" class="favshare"[\s\S]*<\/div>/, 'lives with the big button, after it');
+  assert.match(app, /var show = favOn\(\) && LIB\.isFavOpen\(Date\.now\(\), DEMO\) && !tourZones;/, 'only when the board is on and open');
+  assert.match(app, /function startFavPin\(\)[\s\S]{0,300}openTab\('fav'\); setMode\('fav'\);/, 'straight into pin mode');
+  assert.match(app, /\$\('favShareBtn'\)\.addEventListener\('click', startFavPin\)/);
+  assert.match(app, /favShareYours'\), 'data-tip-key': 'tip_favShare', onclick: startFavPin/, 'fav popup offers “Share yours”');
+  assert.match(app, /class: 'linkbtn pb-fav'[^\n]*startFavPin/, 'explainer bullet is a link');
+  assert.match(app, /favShareBtn: 'tip_favShare'/, 'tooltip key');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.favshare \{[^}]*border: 1\.5px solid #fff7e8; background: rgba\(22,32,51,\.96\); color: #fff7e8;/, 'cream = past favourites, secondary weight');
+  assert.ok(len(I.en.favShareBtn) <= 42 && len(I.zh.favShareBtn) <= 16, 'one short line');
+});
+
+test('v15.1 area scores: Halloween orange dots that pass 3:1 on the popup navy', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16) / 255).map((v) => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  assert.match(css, /\.dots \.dot \{[^}]*background: var\(--orange\);/);
+  const ring = css.match(/\.dots \.dot\.off \{[^}]*border: 2px solid (#[0-9a-f]{6});/)[1];
+  const panel = css.match(/--panel: (#[0-9a-f]{6});/)[1], orange = css.match(/--orange: (#[0-9a-f]{6});/)[1];
+  assert.ok(cr(orange, panel) >= 3, 'filled ' + cr(orange, panel));
+  assert.ok(cr(ring, panel) >= 3, 'empty ring ' + cr(ring, panel));
+  assert.match(app, /class: i <= n \? 'dot' : 'dot off'/);
+  assert.match(app, /'aria-label': t\('scoreOf', \{ n: n \}\)/);
+  assert.match(I.en.scoreOf, /\{n\} of 5/); assert.match(I.zh.scoreOf, /\{n\}\/5/);
+  assert.match(css, /colour meanings: orange = fun streets \(Oct 31\) and area scores/);
+});
+
+// v15.1 (Peng 7:25 / 7:26): How-to = one card per feature (where / How / Why / Show me); numbers say what they count.
+test('v15.1 How-to feature cards: where + real button + How + Why + Show me (EN + ZH)', () => {
+  assert.match(html, /<div id="howtoCards" class="hcards"><\/div>\s*<details id="howtoMore" class="phasemore"><summary data-i18n="hcMoreLbl">/);
+  assert.match(app, /var kinds = bigIsDecor\(\) \? \['decor', 'fav', 'fun', 'like'\] : \['fun', 'fav', 'like', 'decor'\];/);
+  assert.match(app, /function showMe\(kind\)[\s\S]{0,1200}showme-ring[\s\S]{0,400}setTimeout\(function \(\) \{ ring\.remove\(\); \}, 2000\)/, 'Show me rings the real button for 2 s');
+  assert.match(app, /'data-tip-key': 'tip_showMe'/);
+  for (const l of ['en', 'zh']) {
+    assert.ok(I[l].hcShowMe && I[l].hcMoreLbl && I[l].tip_showMe && I[l].hcNotNow, l);
+    assert.match(I[l].hcFav[1], l === 'en' ? /cream button, then tap the street/ : /奶白色按钮，再点那条街/);
+  }
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.rep-purple \{ background: var\(--purple-btn\);/); assert.match(css, /\.rep-orange \{ background: var\(--orange\);/);
+  assert.match(css, /\.rep-cream \{[^}]*color: #fff7e8; \}/); assert.match(css, /\.showme-ring \{[^}]*border: 3px solid #eef2f8;/, 'neutral highlight');
+});
+
+test('v15.1 numbers explain themselves (Peng: “now 23”, “14 likes” were vague) — wording matches what is counted', () => {
+  assert.equal(I.en.zoneCount, '🔥 {n} marks'); assert.equal(I.zh.zoneCount, '🔥 {n} 个标记');      // count(*) of marks in the window (schema.sql), not people
+  assert.match(I.en.zoneInfo, /^Families marked this street \{n\} times in the last \{m\} minutes\.$/);
+  assert.match(I.zh.zoneInfo, /最近 \{m\} 分钟里，家庭们把这条街标记了 \{n\} 次。/);
+  assert.match(I.en.decorInfo, /liked these decorations \{n\} times in the last 14 days/);   // one like per phone per street per day
+  assert.match(I.zh.decorInfo, /最近 14 天里.*\{n\} 次赞/);
+  for (const l of ['en', 'zh']) for (const k of ['zoneCount', 'favBubbleNow', 'tip_zone']) assert.doesNotMatch(I[l][k], l === 'en' ? /\bnow\b/ : /现在/, l + ' ' + k);
+  assert.match(JSON.stringify(I.en.howtoSections), /If 3 different people report a pin or a reply, it is hidden\./);
+  assert.match(JSON.stringify(I.zh.howtoSections), /如果有 3 个不同的人举报一个标记或回复，它就会被隐藏。/);
 });

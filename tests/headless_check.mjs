@@ -143,7 +143,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     /^01Find the fun/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
   check('card 2 shows both buttons; card 3 has safety, the tip hint and ▶ demo', /Share in one tap/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
     await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].querySelectorAll('.gbtn-demo').length===2`) &&
-    /grown-up[\s\S]*Press and hold any button for a tip[\s\S]*25-second demo/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[2].textContent`)));
+    /grown-up[\s\S]*Press and hold any button to see what it does[\s\S]*25-second demo/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[2].textContent`)));
   await p.shot('v3-guide-en.png');
   for (let i = 0; i < 2; i++) { await p.click('#guideNext'); await sleep(350); }
   check('Got it on the last card closes it and remembers ltot.guideSeen.v2', await p.ev(`!document.getElementById('guideDone').hidden`) &&
@@ -165,7 +165,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('HUD overlay present and not clickable', await p.ev(`getComputedStyle(document.querySelector('.hud')).pointerEvents==='none' && getComputedStyle(document.querySelector('.hud')).display!=='none'`));
   check('legend: Quiet / Busy / Very busy', /Quiet[\s\S]*Busy[\s\S]*Very busy/.test(await p.ev(`document.getElementById('legend').textContent`)));
   check('mark window text follows config.js (no raw {win} placeholders)', !(await p.ev(`document.body.textContent.includes('{win}')`)) &&
-    /3\+ marks in 45 min/.test(await p.ev(`document.getElementById('howtoList').textContent`)));
+    /in the last 45 min: grey = 3–5 marks/.test(await p.ev(`document.getElementById('howtoList').textContent`)));
   // v15 tooltips: a real long-press (touch) shows the tip and does NOT run the action; auto-hides; aria-describedby while shown
   const lp = async (sel) => { const r = await p.ev(`(function(){var b=document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();return [b.left+b.width/2,b.top+b.height/2];})()`);
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r[0], y: r[1] }] }, p.sessionId); await sleep(700);
@@ -246,8 +246,20 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = short How-to (9 sections, +Past favourites when on) + one primary ▶ demo, no Board/Safety duplicates', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === ((await p.ev('__ltot.state().favOn')) ? 10 : 9) &&
-    await p.ev(`!document.getElementById('guideBoard') && !document.getElementById('guideSafety') && document.querySelectorAll('#panel-guide .btn-primary').length===1`));
+  check('Guide tab = feature cards + 8 one-sentence answers behind “More answers” + one primary ▶ demo, no Board/Safety duplicates', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 8 &&
+    await p.ev(`!document.getElementById('howtoMore').open && !document.getElementById('guideBoard') && !document.getElementById('guideSafety') && document.querySelectorAll('#panel-guide .btn-primary').length===1`));
+  // v15.1 (Peng): one card per feature = where (mini phone, target ringed) + the real button + How + Why + Show me
+  const hc = await p.ev(`[...document.querySelectorAll('#howtoCards .hcard')].map(function(c){return {k:c.dataset.kind, ok:!!(c.querySelector('.hc-phone .hp-target')&&c.querySelector('.hc-rep')&&/^How: /.test(c.querySelector('.hc-how').textContent)&&/^Why: /.test(c.querySelector('.hc-why').textContent)&&c.querySelector('.hc-show'))};})`);
+  check('v15.1 How-to cards before Oct 31: decorations, past favourite, fun street, like/reply — each with where / button / How / Why / Show me',
+    hc.map((c) => c.k).join() === ((await p.ev('__ltot.state().favOn')) ? 'decor,fav,fun,like' : 'decor,fun') && hc.every((c) => c.ok), JSON.stringify(hc));
+  check('v15.1 the replica buttons wear the real colours (purple / cream / orange), no yellow', await p.ev(`(function(){var g=function(s,p){var e=document.querySelector(s);return e&&getComputedStyle(e)[p];};return g('.hc-decor .hc-rep','backgroundColor')==='rgb(124, 58, 237)' && (!document.querySelector('.hc-fav') || g('.hc-fav .hc-rep','color')==='rgb(255, 247, 232)') && g('.hc-fun .hc-rep','backgroundColor')==='rgb(255, 138, 61)';})()`));
+  if (await p.ev(`!!document.querySelector('.hc-fav .hc-show')`)) {
+    await p.click('.hc-fav .hc-show'); await sleep(700);
+    const sm = await p.ev(`(function(){var r=document.querySelector('.showme-ring'),b=document.getElementById('favShareBtn').getBoundingClientRect();if(!r)return null;var q=r.getBoundingClientRect();return {closed:document.getElementById('sheet').dataset.open==='false', around:q.left<=b.left&&q.right>=b.right&&q.top<=b.top&&q.bottom>=b.bottom};})()`);
+    check('v15.1 “Show me” closes the guide and rings the real “share a past favourite” button', !!sm && sm.closed && sm.around, JSON.stringify(sm));
+    await sleep(2000);
+    check('…the ring is gone after ~2 s', await p.ev(`!document.querySelector('.showme-ring')`));
+  }
 
   // area popup = "Suggested" base layer
   const pop = await p.ev(`(function(){var c; __ltot.map.eachLayer(function(l){ if(!c && l.options && l.options.className==='area-circle') c=l; });
@@ -326,7 +338,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await a.shot('v3-demo-zones.png');
   await a.ev(`__ltot.map.setView([42.9655, -81.2440], 14, {animate:false})`); await sleep(800);
   const full = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
-  check('street zoom: full badge “🔥 23+ now”, decorations “🎃 n likes” (demo ticks up)', full.some((t) => /^🔥 2\d now/.test(t)) && full.some((t) => /^🎃 \d+ likes/.test(t)), full.join(' | '));
+  check('street zoom: full badge “🔥 23+ marks”, decorations “🎃 n likes” (demo ticks up)', full.some((t) => /^🔥 2\d marks/.test(t)) && full.some((t) => /^🎃 \d+ likes/.test(t)), full.join(' | '));
   await a.shot('v3-demo-street.png');
   await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(500);
   check('zones are SVG paths with CSS pulse classes (no per-frame JS)', await a.ev(`document.querySelectorAll('path.zone-hot').length>=1 && document.querySelectorAll('path.zone-lively').length>=1 && document.querySelectorAll('path.zone-quiet').length>=1 && getComputedStyle(document.querySelector('path.zone-hot')).animationName==='zflash'`));
@@ -366,7 +378,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('Route button on a row plans a walk to that zone', await n.ev(`!document.getElementById('panel-route').hidden && document.getElementById('areaSelect').value==='target'`));
   const nz = await openPage('?demo=1&near=1&lang=zh', { wait: 5000 });
   await dismissGuide(nz);
-  check('Near me in Chinese', /我附近好玩的街/.test(await nz.ev(`document.getElementById('panel-near').textContent`)) && /现在 \d+/.test(await nz.ev(`document.getElementById('nearList').textContent`)));
+  check('Near me in Chinese', /我附近好玩的街/.test(await nz.ev(`document.getElementById('panel-near').textContent`)) && /\d+ 个标记/.test(await nz.ev(`document.getElementById('nearList').textContent`)));
   await nz.shot('v3-near-zh.png');
   await nz.ev(`__ltot.openTab(null); __ltot.map.setView([42.975, -81.27], 12, {animate:false})`); await sleep(900);
   await nz.shot('v3-demo-zones-zh.png');
@@ -413,7 +425,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#soundBtn'); await sleep(200);
   check('sound: tap → 🔇, remembered in localStorage, bilingual label', await p.ev(`document.getElementById('soundBtn').dataset.on==='0' && document.getElementById('soundBtn').getAttribute('aria-pressed')==='false' && localStorage.getItem('ltot.sound')==='0' && /Sound off/.test(document.getElementById('soundBtn').getAttribute('aria-label'))`));
   await p.click('#soundBtn'); await sleep(200);
-  check('How-to has the board and the sounds sections', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return /💬 Past favourites/.test(t)&&/🔊 Sounds/.test(t);})()`));
+  check('How-to has the past-favourite card and the sounds answer', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return !!document.querySelector('#howtoCards .hc-fav') && /💬 Share a past favourite/.test(document.getElementById('howtoCards').textContent) && /🔊 Sounds/.test(t);})()`));
   check('privacy notice mentions the past-years board', /Past-years board/.test(await p.ev(`document.getElementById('privacyList').textContent`)));
   check('v14 board page: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
   const n = await openPage('?demo=1&now=2026-10-31T17:30:00-04:00&lang=zh', { wait: 5000 });
@@ -421,7 +433,57 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await n.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false}); __ltot.favPopup(__ltot.favPins()[0])`); await sleep(700);
   const night = await n.ev(`document.querySelector('.pop-fav').textContent`);
   check('Oct 31 (zh): memory + tonight prompt, both counts when the zone is lit', /\d+ 个家庭说这里往年难忘/.test(night) && /今晚：\d+ 个标记/.test(night) && /今晚怎么样？点一下分享！/.test(night), night.slice(0, 90));
-  check('Oct 31 bubbles say “🏆 n · 🔥 现在 n”', /🏆 \d+ · 🔥 现在 \d+/.test(await n.ev(`[...document.querySelectorAll('.favb')].map(function(b){return b.textContent;}).join('|')`)));
+  check('Oct 31 bubbles say “🏆 n · 🔥 n 个标记”', /🏆 \d+ · 🔥 \d+ 个标记/.test(await n.ev(`[...document.querySelectorAll('.favb')].map(function(b){return b.textContent;}).join('|')`)));
+}
+
+// =========================================================== 2b. v15.1 past-favourites entry + orange score dots
+{
+  const R = (id) => `(function(){var r=document.getElementById('${id}').getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom,w:r.width,h:r.height};})()`;
+  const apart = (a, b) => a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t;
+  for (const [lang, q, re] of [['en', '?demo=1&lang=en', /Loved a street in past years\? Share it/], ['zh', '?demo=1&lang=zh', /往年哪条街最好玩？来分享/],
+                               ['zh-night', '?demo=1&lang=zh&now=2026-10-31T19:30:00-04:00', /往年哪条街最好玩？来分享/]]) {
+    const p = await openPage(q, { wait: 5000 });
+    await dismissGuide(p);
+    const vis = await p.ev(`(function(){var b=document.getElementById('favShareBtn');return !b.hidden && b.offsetParent!==null && getComputedStyle(b).display!=='none';})()`);
+    const fb = await p.ev(R('favShareBtn')), mb = await p.ev(R('markBtn')), lg = await p.ev(R('legend'));
+    const w = await p.ev('window.innerWidth');
+    check(`v15.1 (${lang}) “share a past favourite” button visible at ${w} px, under the big button, not overlapping it or the legend`,
+      vis && re.test(await p.ev(`document.getElementById('favShareBtn').textContent`)) && w === 390 && fb.l >= 0 && fb.r <= w && fb.h >= 40 && fb.t >= mb.b && apart(fb, mb) && apart(fb, lg) && apart(mb, lg),
+      JSON.stringify({ vis, fb, mb, lg }));
+    if (lang === 'zh-night') {
+      check('v15.1 Oct 31 night: the entry sits under the orange fun-street button', !(await p.ev(`document.getElementById('markBtn').classList.contains('mb-decor')`)) && fb.t >= mb.b);
+      await send('Target.closeTarget', { targetId: p.targetId }); continue;
+    }
+    await p.tap(fb.l + fb.w / 2, fb.t + fb.h / 2); await sleep(500);
+    check(`v15.1 (${lang}) one tap → pin mode with the “tap the street” prompt, Past favourites panel + layer on`,
+      await p.ev(`!document.getElementById('modeBanner').hidden && document.getElementById('modeText').textContent===__ltot.t('favTapMap') && !document.getElementById('panel-fav').hidden && __ltot.state().layers.fav`),
+      await p.ev(`document.getElementById('modeText').textContent`));
+    if (lang !== 'en') { await p.click('#modeCancel'); await sleep(200); }
+    if (lang === 'en') {
+      await p.shot('v151-pin-mode-en.png');
+      await p.ev(`__ltot.map.setView([42.9605, -81.2410], 17, {animate:false})`); await sleep(400);
+      await p.tap(195, 560); await sleep(600);
+      check('v15.1 second tap on the street → the favourite form opens (2 taps total)', await p.ev(`document.getElementById('favDialog').open`));
+      await p.ev(`document.getElementById('favDialog').close()`);
+      await p.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false}); __ltot.favPopup(__ltot.favPins()[0])`); await sleep(600);
+      check('v15.1 a past-favourite popup offers “💬 Share yours”', await p.ev(`(function(){var b=document.querySelector('.pop-fav .btn-fav-share');return !!b && /Share yours/.test(b.textContent);})()`));
+      await p.click('.pop-fav .btn-fav-share'); await sleep(400);
+      check('…and it goes straight into pin mode', await p.ev(`!document.getElementById('modeBanner').hidden && document.getElementById('modeText').textContent===__ltot.t('favTapMap')`));
+      await p.click('#modeCancel'); await sleep(200);
+      await p.ev(`__ltot.openPhaseCard()`); await sleep(300);
+      check('v15.1 explainer bullet “💬 Mark past favourite streets” is a link to the same flow', await p.ev(`!!document.querySelector('#phaseBullets .pb-fav')`));
+      await p.click('#phaseBullets .pb-fav'); await sleep(400);
+      check('…tap → explainer closes, pin mode starts', await p.ev(`document.getElementById('phaseCard').hidden && !document.getElementById('modeBanner').hidden`));
+      await p.click('#modeCancel'); await sleep(200);
+    }
+    // area scores: orange dots
+    await p.ev(`(function(){var T=__ltot;T.setLayer('areas',true);var c=null;T.map.eachLayer(function(l){if(!c&&l.options&&l.options.className==='area-circle')c=l;});T.map.setView(c.getLatLng(),14,{animate:false});c.fire('click',{latlng:c.getLatLng()});})()`); await sleep(800);
+    const dots = await p.ev(`(function(){var d=document.querySelector('.leaflet-popup .dots');if(!d)return null;var on=d.querySelector('.dot:not(.off)'),off=document.querySelector('.leaflet-popup .dot.off');return {n:d.querySelectorAll('.dot').length,on:on&&getComputedStyle(on).backgroundColor,off:off?getComputedStyle(off).borderTopColor:null,label:d.getAttribute('aria-label')};})()`);
+    check(`v15.1 (${lang}) area score dots: 5 per row, filled = Halloween orange, empty = dim orange ring, labelled`,
+      !!dots && dots.n === 5 && dots.on === 'rgb(255, 138, 61)' && (dots.off === null || dots.off === 'rgb(176, 104, 58)') && (lang === 'en' ? /of 5/ : /\/5 分/).test(dots.label || ''), JSON.stringify(dots));
+    check(`v15.1 (${lang}) page: no JS errors`, realErrors(p).length === 0, realErrors(p).join(' | '));
+    await send('Target.closeTarget', { targetId: p.targetId });
+  }
 }
 
 // =========================================================== 3. h3-js blocked → local hex grid fallback

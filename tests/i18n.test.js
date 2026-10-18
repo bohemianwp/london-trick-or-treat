@@ -72,8 +72,8 @@ test('big kid-friendly wording from the spec, in both languages (v15 short copy)
   assert.deepEqual([I18N.zh.tabMap, I18N.zh.tabRoute, I18N.zh.tabMark, I18N.zh.tabGuide], ['地图', '路线', '标记！', '指南']);
   assert.deepEqual([I18N.en.legendQuiet, I18N.en.legendLively, I18N.en.legendHot, I18N.en.legendDecor], ['Quiet', 'Busy', 'Very busy', 'Decorations']);
   assert.deepEqual([I18N.zh.legendLively, I18N.zh.legendHot, I18N.zh.legendDecor], ['热闹', '非常热闹', '装饰']);
-  assert.equal(I18N.en.zoneCount.replace('{n}', 23), '🔥 23 now');
-  assert.equal(I18N.zh.zoneCount.replace('{n}', 23), '🔥 现在 23');
+  assert.equal(I18N.en.zoneCount.replace('{n}', 23), '🔥 23 marks');   // v15.1: Peng found “now 23” vague
+  assert.equal(I18N.zh.zoneCount.replace('{n}', 23), '🔥 23 个标记');
   assert.equal(I18N.en.decorBadge.replace('{n}', 14), '🎃 14 likes'); assert.equal(I18N.zh.decorBadge.replace('{n}', 14), '🎃 14 个赞');
   assert.equal(I18N.en.newBadge, 'NEW'); assert.equal(I18N.zh.newBadge, '新发现');
   assert.equal(I18N.en.practiceChip, '🧪 Practice'); assert.equal(I18N.zh.practiceChip, '🧪 练习');

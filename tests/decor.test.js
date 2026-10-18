@@ -122,8 +122,8 @@ test('decor copy (EN + ZH), privacy notice, guide, and the SQL file', () => {
   for (const l of ['en', 'zh']) {
     const priv = I18N[l].privacyItems.map((x) => x.join(' ')).join(' ');
     assert.match(priv, l === 'en' ? /Decoration marks.*14 days.*Nov 2, 2026/ : /装饰标记.*14 天.*11 月 2 日/);
-    assert.ok(I18N[l].guideCards[1][1].some((b) => b.includes(l === 'en' ? 'purple button at great decorations' : '看到好看的装饰，点紫色按钮')), l + ' welcome card mentions decor');
-    assert.ok(I18N[l].howtoSections.some((s) => s[0].includes('🎃')), l + ' How-to decor section');
+    assert.ok(I18N[l].guideCards[1][1].some((b) => b.includes(l === 'en' ? 'tap the purple button' : '点紫色按钮')), l + ' welcome card mentions decor');
+    assert.ok(I18N[l].hcDecor[0].includes('🎃'), l + ' How-to decor card');
   }
   const sql = fs.readFileSync(path.join(root, 'supabase/v11_decor.sql'), 'utf8'), schema = fs.readFileSync(path.join(root, 'supabase/schema.sql'), 'utf8');
   for (const s of [sql, schema]) {

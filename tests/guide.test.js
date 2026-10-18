@@ -21,26 +21,29 @@ test('guide / How-to / hint strings exist in both languages', () => {
   for (const k of keys) for (const l of ['en', 'zh']) assert.ok(I18N[l][k], `${l}.${k} missing`);
   for (const l of ['en', 'zh']) {
     assert.equal(I18N[l].guideCards.length, 3, l + ': v15 = 3 short welcome cards');
-    assert.equal(I18N[l].howtoSections.length, 9, l + ': 9 short How-to sections (+ Past favourites when the board is on)');
+    assert.equal(I18N[l].howtoSections.length, 8, l + ': v15.1 = 8 one-sentence answers behind “More answers” (features are cards)');
     for (const c of I18N[l].guideCards) assert.ok(typeof c[0] === 'string' && c[1].length >= 2 && c[1].length <= 3, l + ' card ' + c[0]);
   }
 });
 
 test('welcome cards and How-to cover the product in a few words (EN + 中文)', () => {
   const cards = I18N.en.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(cards[0], /^Find the fun/); assert.match(cards[0], /Orange streets/); assert.match(cards[0], /Purple streets/); assert.match(cards[0], /Bubbles/);
-  assert.match(cards[1], /^Share in one tap/); assert.match(cards[1], /purple button/); assert.match(cards[1], /Oct 31 from 3 PM/); assert.match(cards[1], /practice/);
-  assert.match(cards[2], /^Safe & private/); assert.match(cards[2], /grown-up/); assert.match(cards[2], /Street level only/); assert.match(cards[2], /Nov 2/);
-  assert.match(cards[2], /Press and hold any button for a tip/);
+  assert.match(cards[0], /^Find the fun/); assert.match(cards[0], /orange streets/); assert.match(cards[0], /Purple streets/); assert.match(cards[0], /Cream bubbles/);
+  assert.match(cards[1], /^Share in one tap/); assert.match(cards[1], /purple button/); assert.match(cards[1], /cream button, then the street/); assert.match(cards[1], /Oct 31 from 3 PM/);
+  assert.match(cards[2], /^Safe & private/); assert.match(cards[2], /grown-up/); assert.match(cards[2], /only save the street/); assert.match(cards[2], /Nov 2/);
+  assert.match(cards[2], /Press and hold any button/);
   const zc = I18N.zh.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(zc[0], /橙色的街/); assert.match(zc[0], /紫色的街/); assert.match(zc[1], /紫色按钮/); assert.match(zc[1], /练习/);
-  assert.match(zc[2], /大人/); assert.match(zc[2], /11月2日/); assert.match(zc[2], /长按任意按钮查看提示/);
+  assert.match(zc[0], /橙色的街/); assert.match(zc[0], /紫色的街/); assert.match(zc[1], /紫色按钮/); assert.match(zc[1], /奶白色按钮/);
+  assert.match(zc[2], /大人/); assert.match(zc[2], /11月2日/); assert.match(zc[2], /长按任意按钮/);
   const howto = I18N.en.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
-  for (const w of ['Decorations', 'Fun streets', 'Practice', 'Grey: quiet', 'Light orange: busy', 'Deep orange: very busy', 'NEW', '🔥 23 now', '🎃 14 likes',
-    '3+', 'More ▾', 'Route', 'Sounds', 'Privacy', '2 hours', 'Nov 2', '{win}']) assert.ok(howto.includes(w), 'How-to mentions ' + w);
+  for (const w of ['Practice', 'test days', 'grey = 3–5 marks', 'light orange = 6–14', 'deep orange = 15 or more', 'NEW', '🔥 23 marks means', '🎃 14 likes means',
+    '🏆 12 means', '3 different people report', 'More ▾', 'Route', 'Soft sounds', 'Nov 2', '{win}']) assert.ok(howto.includes(w), 'How-to mentions ' + w);
+  for (const k of ['hcDecor', 'hcFav', 'hcFun', 'hcLike']) for (const l of ['en', 'zh']) {
+    assert.equal(I18N[l][k].length, 3, l + ' ' + k); assert.match(I18N[l][k][1], l === 'en' ? /^How: / : /^怎么做：/); assert.match(I18N[l][k][2], l === 'en' ? /^Why: / : /^为什么：/);
+  }
   for (const w of ['Add my house', 'Share link', 'Teal only', 'Giving now', 'Hot pink', 'decor marks', 'Zones']) assert.ok(!howto.includes(w), 'gone: ' + w);
   const zh = I18N.zh.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
-  for (const w of ['装饰', '好玩的街', '练习', '非常热闹', '🔥 现在 23', '🎃 14 个赞', '更多 ▾', '2 小时', '11月2日']) assert.ok(zh.includes(w), 'zh How-to mentions ' + w);
+  for (const w of ['练习', '试用期', '灰色 3–5 个标记', '新发现', '🔥 23 个标记', '🎃 14 个赞', '🏆 12', '3 个不同的人举报', '更多 ▾', '11月2日']) assert.ok(zh.includes(w), 'zh How-to mentions ' + w);
 });
 
 test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hints, guide dialog, all assets ?v=5', () => {
@@ -58,7 +61,7 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=15$/, u));
+  own.forEach((u) => assert.match(u, /\?v=15\.1$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 
