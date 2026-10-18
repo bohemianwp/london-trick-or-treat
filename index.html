@@ -19,11 +19,11 @@
     <span id="demoChip" class="chip chip-demo" data-i18n="demoChip" hidden>DEMO</span>
     <button id="practiceChip" class="chip chip-practice chip-split" type="button" hidden>🧪 Practice mode</button>
     <button id="offlineChip" class="chip chip-off chip-split" type="button" hidden>📴 Offline mode</button>
-    <button id="boardBtn" class="chip chip-icon" type="button" aria-controls="panel-board">🏆</button>
-    <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">🦺 Safety</button>
-    <button id="tourBtn" class="chip chip-help chip-tour" type="button" aria-controls="tour">▶</button>
+    <button id="boardBtn" class="chip chip-icon" type="button" aria-controls="panel-board"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg></button>
+    <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">Safety</button>
+    <button id="tourBtn" class="chip chip-help chip-tour" type="button" aria-controls="tour"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor" stroke="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
     <button id="helpBtn" class="chip chip-help" type="button" aria-label="How to use this map" aria-controls="panel-guide">?</button>
-    <button id="soundBtn" class="chip chip-icon chip-sound" type="button" aria-pressed="true">🔊</button>
+    <button id="soundBtn" class="chip chip-icon chip-sound" type="button" aria-pressed="true"></button>
     <button id="langBtn" class="chip" type="button">中文</button>
   </header>
   <div id="countdown" class="countdown" role="timer"></div>
@@ -36,7 +36,7 @@
     <div class="hud" aria-hidden="true"><div class="hud-grid"></div><div class="hud-sweep"></div></div>
 
     <div id="layerbar" class="layerbar" role="group">
-      <button id="nearChip" class="lchip lchip-near" type="button"><span class="li">📍</span><span data-i18n="layerNear">Near me</span></button>
+      <button id="nearChip" class="lchip lchip-near" type="button"><span class="li li-near" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span data-i18n="layerNear">Near me</span></button>
     </div>
     <div id="legend" class="legend">
       <span><i class="lg lg-quiet"></i><span data-i18n="legendQuiet">Quiet</span></span>
@@ -48,7 +48,7 @@
     </div>
 
     <button id="locateBtn" class="fab" type="button">
-      <span class="fab-icon">📍</span><span id="locateLabel" data-i18n="showMyLocation">Show my location</span>
+      <span class="fab-icon"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></span><span id="locateLabel" data-i18n="showMyLocation">Show my location</span>
     </button>
     <button id="altBtn" class="fab fab-decor" type="button" hidden><span id="altLabel">Cool decorations here! 🎃</span></button>
 
@@ -204,7 +204,7 @@
         <button id="replayGuide" class="btn btn-block" type="button" data-i18n="howtoReplay">▶ Show the welcome cards again</button>
         <div class="row">
           <button id="guideBoard" class="btn" type="button" data-i18n="boardLink">🏆 Board</button>
-          <button id="guideSafety" class="btn" type="button" data-i18n="safetyBtn">🦺 Safety</button>
+          <button id="guideSafety" class="btn" type="button" data-i18n="safetyBtn">Safety</button>
         </div>
         <div id="howtoList" class="howto"></div>
         <button class="btn btn-link privacy-link" type="button" data-i18n="privacyLink">Privacy</button>
@@ -277,10 +277,10 @@
   </div>
 
   <nav class="tabbar" aria-label="Sections">
-    <button type="button" data-tab="map"><span class="ti">🗺️</span><span data-i18n="tabMap">Map</span></button>
-    <button type="button" data-tab="route"><span class="ti">🚶</span><span data-i18n="tabRoute">Route</span></button>
-    <button type="button" data-tab="mark" class="tab-mark"><span class="ti">✨</span><span data-i18n="tabMark">Mark it!</span></button>
-    <button type="button" data-tab="guide"><span class="ti">📖</span><span data-i18n="tabGuide">Guide</span></button>
+    <button type="button" data-tab="map"><span class="ti"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></span><span data-i18n="tabMap">Map</span></button>
+    <button type="button" data-tab="route"><span class="ti"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg></span><span data-i18n="tabRoute">Route</span></button>
+    <button type="button" data-tab="mark" class="tab-mark"><span class="ti"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><path d="M12 6.5v6M9 9.5h6"/></svg></span><span data-i18n="tabMark">Mark it!</span></button>
+    <button type="button" data-tab="guide"><span class="ti"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></svg></span><span data-i18n="tabGuide">Guide</span></button>
   </nav>
 
   <dialog id="locDialog" class="dialog">

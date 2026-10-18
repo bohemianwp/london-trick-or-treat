@@ -6,7 +6,7 @@
   en: {
     appTitle: 'Mark it! London Trick-or-Treat', langBtn: '中文', langAria: 'Switch language to Chinese',
     tabMap: 'Map', tabRoute: 'Route', tabMark: 'Mark it!', tabGuide: 'Guide',
-    safetyBtn: '🦺 Safety', offlineChip: '📴 Offline mode', demoChip: 'DEMO', practiceChip: '🧪 Practice mode',
+    safetyBtn: 'Safety', offlineChip: '📴 Offline mode', demoChip: 'DEMO', practiceChip: '🧪 Practice mode',
     practiceWhy: 'Practice mode: marks stay on this phone until Halloween night (Oct 31, 3–11 PM). Then everyone’s marks are shared.',
     offlineWhy: 'The shared server is not reachable, so data is saved on this phone only. Retrying every 2 minutes.',
     offlineWhy_notConfigured: 'Supabase is selected in config.js but the URL or key is empty, so the app runs in local mode.',
@@ -335,7 +335,7 @@
   zh: {
     appTitle: '标记它！伦敦万圣节讨糖地图', langBtn: 'EN', langAria: '切换到英文',
     tabMap: '地图', tabRoute: '路线', tabMark: '标记！', tabGuide: '指南',
-    safetyBtn: '🦺 安全', offlineChip: '📴 离线模式', demoChip: '演示', practiceChip: '🧪 练习模式',
+    safetyBtn: '安全', offlineChip: '📴 离线模式', demoChip: '演示', practiceChip: '🧪 练习模式',
     practiceWhy: '练习模式：万圣节当晚（10 月 31 日下午 3 点到晚上 11 点）之前，标记只存在这台手机上。到了当晚，大家的标记才会共享。',
     offlineWhy: '连不上共享服务器，数据暂时只存在这台手机上。每 2 分钟自动重试。',
     offlineWhy_notConfigured: 'config.js 里选了 Supabase，但网址或密钥是空的，所以 app 用本地模式运行。',

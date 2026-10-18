@@ -178,7 +178,7 @@
   $('phaseBanner').addEventListener('click', openPhaseCard);
 
   // ==== layer chips ====
-  var LAYER_ICONS = { zones: '🔥', decor: '🎃', fav: '💬', areas: '🧭', events: '📅' };
+  var LAYER_ICONS = { zones: '🔥', decor: '🎃', fav: '💬', areas: '🧭', events: '📅' };   // v14: chips show a colour dot (.li-*), not the emoji
   var LAYER_KEYS = { zones: 'layerZones', decor: 'layerDecor', fav: 'layerFav', areas: 'layerAreas', events: 'layerEvents' };
   function decorLayerShown() { return LIB.decorVisible(Date.now(), DEMO); }
   function applyLayers() {
@@ -199,7 +199,7 @@
       if (k === 'decor' && !decorLayerShown()) return;
       if (k === 'fav' && !favOn()) return;
       bar.insertBefore(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
-        onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]), nearChip);
+        onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li li-' + k, 'aria-hidden': 'true' }), t(LAYER_KEYS[k])]), nearChip);
     });
   }
   $('nearChip').addEventListener('click', function () { openNear(); });
@@ -1226,6 +1226,10 @@
     var line2, z = tonight ? favZone(p) : null;
     if (tonight) line2 = (p.families ? '🏆 ' + p.families + ' · ' : '') + (z ? '🔥 ' + esc(t('favBubbleNow', { n: z.count })) : '🔥 ' + esc(t('favBubbleAsk')));
     else line2 = '👍 ' + (p.likes || 0) + ' ❤️ ' + (p.hearts || 0);
+    if (!full) {   // v14 tidy: zoomed out = one small pill (tag icon + likes), no scaling, so it never covers the zone badges
+      return '<div class="favb favb-mini' + (tonight ? ' favb-night' : '') + (favTokens[p.id] ? ' favb-mine' : '') + '"><div class="fb-l1"><i>' + LIB.FAV_ICON[p.tag] + '</i>' +
+        '<b class="mono-num">' + ((p.likes || 0) + (p.hearts || 0)) + '</b></div></div>';
+    }
     return '<div class="favb' + (tonight ? ' favb-night' : '') + (favTokens[p.id] ? ' favb-mine' : '') + '" style="--s:' + LIB.favScale(p.likes, p.hearts) + '">' +
       '<div class="fb-l1"><i>' + LIB.FAV_ICON[p.tag] + '</i>' + (full && p.body ? '<span class="fb-t">' + esc(trunc(p.body, 24)) + '</span>' : '') + '</div>' +
       '<div class="fb-l2 mono-num">' + line2 + '</div></div>';
@@ -1238,7 +1242,7 @@
       : LIB.clusterFav(favPins, function (la, ln) { return map.project([la, ln], zm); }, 72);
     groups.forEach(function (g) {
       var p = g.pins[0], many = g.pins.length > 1;
-      var html = many ? '<div class="favb favb-cluster" style="--s:' + LIB.favScale(g.score, 0) + '"><div class="fb-l1"><i>💬</i><b class="mono-num">' + g.pins.length + '</b></div></div>'
+      var html = many ? '<div class="favb favb-mini favb-cluster"><div class="fb-l1"><i>💬</i><b class="mono-num">' + g.pins.length + '</b></div></div>'
         : favBubbleHtml(p, tonight, full);
       L.marker([g.lat, g.lng], { pane: 'favPane', keyboard: true, title: many ? t('favCluster', { n: g.pins.length }) : t('ftag_' + p.tag),
         icon: L.divIcon({ className: 'favicon', html: html, iconSize: null }) })
@@ -1566,9 +1570,12 @@
   document.querySelectorAll('.privacy-link').forEach(function (b) { b.addEventListener('click', function () { openTab('privacy'); }); });
   function toggleTab(name) { openTab(currentTab === name && $('sheet').dataset.open === 'true' ? null : name); }
   $('safetyBtn').addEventListener('click', function () { toggleTab('safety'); });
+  var SOUND_ICON_ON = '<svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>';
+  var SOUND_ICON_OFF = '<svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
   function renderSoundBtn() {
     var on = SFX.isOn(), b = $('soundBtn');
-    b.textContent = on ? '🔊' : '🔇';
+    b.innerHTML = on ? SOUND_ICON_ON : SOUND_ICON_OFF;          // v14: line icons in the top bar (emoji stay in content)
+    b.dataset.on = on ? '1' : '0';
     b.setAttribute('aria-pressed', String(on));
     b.setAttribute('aria-label', t(on ? 'soundOnAria' : 'soundOffAria')); b.title = t(on ? 'soundOnAria' : 'soundOffAria');
   }

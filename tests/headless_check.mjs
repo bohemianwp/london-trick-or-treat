@@ -253,7 +253,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const zh = await p.ev(`({ title: document.title, lang: document.documentElement.lang, tabs: [...document.querySelectorAll('.tabbar button')].map(b=>b.textContent).join('|'),
      btn: document.getElementById('markBtn').textContent, legend: document.getElementById('legend').textContent,
      leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n) })`);
-  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这里装饰很棒！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
+  check('one-tap Chinese: title, tabs (v14: line icons), big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '地图|路线|标记！|指南' && (await p.ev(`document.querySelectorAll('.tabbar .ti svg.ico').length`)) === 4 && /这里装饰很棒！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
   check('no untranslated i18n keys on screen', zh.leftovers.length === 0, zh.leftovers.join(','));
   await p.click('.tabbar [data-tab="map"]'); await sleep(200);
   check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
@@ -383,9 +383,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const mine = await p.ev(`(function(){var x=__ltot.favPins().filter(function(q){return q.body==='Full-size bars every year';})[0]; return x?{lat:x.lat,lng:x.lng}:null;})()`);
   check('pin posted, snapped to the ~50 m street grid, popup shows “yours” + Delete', !!mine && mine.lat === 42.96015 && mine.lng === -81.2412 &&
     await p.ev(`/yours/.test(document.querySelector('.pop-fav').textContent) && /Delete/.test(document.querySelector('.pop-fav').textContent)`), JSON.stringify(mine));
-  check('sound: 🔊 in the top bar, ON by default', await p.ev(`document.getElementById('soundBtn').textContent==='🔊' && __ltot.SFX.isOn()`));
+  check('sound: 🔊 (line icon) in the top bar, ON by default', await p.ev(`document.getElementById('soundBtn').dataset.on==='1' && document.getElementById('soundBtn').getAttribute('aria-pressed')==='true' && !!document.querySelector('#soundBtn svg') && __ltot.SFX.isOn()`));
   await p.click('#soundBtn'); await sleep(200);
-  check('sound: tap → 🔇, remembered in localStorage, bilingual label', await p.ev(`document.getElementById('soundBtn').textContent==='🔇' && localStorage.getItem('ltot.sound')==='0' && /Sound off/.test(document.getElementById('soundBtn').getAttribute('aria-label'))`));
+  check('sound: tap → 🔇, remembered in localStorage, bilingual label', await p.ev(`document.getElementById('soundBtn').dataset.on==='0' && document.getElementById('soundBtn').getAttribute('aria-pressed')==='false' && localStorage.getItem('ltot.sound')==='0' && /Sound off/.test(document.getElementById('soundBtn').getAttribute('aria-label'))`));
   await p.click('#soundBtn'); await sleep(200);
   check('How-to has the board and the sounds sections', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return /Best streets from past years/.test(t)&&/🔊 Sounds/.test(t);})()`));
   check('privacy notice mentions the past-years board', /Past-years board/.test(await p.ev(`document.getElementById('privacyList').textContent`)));
@@ -456,8 +456,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const w2 = await p.ev(`document.querySelector('#countdown .cd-digits').getBoundingClientRect().width`);
   check('countdown ticks every second: “Halloween in 14d 01h 05m 32s” format', /Halloween in \d\dd \d\dh \d\dm \d\ds$/.test(c1) && c1 !== c2, c1 + ' → ' + c2);
   check('…digits have a fixed width (no shifting between ticks)', Math.abs(w1 - w2) < 0.01, w1 + ' / ' + w2);
-  check('…seconds digit has the CSS flicker, monospace + tabular-nums', await p.ev(`(function(){var s=getComputedStyle(document.querySelector('#countdown .cd-s')), d=getComputedStyle(document.querySelector('#countdown .cd-digits'));
-    return /cd-tick-[ab]/.test(s.animationName) && d.fontVariantNumeric==='tabular-nums' && /mono/i.test(d.fontFamily);})()`));
+  check('…seconds digit has the CSS flicker, tabular-nums (v14: one font stack, no monospace)', await p.ev(`(function(){var s=getComputedStyle(document.querySelector('#countdown .cd-s')), d=getComputedStyle(document.querySelector('#countdown .cd-digits'));
+    return /cd-tick-[ab]/.test(s.animationName) && d.fontVariantNumeric==='tabular-nums' && !/mono/i.test(d.fontFamily);})()`));
   check('top bar fits at 390 px (practice chip shows its icon only)', await p.ev(`[...document.querySelectorAll('.topbar > *')].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().right<=390)`) &&
     await p.ev(`getComputedStyle(document.querySelector('#practiceChip .chip-txt')).display==='none' && document.getElementById('practiceChip').getAttribute('aria-label')==='Practice mode'`));
   check('countdown is role="timer" (not announced every second)', await p.ev(`document.getElementById('countdown').getAttribute('role')==='timer'`));
