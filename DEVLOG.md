@@ -264,7 +264,7 @@ Found while reviewing the v15.1 screenshots myself, under Peng's rule that every
 - **Pin prompt:** the Chinese "取消" (Cancel) button wrapped onto two lines at 390 px. The button no longer shrinks (`white-space: nowrap`, `min-width: 64px`) and the prompt text takes the remaining width. The headless test checks one line of text in EN and ZH.
 - **Welcome card 2:** its middle line names the cream button, but the card only showed purple and orange sample buttons. It now shows the cream "💬 Loved a street in past years? Share it" sample too, in the same order as the lines (purple, cream, orange).
 
-### v=15.3: what reporting means, and More stays on screen (Oct 18, 9:10 AM, COMMIT_LINK)
+### v=15.3: what reporting means, and More stays on screen (Oct 18, 9:10 AM, [d577775](https://github.com/bohemianwp/london-trick-or-treat/commit/d577775))
 Peng, 8:45 AM: "被举报三次会被隐藏是什么意思？怎么举报" ("What does 'hidden after 3 reports' mean? How do I report?")
 - **Every report line now says why, how and what happens.** The past-favourite rules, the board rules and the privacy notes all read: "See something rude, unsafe or personal (like a house number)? Tap ⚑ Report. If 3 different people report it, it is hidden for everyone." (中文：「看到不友善、不安全或涉及个人信息（比如门牌号）的内容？点 ⚑ 举报。3 个不同的人举报后，它会对所有人隐藏。」)
 - **The toast after reporting counts down,** using the count the server returns: "Thanks! If 2 more people report it, it will be hidden for everyone." (1 more person / now hidden). If the count is unknown, it shows the general rule.
