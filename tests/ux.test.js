@@ -265,3 +265,44 @@ test('v15.4 app: events list + pins use LIB.activeEvents with the ?now= clock, r
   assert.match(app, /!== eventsKey\) renderEvents\(\);/);
   for (const l of ['en', 'zh']) assert.ok(I[l].eventsNone, l);
 });
+
+// v15.6 (Peng 11:04–11:46: "哪里可以分析用户得使用情况吗" … "仅仅开发者我能看"): anonymous, cookieless visit counter + fixed event names.
+test('v15.6 GoatCounter: one cookieless tag, fixed event names only, honest privacy copy (EN + ZH)', () => {
+  const L = require('../lib.js');
+  const tags = html.match(/<script[^>]*goatcounter[^>]*><\/script>/g) || [];
+  assert.equal(tags.length, 1);
+  assert.equal(tags[0], '<script data-goatcounter="https://ltot-london.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>');
+  assert.equal(L.gcPath('decor-share'), 'ev-decor-share'); assert.equal(L.gcPath('Show me fav'), 'ev-show-me-fav');
+  assert.equal(L.gcPath('a@b.com 519-555-1234'), 'ev-a-b-com-519-555-1234'.slice(0, 43)); assert.equal(L.gcPath(''), null);
+  const calls = [...app.matchAll(/gcEvent\(([^)]*)\)/g)].map((m) => m[1]).filter((a) => a !== 'name');
+  assert.deepEqual(calls.sort(), ["'decor-share'", "'fav-share'", "'lang-' + lang", "'lang-' + lang", "'mark'", "'reply'", "'show-me-' + kind", "kind === 'like' ? 'like' : 'heart'"].sort());
+  assert.match(app, /if \(!DEMO && path && g && typeof g\.count === 'function'\) g\.count\(\{ path: path, title: path, event: true \}\)/);
+  assert.ok(I.en.privacyItems.some((r) => r[1].startsWith('We count visits anonymously, with no cookies, so we can improve the map. Only the developer sees these totals.')));
+  assert.ok(I.zh.privacyItems.some((r) => r[1].startsWith('我们匿名统计访问量，不用 cookie，只为改进地图。只有开发者能看到这些总数。')));
+  for (const l of ['en', 'zh']) assert.doesNotMatch(JSON.stringify([I[l].privacyItems, I[l].privacySummary]), l === 'en' ? /No tracking|no analytics/ : /不追踪|没有统计分析/, l);
+});
+
+// v15.6 (Peng 11:50: "注明一下这个程序仅为伦敦区域使用，不提供其他区域"): London-only note on the chooser + Guide, gentle toast when far away.
+test('v15.6 London-only note: chooser + Guide line (grey, small), toast only when the first fix is far away', () => {
+  const L = require('../lib.js');
+  assert.equal(I.en.areaOnly, 'This map only covers London, Ontario. Other cities and areas are not included.');
+  assert.equal(I.zh.areaOnly, '本地图仅限安大略省伦敦市使用，不提供其他城市或地区。');
+  assert.ok(html.includes('<p class="langpick-note langpick-area"><span lang="en">' + I.en.areaOnly + '</span><span lang="zh-CN">' + I.zh.areaOnly + '</span></p>'));
+  assert.match(html, /<p class="area-note" data-i18n="areaOnly">/);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.area-note \{ margin: 12px 0 0; color: var\(--muted\); font-size: var\(--fs-s\); text-align: center; \}/);
+  assert.ok(L.nearLondon(42.9849, -81.2453) && L.nearLondon(42.78, -81.18) && L.nearLondon(43.04, -80.88) && L.nearLondon(42.77, -80.98), 'London, St. Thomas, Ingersoll, Aylmer (the event towns)');
+  assert.ok(!L.nearLondon(43.6532, -79.3832) && !L.nearLondon(42.3149, -83.0364) && !L.nearLondon(NaN, 1), 'Toronto, Windsor');
+  assert.match(app, /if \(first && !farToastShown && !LIB\.nearLondon\(geo\.pos\[0\], geo\.pos\[1\]\)\) \{ farToastShown = true; toast\(t\('areaOnly'\), 6000\); \}/);
+});
+
+// v15.6: two "function showMe" in app.js (v15.1) meant the location fix called the Guide's Show me helper, so the blue
+// "you are here" dot was never drawn. Function declarations in one scope must have unique names.
+test('v15.6 app.js: no two function declarations share a name (the showMe / drawMeDot bug)', () => {
+  const names = [...app.matchAll(/^ {2}function ([A-Za-z0-9_$]+)\s*\(/gm)].map((m) => m[1]);
+  const dup = names.filter((n, i) => names.indexOf(n) !== i);
+  assert.deepEqual(dup, [], 'duplicate: ' + dup.join(', '));
+  assert.match(app, /function drawMeDot\(\)[\s\S]{0,600}geo\.marker = L\.marker/);
+  assert.doesNotMatch(app, /^\s*showMe\(\);/m, 'the location fix must not call the Show me helper');
+  assert.match(app, /^\s*drawMeDot\(\);/m);
+});

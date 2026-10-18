@@ -1001,3 +1001,7 @@ body.has-favshare .markcard:not(.phasecard) { bottom: 130px; }
 .fab { top: calc(56px + var(--lb-extra, 0px)); }
 .fab-decor { top: calc(112px + var(--lb-extra, 0px)); }
 .mode-banner { top: calc(56px + var(--lb-extra, 0px)); }
+
+/* v15.6 (Peng 11:50): London-only note. Small grey line, AA on the panel (#a7b2c5 on #162033 ≈ 7.6:1) */
+.area-note { margin: 12px 0 0; color: var(--muted); font-size: var(--fs-s); text-align: center; }
+.langpick-area { margin-top: -4px; }

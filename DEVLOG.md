@@ -83,6 +83,11 @@ Between 3:31 and 3:52 PM the Mac went offline mid-build. The build finished at a
   - **8:45 AM**: "被举报三次会被隐藏是什么意思？怎么举报" ("What does 'hidden after 3 reports' mean? How do I report?")
   - **8:48 AM**: "如果点击更多，在手机上更多的菜单会出屏幕之外，还需要左滑才能看到。这个设计需要修改一下" ("On a phone, tapping More pushes the menu off the screen, and you have to swipe left to see it. Please change this design.")
   - See **v=15.3** below.
+- **v15.6, Oct 18 late morning (Peng's words, quoted verbatim):**
+  - **11:04 AM**: "哪里可以分析用户得使用情况吗" ("Where can I analyze how users use it?"). Then he chose "Set up both" (an evening usage report + an anonymous visit counter).
+  - **11:46 AM**: "仅仅开发者我能看" ("Only I, the developer, can see it.")
+  - **11:50 AM**: "注明一下这个程序仅为伦敦区域使用，不提供其他区域" ("State that this app is only for the London area and doesn't cover other areas.")
+  - See **v=15.6** below.
 
 ### Cancelled
 - **Promo QR / video v4:** cancelled before any work. `qr.png` was never touched. Earlier promo video drafts (v1–v3) are kept in `halloween_app/` and were never published. (Re-requested by Peng on Oct 18, 10:03 AM and made then; see "Promo video v4 + posters" below.)
@@ -308,6 +313,35 @@ Found while testing v15.6 (the far-away toast check never got a location fix). N
 - **Fix:** the location helper is renamed `drawMeDot` ([e6b12c4](https://github.com/bohemianwp/london-trick-or-treat/commit/e6b12c4), 2 lines). The asset cache-buster went to `?v=15.5.1` so phones fetch the new `app.js` ([f881698](https://github.com/bohemianwp/london-trick-or-treat/commit/f881698); there is no service worker).
 - **Verified live:** the page loads `app.js?v=15.5.1`, which contains `drawMeDot`. Headless against the live URL passed 192/192. A 390 px live screenshot with a London location (Wortley Village) shows the blue dot: `halloween_app/screenshots/v1551-medot-live.png`.
 - **Guard (in v15.6, branch `stats`):** a unit test fails if two function declarations in `app.js` share a name, and the headless test checks the blue dot appears after a location fix.
+### v=15.6: usage stats only the developer can see, a London-only note, and the "you are here" dot (Oct 18, 12:30 PM, branch `stats`, not pushed)
+Peng, 11:04–11:46 AM: "哪里可以分析用户得使用情况吗" … "仅仅开发者我能看" ("Where can I analyze how users use it?" … "Only I, the developer, can see it.")
+- **Private usage report.**
+  - `supabase/v155_usage_stats.sql` adds `public.usage_stats(p_token, p_since)`. It returns aggregate counts only:
+    - marks, split into test days and Oct 31 (practice is not stored);
+    - decoration marks;
+    - past-favourite pins, 👍, ❤️, replies and reports;
+    - board posts, votes and reports, and suggestions;
+    - distinct-phone counts (never the hashes) and counts per Toronto hour;
+    - the top 5 H3 cells, and favourite spots rounded to ≈100 m.
+  - Language is not stored. GoatCounter counts it instead.
+  - The gate is a random 32-byte token. Only its sha256 is in `private.stats_token` (RLS on, no grants), and a wrong token raises `forbidden`. The plain token stays on the box, outside every repo.
+  - `tools/usage_report.mjs` prints a plain-English summary plus the JSON.
+  - Verified in PGlite (`tests/sql_usage_pglite_check.mjs`, 25/25): wrong/short/hash-as-token are refused, the counts are exact, by-hour sums match, there are no hashes or text in the output, and the tool runs end to end. `sql_pglite_check.mjs` is still 150/150.
+  - The SQL is **not run yet**: the paste page is `sqlserve/v155_usage_stats.html`.
+- **Anonymous visit counter (GoatCounter, cookieless).** One script tag. The site code `ltot-london` is confirmed (dashboard verified, visible only to logged-in users).
+  - Events have fixed names only: `ev-lang-en|zh`, `ev-decor-share`, `ev-fav-share`, `ev-mark`, `ev-like`, `ev-heart`, `ev-reply`, `ev-show-me-<kind>`. `LIB.gcPath` allows only `a–z 0–9 -`. Events are sent after a successful send, never in `?demo=1`, and errors are swallowed.
+  - The privacy notice replaces "No tracking" with: "We count visits anonymously, with no cookies, so we can improve the map. Only the developer sees these totals." / "我们匿名统计访问量，不用 cookie，只为改进地图。只有开发者能看到这些总数。" The summary line is now "📊 Visits are counted anonymously, with no cookies or ads." `REVIEW_safety_legal.md` has a PIPEDA addendum.
+
+Peng, 11:50 AM: "注明一下这个程序仅为伦敦区域使用，不提供其他区域" ("State that this app is only for the London area and doesn't cover other areas.")
+- **Why:** friends outside London may open the link and wonder why their town is empty.
+- **What changed:**
+  - One small grey line on the EN/中文 chooser (both languages, the first thing a new visitor sees) and at the foot of the Guide: "This map only covers London, Ontario. Other cities and areas are not included." / "本地图仅限安大略省伦敦市使用，不提供其他城市或地区。"
+  - It uses the muted colour (#a7b2c5, AA), no new colours.
+  - If the first location fix is more than ~25 km outside London, one toast says the same thing once per page load. The event towns (St. Thomas, Ingersoll, Aylmer) count as nearby, and nothing is stored.
+
+Found while testing: the duplicate `showMe` hid the blue "you are here" dot. It shipped first as the **v=15.5.1 hotfix** (see above). v15.6 adds the guards: a unit test forbids duplicate function names in app.js, and the headless test checks the blue dot appears.
+- Tests: unit 125/125, headless 203/203 (new: chooser note, Guide note EN/ZH, far-away toast EN/ZH, GoatCounter event stub, blue dot, no toast in London). `APP_VERSION v=15.6`.
+- Screenshots: `halloween_app/screenshots/v156-chooser.png`, `v156-guide-{en,zh}.png`, `v156-toast-{en,zh}.png`.
 
 ### Promo video v4 + posters for friends' testing (Oct 18, 10:30 AM)
 Peng, 10:03 AM: "重新在生成个视频和海报吧，我今天就要开始让朋友测试了。" ("Make the video and posters again. I'm starting testing with friends today.")

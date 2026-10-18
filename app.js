@@ -403,7 +403,7 @@
     if (geo.marker) { map.removeLayer(geo.marker); map.removeLayer(geo.circle); geo.marker = geo.circle = null; }
     updateLocateBtn();
   }
-  function drawMeDot() {   // was a second "showMe", silently replaced by the Show me helper (v15.1 bug): the blue dot never showed
+  function drawMeDot() {   // v15.6: was a second "showMe", silently replaced by the Show me helper below (v15.1 bug)
     if (!geo.marker) {
       geo.circle = L.circle(geo.pos, { radius: geo.acc, color: '#2f80ff', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
       geo.marker = L.marker(geo.pos, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -414,9 +414,11 @@
     }
     geo.marker.bindTooltip(t('youAreHere', { a: geo.acc }));
   }
+  var farToastShown = false;   // v15.6: once per page load, nothing stored
   function onPos(p) {
     var first = !geo.pos;
     geo.pos = [p.coords.latitude, p.coords.longitude];
+    if (first && !farToastShown && !LIB.nearLondon(geo.pos[0], geo.pos[1])) { farToastShown = true; toast(t('areaOnly'), 6000); }
     geo.posAt = Date.now();
     geo.acc = Math.round(p.coords.accuracy || 0);
     drawMeDot();
@@ -515,6 +517,7 @@
     lsSet(STORE.session, s);
     var token = LIB.randomHex(40);
     backend.sendMark({ session: s.id, lat: pos[0], lng: pos[1], tags: [] }, token, grid.cell).then(function (res) {
+      gcEvent('mark');
       markHist = LIB.pruneHistory(markHist.concat({ t: now, cell: cell, id: res.id }), now);
       lsSet(STORE.markHist, markHist);
       lastMark = { id: res.id, token: token, tags: [], at: now };
@@ -890,6 +893,7 @@
     var now = Date.now(), before = decorCount(d.cell);
     $('markCardDone').disabled = true;
     backend.sendDecor({ device: DEVICE, lat: d.pos[0], lng: d.pos[1], tags: d.tags }, grid.cell).then(function () {
+      gcEvent('decor-share');
       $('markCardDone').disabled = false;
       decorHist = decorHist.concat({ t: now, cell: d.cell }).filter(function (h) { return now - h.t < LIB.DECOR_KEEP_MS; }).slice(-60);
       lsSet(STORE.decorHist, decorHist);
@@ -1334,6 +1338,7 @@
     if (kind === 'like' ? p.myLike : p.myHeart) { toast(t('favAlready'), 1800); return; }
     btn.disabled = true;
     backend.favReact(DEVICE, p.id, kind).then(function (r) {
+      gcEvent(kind === 'like' ? 'like' : 'heart');
       p.likes = r.likes; p.hearts = r.hearts;
       if (kind === 'like') p.myLike = true; else p.myHeart = true;
       btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
@@ -1383,6 +1388,7 @@
       var token = LIB.randomHex(40);
       send.disabled = true;
       backend.favReply(DEVICE, p.id, chk.text, token).then(function (r) {
+        gcEvent('reply');
         favTokens['r:' + r.id] = token; lsSet(STORE.favTokens, favTokens);
         inp.value = ''; showE(''); p.replies = (p.replies || 0) + 1;
         giftToast(); SFX.play('chime');
@@ -1478,6 +1484,7 @@
     var token = LIB.randomHex(40), btn = $('favSend'), pos = pendingFav;
     btn.disabled = true;
     backend.favCreate({ device: DEVICE, lat: pos[0], lng: pos[1], tag: favTag, body: chk.text || null }, token).then(function (r) {
+      gcEvent('fav-share');
       favTokens[r.id] = token; lsSet(STORE.favTokens, favTokens);
       $('favDialog').close(); pendingFav = null;
       giftToast(); SFX.play('chime');
@@ -1753,6 +1760,7 @@
   $('langBtn').addEventListener('click', function () {
     lang = lang === 'en' ? 'zh' : 'en';
     try { localStorage.setItem(STORE.lang, lang); } catch (e) { /* ignore */ }
+    gcEvent('lang-' + lang);
     map.closePopup();
     renderAll();
   });
@@ -2028,7 +2036,15 @@
   function clearShowMe() { clearTimeout(showMeT); showMeT = null; if (showMeRing) { showMeRing.remove(); showMeRing = null; } }
   map.on('movestart zoomstart', clearShowMe);
   document.addEventListener('pointerdown', clearShowMe, true);
+  // v15.6: anonymous GoatCounter events (cookieless). Only a fixed event name is sent: no ids, text or location. Off in demo.
+  function gcEvent(name) {
+    try {
+      var g = window.goatcounter, path = LIB.gcPath(name);
+      if (!DEMO && path && g && typeof g.count === 'function') g.count({ path: path, title: path, event: true });
+    } catch (e) { /* counting must never break the app */ }
+  }
   function showMe(kind) {
+    gcEvent('show-me-' + kind);
     setSheetOpen(false);
     if (kind === 'like' && favPins.length) {
       if (!layerOn.fav) setLayer('fav', true);
@@ -2172,6 +2188,7 @@
       b.addEventListener('click', function () {
         lang = b.getAttribute('data-pick') === 'zh' ? 'zh' : 'en';
         try { localStorage.setItem(STORE.lang, lang); } catch (e) { /* ignore */ }
+        gcEvent('lang-' + lang);
         box.hidden = true;
         renderAll();
         resolve();

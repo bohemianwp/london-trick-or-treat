@@ -114,6 +114,10 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('…and the page underneath is ENGLISH, not the browser language', await p.ev(`document.documentElement.lang==='en' && __ltot.state().lang==='en' && document.getElementById('langBtn').textContent.trim()==='中文'`));
   check('…two big buttons English and 中文 (≥ 64 px)', await p.ev(`[...document.querySelectorAll('#langPick [data-pick]')].map(b=>b.textContent.trim()+':'+(b.getBoundingClientRect().height>=64)).join()==='English:true,中文:true'`));
   await p.shot('v9-chooser.png');
+  // v15.6 (Peng 11:50): the chooser says the map only covers London (small grey line, fully on screen, AA contrast)
+  check('v15.6 chooser: London-only note in EN + 中文, on screen, grey, AA', await p.ev(`(function(){var n=document.querySelector('#langPick .langpick-area');if(!n)return false;var r=n.getBoundingClientRect(),c=getComputedStyle(n).color;
+    return /only covers London, Ontario\. Other cities and areas are not included\./.test(n.textContent) && /本地图仅限安大略省伦敦市使用，不提供其他城市或地区。/.test(n.textContent) && r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth && c==='rgb(167, 178, 197)';})()`));
+  await p.shot('v156-chooser.png');
   await p.click('#langPick [data-pick="en"]'); await sleep(400);
   check('English → chooser closes, saved, English welcome cards appear', await p.ev(`document.getElementById('langPick').hidden && localStorage.getItem('ltot.lang')==='en' && !document.getElementById('guide').hidden`) &&
     /Find the fun/.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
@@ -133,6 +137,35 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     (await tq2.click('#langPick [data-pick="en"]'), await sleep(1500), await tq2.ev(`document.getElementById('langPick').hidden && __ltot.tour.state().active`)));
   await tq2.ev(`localStorage.clear(); localStorage.setItem('ltot.lang','en')`);
   check('chooser pages: no JS errors', [p, p2, z, d, tq, tq2].every((x) => realErrors(x).length === 0), [p, p2, z, d, tq, tq2].map(realErrors).flat().join(' | '));
+}
+
+// =========================================================== 0b. v15.6: London-only note in the Guide, far-away toast, GoatCounter events
+{
+  for (const lang of ['en', 'zh']) {
+    const g = await openPage(`?lang=${lang}`, { wait: 3000, block: ['*gc.zgo.at*'], geo: [43.6532, -79.3832] });   // Toronto
+    await dismissGuide(g);
+    await g.ev(`window.__gc=[]; window.goatcounter={count:function(o){window.__gc.push(o.path+(o.event?'!':''));}}`);
+    await g.click('#locateBtn'); await sleep(300); await g.ev(`(function(){var d=document.getElementById('locDialog');if(d&&d.open)document.getElementById('locYes').click();})()`); await sleep(1500);
+    const tt = await g.ev(`document.getElementById('toast').textContent`);
+    check(`v15.6 (${lang}) far from London (Toronto fix) → one gentle toast with the London-only line`, (lang === 'en' ? /^This map only covers London, Ontario\. Other cities and areas are not included\.$/ : /^本地图仅限安大略省伦敦市使用，不提供其他城市或地区。$/).test(tt), tt);
+    await g.ev(`__ltot.openTab('guide')`); await sleep(400);
+    await g.ev(`document.querySelector('#panel-guide .area-note').scrollIntoView({block:'center'})`); await sleep(400);
+    check(`v15.6 (${lang}) Guide ends with the London-only line (grey, small, visible)`, await g.ev(`(function(){var n=document.querySelector('#panel-guide .area-note'),r=n.getBoundingClientRect(),cs=getComputedStyle(n);return n.textContent===${JSON.stringify(lang === 'en' ? 'This map only covers London, Ontario. Other cities and areas are not included.' : '本地图仅限安大略省伦敦市使用，不提供其他城市或地区。')} && r.height>0 && r.bottom<=innerHeight && cs.color==='rgb(167, 178, 197)';})()`));
+    await g.shot(`v156-guide-${lang}.png`);
+    await g.click('#langBtn'); await sleep(300);
+    const ev = await g.ev(`window.__gc.join(',')`);
+    check(`v15.6 (${lang}) switching language sends one GoatCounter event with a fixed name only`, ev === (lang === 'en' ? 'ev-lang-zh!' : 'ev-lang-en!'), ev);
+    await g.ev(`localStorage.setItem('ltot.lang','en')`);
+    check(`v15.6 (${lang}) no JS errors`, realErrors(g).length === 0, realErrors(g).join(' | '));
+    await send('Target.closeTarget', { targetId: g.targetId });
+  }
+  const n = await openPage('?lang=en', { wait: 3000, block: ['*gc.zgo.at*'], geo: [42.966812, -81.245533] });
+  await dismissGuide(n);
+  await n.click('#locateBtn'); await sleep(300); await n.ev(`(function(){var d=document.getElementById('locDialog');if(d&&d.open)document.getElementById('locYes').click();})()`); await sleep(1500);
+  check('v15.6 in London: the fix arrived (blue dot)', await n.ev(`!!document.querySelector('.me-dot')`));
+  check('v15.6 in London: no London-only toast', !/only covers London/.test(await n.ev(`document.getElementById('toast').textContent`)));
+  await n.ev(`localStorage.clear(); localStorage.setItem('ltot.lang','en')`);   // section 1 expects a first visit in English
+  await send('Target.closeTarget', { targetId: n.targetId });
 }
 
 // =========================================================== 1. normal page (practice mode today, local backend)

@@ -563,7 +563,7 @@
         'Your location',
         'Only after you tap a location button and allow it. The blue dot and route planning use it on your phone only. Everything works without location: you can tap the map instead.'
       ],
-      ['No tracking', 'No cookies, no analytics, no ads, no trackers. Settings are kept in this browser’s local storage only.'],
+      ['Anonymous visit counts', 'We count visits anonymously, with no cookies, so we can improve the map. Only the developer sees these totals. There are no ads and no trackers that follow you, and the counter (GoatCounter) never gets your name, location or what you write. Settings are kept in this browser’s local storage only.'],
       [
         'Where data is kept',
         'Shared marks, decoration marks, suggestions and posts are stored on the organiser’s Supabase server; everything else stays in this browser. Map pictures come from OpenStreetMap, walking routes from OSRM, and the map code from unpkg/jsDelivr; like any website, they see your device’s internet address.'
@@ -579,6 +579,7 @@
     ],
     testChip: '🧪 Test days',
     layerMore: 'More',
+    areaOnly: 'This map only covers London, Ontario. Other cities and areas are not included.',
     phaseMoreLbl: 'More details',
     phaseBullets: [
       '🎃 Now: tap the purple button at great decorations.',
@@ -591,7 +592,7 @@
       '📍 Street level only (blurred ~50 m).',
       '3️⃣ Nothing shows until 3+ families.',
       '🗑️ Everything deleted by Nov 2, 2026.',
-      '🚫 No ads, cookies or tracking.'
+      '📊 Visits are counted anonymously, with no cookies or ads.'
     ],
     privacyFull: 'Full privacy notice',
     tipHint: 'Press and hold any button for a tip',
@@ -1183,7 +1184,7 @@
       ['推荐区域', '只有你推荐时才会保存：那个六边形（大约 800 米宽）和一句可选的理由（80 字以内，不能有链接或电话）。万圣节后删除。'],
       ['投票板帖子', '只有你发帖时才会保存：内容（最多 140 字）、哪个投票板、可选的社区，以及可选的大概位置（约 100 米）。3 个不同的人举报后，帖子会被隐藏。'],
       ['你的位置', '只有你点定位按钮并允许后才会用。蓝点和路线规划只在你的手机上使用。不开定位也能用：直接点地图就行。'],
-      ['不追踪', '没有 Cookie、没有统计分析、没有广告、没有追踪器。设置只存在这个浏览器的本地存储里。'],
+      ['匿名统计访问量', '我们匿名统计访问量，不用 cookie，只为改进地图。只有开发者能看到这些总数。没有广告，也没有跟着你的追踪器；计数工具（GoatCounter）拿不到你的名字、位置或你写的内容。设置只存在这个浏览器的本地存储里。'],
       [
         '数据存在哪里',
         '共享的标记、装饰标记、推荐和帖子存在组织者的 Supabase 服务器上，其他内容只存在这个浏览器里。地图图片来自 OpenStreetMap，步行路线来自 OSRM，地图程序来自 unpkg/jsDelivr，它们和任何网站一样能看到你设备的网络地址。'
@@ -1193,9 +1194,10 @@
     ],
     testChip: '🧪 试用期',
     layerMore: '更多',
+    areaOnly: '本地图仅限安大略省伦敦市使用，不提供其他城市或地区。',
     phaseMoreLbl: '更多说明',
     phaseBullets: ['🎃 现在：看到好看的装饰，点紫色按钮。', '💬 标记往年最爱的街。', '🔥 10月31日 下午3–11点：实时分享好玩的街。', '🔒 只记录街区，11月2日前全部删除。'],
-    privacySummary: ['🙅 不要账号、名字或照片。', '📍 只记录街区（模糊约 50 米）。', '3️⃣ 满 3 个家庭才显示。', '🗑️ 2026年11月2日前全部删除。', '🚫 没有广告、Cookie 或追踪。'],
+    privacySummary: ['🙅 不要账号、名字或照片。', '📍 只记录街区（模糊约 50 米）。', '3️⃣ 满 3 个家庭才显示。', '🗑️ 2026年11月2日前全部删除。', '📊 匿名统计访问量，不用 Cookie，没有广告。'],
     privacyFull: '完整隐私说明',
     tipHint: '长按任意按钮查看提示',
     tipHintHover: '鼠标悬停在任意按钮上查看提示',

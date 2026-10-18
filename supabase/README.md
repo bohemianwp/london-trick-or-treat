@@ -157,3 +157,13 @@ Details in the main [README](../README.md). 详见主 [README](../README.md)。
   标记在服务器上挪到约 50 米网格，文字过滤（中英），3 次举报隐藏，2026 年 11 月 2 日全部删除。
 - Tested in PGlite: 150/150 (fresh schema.sql, and old schema + v11 + v14_board.sql). Check afterwards with
   `node tests/supabase_smoke.mjs` (its one test pin is deleted again; `SMOKE_NO_ROWS=1` skips it).
+
+---
+
+## v15.5/15.6 · Private usage report (developer only) · 使用情况统计（仅开发者）
+- Run `v155_usage_stats.sql` once (SQL Editor). It adds `private.stats_token` (one sha256, unreadable through the API) and
+  `usage_stats(p_token, p_since)`, which returns **only aggregate counts** (no text, ids, hashes or exact points).
+- Report: `node tools/usage_report.mjs` (last 24 h), `node tools/usage_report.mjs 72` (hours) or
+  `node tools/usage_report.mjs 2026-10-17` (since that day). It reads the token from `~/.secrets/ltot_stats_token` (chmod 600).
+  **Never commit or share the token.** To rotate it, make a new one and re-run the insert with its sha256.
+- Tested in PGlite: `tests/sql_usage_pglite_check.mjs` (same setup as `sql_pglite_check.mjs`).
