@@ -161,7 +161,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('v15: one-time “Press and hold any button for a tip” hint after the welcome, remembered', await p.ev(`!document.getElementById('tipHint').hidden && /Press and hold any button for a tip/.test(document.getElementById('tipHint').textContent) && localStorage.getItem('ltot.tipHintSeen')==='true'`));
   check('v15: no ⓘ buttons left (tooltips instead)', await p.ev(`!document.querySelector('.ibtn') && !document.getElementById('markHintBtn')`));
   check('no house UI left', await p.ev(`!document.getElementById('addHouseBtn') && !document.getElementById('filterChips') && !document.querySelector('.pk')`));
-  check('3 event markers on the map', (await p.ev('document.querySelectorAll(".ev-pin").length')) === 3);
+  check('v15.4: one event pin per upcoming mapped event (past events hidden)', (await p.ev('document.querySelectorAll(".ev-pin").length')) === (await p.ev(`TOT_LIB.activeEvents(window.TOT_AREAS_RAW.meta.events, Date.now()).filter(function(e){return e.map&&e.lat!=null;}).length`)));
   check('HUD overlay present and not clickable', await p.ev(`getComputedStyle(document.querySelector('.hud')).pointerEvents==='none' && getComputedStyle(document.querySelector('.hud')).display!=='none'`));
   check('legend: Quiet / Busy / Very busy', /Quiet[\s\S]*Busy[\s\S]*Very busy/.test(await p.ev(`document.getElementById('legend').textContent`)));
   check('mark window text follows config.js (no raw {win} placeholders)', !(await p.ev(`document.body.textContent.includes('{win}')`)) &&
@@ -517,6 +517,47 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
       !!dots && dots.n === 5 && dots.on === 'rgb(255, 138, 61)' && (dots.off === null || dots.off === 'rgb(176, 104, 58)') && (lang === 'en' ? /of 5/ : /\/5 分/).test(dots.label || ''), JSON.stringify(dots));
     check(`v15.1 (${lang}) page: no JS errors`, realErrors(p).length === 0, realErrors(p).join(' | '));
     await send('Target.closeTarget', { targetId: p.targetId });
+  }
+}
+
+// =========================================================== 2c. v15.4 events: 5 verified popular picks, past events hide themselves
+{
+  const cases = [
+    ['2026-10-18T09:30:00-04:00', 9, 8, 'pumpkins-after-dark,st-thomas-prowl,hitv,ingersoll-pumpkin-fest,candy-crawl,clovermead,somerset,camp-weathered,ctv-map'],
+    ['2026-10-23T19:00:00-04:00', 8, 7, 'pumpkins-after-dark,hitv,ingersoll-pumpkin-fest,candy-crawl,clovermead,somerset,camp-weathered,ctv-map'],
+    ['2026-10-26T12:00:00-04:00', 5, 4, 'pumpkins-after-dark,clovermead,somerset,camp-weathered,ctv-map'],
+    ['2026-11-01T00:00:00-04:00', 0, 0, ''],
+  ];
+  for (const [now, cards, pins, ids] of cases) {
+    const q = await openPage(`?lang=en&now=${encodeURIComponent(now)}`, { wait: 2500 });
+    await dismissGuide(q);
+    const got = await q.ev(`JSON.stringify({cards: document.querySelectorAll('#eventList .card-ev').length, pins: document.querySelectorAll('.ev-pin').length,
+      none: /No upcoming events right now/.test(document.getElementById('eventList').textContent)})`);
+    const g = JSON.parse(got);
+    check(`v15.4 events at ${now}: ${cards} cards, ${pins} pins${cards ? '' : ', empty-state line'}`, g.cards === cards && g.pins === pins && (cards > 0 || g.none), got);
+    if (now.startsWith('2026-10-26')) {
+      const listed = await q.ev(`[...document.querySelectorAll('#eventList .card-ev .card-title')].map(function(n){return n.textContent;}).join(' | ')`);
+      check('…Oct 26: St. Thomas / HitV / Ingersoll / Candy Crawl are gone, Pumpkins After Dark + Clovermead stay', !/St\. Thomas|Wortley|Ingersoll|Candy Crawl/.test(listed) && /Pumpkins After Dark/.test(listed) && /Clovermead/.test(listed), listed);
+      void ids;
+    }
+    check(`…no JS errors (${now})`, realErrors(q).length === 0, realErrors(q).join(' | '));
+  }
+  // Screenshots at 390×844: Events layer (zoomed out to show the out-of-town pins) and the Events list, EN + 中文
+  for (const lang of ['en', 'zh']) {
+    const q = await openPage(`?lang=${lang}&now=2026-10-18T09:30:00-04:00`, { wait: 3000 });
+    await dismissGuide(q);
+    await q.ev(`__ltot.setLayer('events', true); __ltot.setLayer('zones', false); __ltot.setLayer('areas', false); __ltot.map.setView([42.92,-81.15], 9, {animate:false})`); await sleep(1500);
+    await q.shot(`v154-events-layer-${lang}.png`);
+    await q.ev(`__ltot.openTab('map')`); await sleep(300);
+    await q.ev(`document.getElementById('eventList').previousElementSibling.scrollIntoView({block:'center'})`); await sleep(400);
+    const txt = await q.ev(`document.getElementById('eventList').textContent`);
+    check(`v15.4 Events list (${lang}): 9 cards; out-of-town lines lead with town + km`, (await q.ev(`document.querySelectorAll('#eventList .card-ev').length`)) === 9 &&
+      (lang === 'en' ? /St\. Thomas · 23 km[\s\S]*Ingersoll · 31 km[\s\S]*Aylmer · 30 km/ : /圣托马斯 · 23 公里[\s\S]*英格索尔 · 31 公里[\s\S]*艾尔默 · 30 公里/).test(txt), txt.slice(0, 160));
+    await q.shot(`v154-events-list-${lang}.png`);
+    await q.ev(`document.getElementById('eventList').lastElementChild.scrollIntoView({block:'end'})`); await sleep(300);
+    await q.shot(`v154-events-list-${lang}-2.png`);
+    check(`…Events screenshots (${lang}): no JS errors`, realErrors(q).length === 0, realErrors(q).join(' | '));
+    await q.ev(`__ltot.setLayer('zones', true); __ltot.setLayer('areas', true)`);   // setLayer saves to the shared profile: put it back for later sections
   }
 }
 

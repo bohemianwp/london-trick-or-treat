@@ -72,7 +72,47 @@ test('events: HitV (Oct 24), Camp Weathered (65 Wethered St), Somerset Monster H
 
 test('past "Halloween in Argyle" event (Oct 17) is gone from the data and the shipped JS', () => {
   assert.ok(!json.meta.events.some((e) => e.id === 'argyle'));
-  assert.deepEqual(json.meta.events.map((e) => e.id), ['hitv', 'somerset', 'camp-weathered', 'ctv-map']);
+  assert.deepEqual(json.meta.events.map((e) => e.id), ['pumpkins-after-dark', 'st-thomas-prowl', 'hitv', 'ingersoll-pumpkin-fest', 'candy-crawl', 'clovermead', 'somerset', 'camp-weathered', 'ctv-map']);
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'data/areas.js'), 'utf8'), /argyle/i);
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'demo.js'), 'utf8'), /argyle/i);
+});
+
+// v15.4 (Peng 9:25: "不要添加完，要添加评价最好的，最popular的"; 9:27: "核实活动今年是否存在，确保100%真实")
+test('v15.4 events: 5 popular picks, verified 2026 sources, bilingual, out-of-town lines show town + km, every event has an end', () => {
+  const byId = Object.fromEntries(json.meta.events.map((e) => [e.id, e]));
+  const picks = { 'pumpkins-after-dark': 'pumpkinsafterdark.com', 'st-thomas-prowl': 'downtownpumpkinprowl.ca',
+    'ingersoll-pumpkin-fest': 'ingersoll.ca', 'candy-crawl': 'canadalifeplace.com', clovermead: 'clovermead.com' };
+  for (const [id, host] of Object.entries(picks)) {
+    const e = byId[id];
+    assert.ok(e && e.map && typeof e.lat === 'number' && typeof e.lng === 'number', id);
+    assert.ok(e.url.includes(host), id + ' links to the organizer (' + host + ')');
+    assert.ok(e.name_zh && e.when_zh && e.when_en && /2026/.test(e.when_en) && /2026 年/.test(e.when_zh), id + ' bilingual with 2026 dates');
+    assert.ok(L.distM([42.9849, -81.2453], [e.lat, e.lng]) <= 50000, id + ' within 50 km');
+  }
+  assert.match(byId['st-thomas-prowl'].when_en, /^St\. Thomas · 23 km · /); assert.match(byId['st-thomas-prowl'].when_zh, /^圣托马斯 · 23 公里 · /);
+  assert.match(byId['ingersoll-pumpkin-fest'].when_en, /^Ingersoll · 31 km · /); assert.match(byId['ingersoll-pumpkin-fest'].when_zh, /^英格索尔 · 31 公里 · /);
+  assert.match(byId.clovermead.when_en, /^Aylmer · 30 km · /); assert.match(byId.clovermead.when_zh, /^艾尔默 · 30 公里 · /);
+  assert.ok(!byId.kustermans, 'Kustermans dropped: its page shows no year for the Halloween dates');
+  for (const e of json.meta.events) assert.ok(L.eventEndMs(e) !== null, e.id + ' has a valid end');
+});
+
+test('v15.4 events hide by themselves once they end (Toronto time; date = through that day, date+time = that minute)', () => {
+  const ev = json.meta.events;
+  const at = (d, t) => L.zonedToUtcMs ? L.zonedToUtcMs(d, t) : null;
+  const ms = (iso) => Date.parse(iso);
+  const ids = (now) => L.activeEvents(ev, now).map((e) => e.id);
+  // Today (Oct 18, 9 AM EDT): all 9 still to come.
+  assert.equal(ids(ms('2026-10-18T13:00:00Z')).length, 9);
+  // St. Thomas ends Oct 23 7 PM EDT (23:00Z): shown at 6:59 PM, gone at 7:00 PM.
+  assert.ok(ids(ms('2026-10-23T22:59:00Z')).includes('st-thomas-prowl'));
+  assert.ok(!ids(ms('2026-10-23T23:00:00Z')).includes('st-thomas-prowl'));
+  // Oct 26 noon: the Oct 23/24/25 events are gone, ongoing ones remain.
+  assert.deepEqual(ids(ms('2026-10-26T16:00:00Z')), ['pumpkins-after-dark', 'clovermead', 'somerset', 'camp-weathered', 'ctv-map']);
+  // Date-only end = through that local day: Oct 31 11:59 PM EDT shown, Nov 1 00:00 EDT gone.
+  assert.ok(ids(ms('2026-11-01T03:59:00Z')).includes('pumpkins-after-dark'));
+  assert.deepEqual(ids(ms('2026-11-01T04:00:00Z')), []);
+  // No / bad end = always shown.
+  assert.equal(L.eventActive({ id: 'x' }, ms('2030-01-01T00:00:00Z')), true);
+  assert.equal(L.eventEndMs({ end: 'Oct 31' }), null);
+  void at;
 });

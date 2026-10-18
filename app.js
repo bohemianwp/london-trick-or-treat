@@ -338,11 +338,17 @@
       e.url ? el('a', { href: e.url, target: '_blank', rel: 'noopener noreferrer', text: t('eventOpen') + ' ↗' }) : null
     ]);
   }
+  // v15.4: only events that have not ended yet (each event's `end`, Toronto time; ?now= previews follow it).
+  var eventsKey = '';
+  function liveEvents() { return LIB.activeEvents(EVENTS, phaseNow()); }
   function renderEvents() {
+    var shown = liveEvents();
+    eventsKey = lang + '|' + shown.map(function (e) { return e.id; }).join();
     layers.events.clearLayers();
     var list = $('eventList');
     list.textContent = '';
-    EVENTS.forEach(function (e) {
+    if (!shown.length) list.appendChild(el('p', { class: 'hint', text: t('eventsNone') }));
+    shown.forEach(function (e) {
       if (e.map && e.lat != null) {
         L.marker([e.lat, e.lng], { icon: L.divIcon({ className: '', html: '<div class="ev-pin">📅</div>', iconSize: [36, 36], iconAnchor: [18, 18] }) })
           .bindPopup(function () { return eventPopup(e); }).addTo(layers.events);
@@ -1577,6 +1583,7 @@
   setInterval(function () {
     if (document.visibilityState === 'visible') refreshAll();
     renderChips();
+    if (lang + '|' + liveEvents().map(function (e) { return e.id; }).join() !== eventsKey) renderEvents();   // an event just ended
   }, CFG.pollSec * 1000);
   var changeTimer;
   backend.onChange(function () { clearTimeout(changeTimer); changeTimer = setTimeout(refreshAll, 250); });

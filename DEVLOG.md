@@ -24,8 +24,8 @@ A free, no-sign-up, bilingual (EN / 中文) map for families in London, Ontario.
 - **Backend adapters:** `LocalAdapter` (phone only) and `SupabaseAdapter`. The app falls back to local by itself when Supabase is slow or down, and retries every 2 minutes.
 - **Supabase:** RLS on every table; anon has no table grants. The app talks only through SECURITY DEFINER RPCs that check input, rate limits, the London box and the time windows. Only the public anon key is in `config.js`.
 - **Tests:**
-  - `node --test tests/`: unit tests (112 at v15).
-  - `tests/headless_check.mjs`: a headless Chrome walk-through of the whole app at 390×844, including real long-press touches (153 at v15).
+  - `node --test tests/`: unit tests (112 at v15, 122 at v15.4).
+  - `tests/headless_check.mjs`: a headless Chrome walk-through of the whole app at 390×844, including real long-press touches (153 at v15, 192 at v15.4).
   - `tests/sql_pglite_check.mjs`: real Postgres 17 in WebAssembly with Supabase-style roles (150 checks).
   - `tests/supabase_smoke.mjs`: read-mostly checks against the live project.
 - **Cache busting:** `APP_VERSION` in lib.js must equal every `?v=` in index.html; tests enforce this.
@@ -276,6 +276,30 @@ Peng, 8:48 AM: "如果点击更多，在手机上更多的菜单会出屏幕之�
 - **Fix:** the bar wraps instead of scrolling. With More open the extra chips go onto a second row (ZH) or a second and third row (EN), all fully visible. The app measures the bar and moves the zoom buttons, the locate button, the Practice / decorations pill and the pin prompt down by exactly the extra height, so nothing overlaps. Closing More moves them back.
 - **Checked** at 360, 375, 390 and 430 px, EN and ZH, before and on Oct 31. The headless test opens More and checks every chip's box is inside the viewport, the bar's scrollWidth ≤ clientWidth, and no chip overlaps zoom / locate / Practice. It fails on v15.2 in all 16 cases.
 - **Also fixed:** the Guide's Map tools line and tour step 2 used the ⌖ symbol, which many phone fonts can't show (an empty box). They now say "the round crosshair button" / 「带十字准星的圆形按钮」, and the tour uses 📍.
+
+### v=15.4: only the most popular nearby events, each checked on the organizer's own page (Oct 18, 9:45 AM, commit link below)
+Peng, 8:49 AM: "在深入探究搜索一下伦敦50km以内是否有更多的活动，可以列在这个上面" ("Do a deeper search for more events within 50 km of London that can be listed on the map.")
+Peng, 9:25 AM: "不要添加完，要添加评价最好的，最popular的" ("Don't add all of them. Add the best-rated, most popular ones.")
+Peng, 9:27 AM: "核实活动今年是否存在，确保100%真实" ("Verify each event really exists this year, 100% real.")
+- **Research:** 18 family events from Oct 18–31 within 50 km were confirmed for 2026 (`halloween_app/research/events_50km_2026.md`). Per Peng, only the most popular were added, ranked on real evidence (attendance reported by organizers or news, news coverage, review ratings). No numbers were estimated.
+- **5 picks added** (with Wortley's HitV, Somerset, Camp Weathered and the CTV map still listed):
+
+| Pick | Date (2026) | Where | Why it's popular (source) |
+|---|---|---|---|
+| Pumpkins After Dark | Oct 2–31, nightly | Storybook Gardens, London | 10,000+ hand-carved pumpkins (London Free Press photo feature, Oct 2025); a family reviewer waited 20 minutes just to park (mamasonvacation.com) |
+| Downtown Pumpkin Prowl | Fri Oct 23, 5–7 PM | St. Thomas · 23 km | 7th year, "attendance … now topping a thousand people", nearly 90 businesses, street closed for safety (St. Thomas Today, Oct 21, 2025) |
+| Pumpkin Fest | Sat Oct 24, 1–4 PM | Ingersoll · 31 km | "approximately 3,500 visitors despite the rainy weather" (Town of Ingersoll museum report, Nov 12, 2025) |
+| Downtown London Candy Crawl | Sun Oct 25, 12–3 PM | Downtown London | "Hundreds of people … in costume" (CTV London, Oct 26, 2025); "record-breaking year … highest participation to date" (organizers, 2026) |
+| Clovermead Fall Festival | Until Oct 31, Mon–Sat 9–5 | Aylmer · 30 km | Tripadvisor 4.7/5 from 232 reviews, Travellers' Choice |
+
+- **100% real (9:27 rule):** each pick was opened on the organizer's own page and the exact 2026 date, time, venue and cost were quoted. An HTML copy and a screenshot of each are in `halloween_app/research/evidence/` (`EVIDENCE.md` holds the table). Dropped because of doubt: **Kustermans** (its Halloween dates show no year) and the **Port Stanley pumpkin train** (no year beside its dates, and prices only on third-party sites). The Ingersoll link now points to the Town's own page, not the radio listing. St. Thomas's line makes no cost claim because the organizer doesn't state one.
+- **Past events hide themselves:** each event now has an `end` (a Toronto date = through that day, or date + time = from that minute). The list and pins show only events that haven't ended, re-checked on the poll timer, and `?now=` previews follow it. If nothing is left, the list says "No upcoming events right now / 目前没有即将举行的活动". Before this, past events stayed listed until someone deleted them (Halloween in Argyle had to be removed by hand on Oct 17).
+- **Out-of-town lines start with the town and distance:** "St. Thomas · 23 km · …" / "圣托马斯 · 23 公里 · …", so nobody drives 30 km by surprise. Chinese town names: 圣托马斯, 英格索尔, 艾尔默.
+- **Events note:** "The most popular family events nearby, each checked on the organizer's own page. Past events disappear on their own. Details can change, so check the event page before you go." (中文同步)
+- **Design:** no new colours. Event pins and cards keep the existing 📅 pin and card style.
+- **Tests:**
+  - Unit tests check the 5 picks, their organizer links, 2026 dates in EN and ZH, the town · km prefixes, a valid `end` on every event, and hiding at the exact minute and day boundaries (Oct 23 6:59/7:00 PM, Oct 26, Oct 31 11:59 PM → Nov 1).
+  - Headless runs at 4 `?now=` times: 9/8/5/0 cards, 8/7/4/0 pins, and the empty-state line. Screenshots: `v154-events-layer-{en,zh}.png`, `v154-events-list-{en,zh}(-2).png`.
 
 ## Issues and fixes
 - **4:51 PM:** the map said "API key required" → OSM tiles with a dark filter.

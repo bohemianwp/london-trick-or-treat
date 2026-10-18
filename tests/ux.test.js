@@ -253,3 +253,11 @@ test('v15.3 layer bar: wraps onto extra rows and the controls below move down by
   assert.match(app, /function syncBarRows\(\)[\s\S]{0,200}setProperty\('--lb-extra'/);
   assert.match(app, /new ResizeObserver\(function \(\) \{ syncBarRows\(\); \}\)\.observe\(\$\('layerbar'\)\)/);
 });
+
+test('v15.4 app: events list + pins use LIB.activeEvents with the ?now= clock, re-check on the poll timer, empty-state text', () => {
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  assert.match(app, /function liveEvents\(\) \{ return LIB\.activeEvents\(EVENTS, phaseNow\(\)\); \}/);
+  assert.match(app, /var shown = liveEvents\(\);[\s\S]*shown\.forEach\(function \(e\)/);
+  assert.match(app, /!== eventsKey\) renderEvents\(\);/);
+  for (const l of ['en', 'zh']) assert.ok(I[l].eventsNone, l);
+});

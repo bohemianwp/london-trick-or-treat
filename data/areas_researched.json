@@ -12,6 +12,34 @@
     "scoring": "1-5, higher is better. crowd: 5 = comfortable/not crowded, 1 = very crowded.",
     "events": [
       {
+        "id": "pumpkins-after-dark",
+        "name_en": "Pumpkins After Dark (Storybook Gardens)",
+        "name_zh": "南瓜灯夜游（Storybook 花园）",
+        "when_en": "Oct 2–31, 2026 · nightly from about 7 PM · timed tickets",
+        "when_zh": "2026 年 10 月 2–31 日 · 每晚约 19:00 起 · 分时段购票",
+        "url": "https://www.pumpkinsafterdark.com/london-on",
+        "lat": 42.9573,
+        "lng": -81.3148,
+        "end": "2026-10-31",
+        "map": true,
+        "name": "Pumpkins After Dark (Storybook Gardens)",
+        "when": "Oct 2–31, 2026 · nightly from about 7 PM · timed tickets"
+      },
+      {
+        "id": "st-thomas-prowl",
+        "name_en": "Downtown Pumpkin Prowl (St. Thomas)",
+        "name_zh": "圣托马斯市中心南瓜讨糖夜",
+        "when_en": "St. Thomas · 23 km · Fri Oct 23, 2026 · 5–7 PM · trick-or-treat at downtown shops",
+        "when_zh": "圣托马斯 · 23 公里 · 2026 年 10 月 23 日（周五）· 17:00–19:00 · 到市中心商店讨糖",
+        "url": "https://www.downtownpumpkinprowl.ca/",
+        "lat": 42.7791,
+        "lng": -81.1962,
+        "end": "2026-10-23T19:00",
+        "map": true,
+        "name": "Downtown Pumpkin Prowl (St. Thomas)",
+        "when": "St. Thomas · 23 km · Fri Oct 23, 2026 · 5–7 PM · trick-or-treat at downtown shops"
+      },
+      {
         "name": "Halloween in the Village (Wortley Village)",
         "when": "Sat Oct 24 2026, carnival 1-5 PM, parade 5:30-7 PM",
         "url": "https://www.hitv.ca/",
@@ -22,7 +50,50 @@
         "name_zh": "Wortley 村万圣节活动（HitV）",
         "when_en": "Sat Oct 24, 2026 · carnival 1–5 PM, parade 5:30–7 PM",
         "when_zh": "2026 年 10 月 24 日（周六）· 嘉年华 13:00–17:00，游行 17:30–19:00",
-        "map": true
+        "map": true,
+        "end": "2026-10-24T19:00"
+      },
+      {
+        "id": "ingersoll-pumpkin-fest",
+        "name_en": "Pumpkin Fest (Ingersoll Cheese Museum)",
+        "name_zh": "英格索尔南瓜节（奶酪博物馆）",
+        "when_en": "Ingersoll · 31 km · Sat Oct 24, 2026 · 1–4 PM · free, one free pumpkin per family",
+        "when_zh": "英格索尔 · 31 公里 · 2026 年 10 月 24 日（周六）· 13:00–16:00 · 免费，每家送一个南瓜",
+        "url": "https://www.ingersoll.ca/calendar/events/pumpkin-fest/",
+        "lat": 43.0366,
+        "lng": -80.8673,
+        "end": "2026-10-24T16:00",
+        "map": true,
+        "name": "Pumpkin Fest (Ingersoll Cheese Museum)",
+        "when": "Ingersoll · 31 km · Sat Oct 24, 2026 · 1–4 PM · free, one free pumpkin per family"
+      },
+      {
+        "id": "candy-crawl",
+        "name_en": "Downtown London Candy Crawl",
+        "name_zh": "伦敦市中心糖果巡游（Candy Crawl）",
+        "when_en": "Sun Oct 25, 2026 · 12–3 PM · free",
+        "when_zh": "2026 年 10 月 25 日（周日）· 12:00–15:00 · 免费",
+        "url": "https://www.canadalifeplace.com/events/detail/downtown-candy-crawl-2026",
+        "lat": 42.9836,
+        "lng": -81.247,
+        "end": "2026-10-25T15:00",
+        "map": true,
+        "name": "Downtown London Candy Crawl",
+        "when": "Sun Oct 25, 2026 · 12–3 PM · free"
+      },
+      {
+        "id": "clovermead",
+        "name_en": "Clovermead Fall Festival",
+        "name_zh": "Clovermead 农场秋季节",
+        "when_en": "Aylmer · 30 km · until Oct 31, 2026 · Mon–Sat 9 AM–5 PM · pumpkin & candy cannons · from $22",
+        "when_zh": "艾尔默 · 30 公里 · 至 2026 年 10 月 31 日 · 周一至周六 9:00–17:00 · 南瓜炮和糖果炮 · $22 起",
+        "url": "https://clovermead.com/pages/fall-festival",
+        "lat": 42.8022,
+        "lng": -80.9811,
+        "end": "2026-10-31T17:00",
+        "map": true,
+        "name": "Clovermead Fall Festival",
+        "when": "Aylmer · 30 km · until Oct 31, 2026 · Mon–Sat 9 AM–5 PM · pumpkin & candy cannons · from $22"
       },
       {
         "name": "Somerset Monster House (71 Somerset Cres)",
@@ -35,7 +106,8 @@
         "name_zh": "Somerset 怪物屋（Somerset 新月街 71 号）",
         "when_en": "Oct 8–31, 2026 · donations welcome",
         "when_zh": "2026 年 10 月 8–31 日 · 欢迎捐款",
-        "map": true
+        "map": true,
+        "end": "2026-10-31"
       },
       {
         "name": "Camp Weathered display (65 Wethered St) and other big houses",
@@ -48,7 +120,8 @@
         "name_zh": "Camp Weathered 大型装饰（Wethered 街 65 号）",
         "when_en": "Halloween season",
         "when_zh": "万圣节期间",
-        "map": true
+        "map": true,
+        "end": "2026-10-31"
       },
       {
         "name": "CTV London Halloween displays map 2026",
@@ -61,7 +134,8 @@
         "name_zh": "CTV 伦敦 2026 万圣节装饰地图",
         "when_en": "updated Oct 15, 2026",
         "when_zh": "2026 年 10 月 15 日更新",
-        "map": false
+        "map": false,
+        "end": "2026-10-31"
       }
     ],
     "source_note": "Reddit pages block direct fetching from our servers; their content was confirmed through the search index. All news and City pages were fetched and checked.",

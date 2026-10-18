@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=15.3';                      // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=15.4';                      // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -39,6 +39,17 @@
     if (off2 !== off) ms = guess - off2 * 60000;
     return ms;
   }
+  // v15.4 events: `end` is the last local (Toronto) day 'YYYY-MM-DD' (hidden from the next midnight) or an exact end
+  // 'YYYY-MM-DDTHH:MM' (hidden from that minute). No/invalid `end` = always shown. Past events hide by themselves.
+  function eventEndMs(e) {
+    var end = e && e.end;
+    if (typeof end !== 'string') return null;
+    var m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/.exec(end);
+    if (!m) return null;
+    return m[2] ? zonedToUtcMs(m[1], m[2], TZ) : zonedToUtcMs(nextDay(m[1]), '00:00', TZ);
+  }
+  function eventActive(e, nowMs) { var end = eventEndMs(e); return end === null || nowMs < end; }
+  function activeEvents(list, nowMs) { return (list || []).filter(function (e) { return eventActive(e, nowMs); }); }
   function liveWindow(cfg) {
     var w = (cfg && cfg.liveWindow) || DEFAULT_WINDOW;
     return { start: zonedToUtcMs(w.date, w.start, w.tz), end: zonedToUtcMs(w.date, w.end, w.tz) };
@@ -710,6 +721,7 @@
     countdownParts: countdownParts, sha256Hex: sha256Hex, APP_VERSION: APP_VERSION,
     HALLOWEEN: HALLOWEEN, countdownPhase: countdownPhase, countdownUnits: countdownUnits, formatCountdown: formatCountdown,
     msToNextSecond: msToNextSecond, parseNowParam: parseNowParam,
+    eventEndMs: eventEndMs, eventActive: eventActive, activeEvents: activeEvents,
     staminaHint: staminaHint, startTimeHintKey: startTimeHintKey, estimateHouses: estimateHouses, bearingDeg: bearingDeg, loopWaypoints: loopWaypoints,
     FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
     GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, markProgress: markProgress, BADGES: BADGES, badgeFor: badgeFor, newBadge: newBadge, shouldNudge: shouldNudge, NUDGE_MS: NUDGE_MS,
