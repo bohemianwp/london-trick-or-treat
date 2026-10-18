@@ -345,7 +345,8 @@ Found while testing: the duplicate `showMe` hid the blue "you are here" dot. It 
 - Tests: unit 125/125, headless 203/203 (new: chooser note, Guide note EN/ZH, far-away toast EN/ZH, GoatCounter event stub, blue dot, no toast in London). `APP_VERSION v=15.6`.
 - Screenshots: `halloween_app/screenshots/v156-chooser.png`, `v156-guide-{en,zh}.png`, `v156-toast-{en,zh}.png`.
 
-### v=15.7: a friend's test (posters, fake marks, Halloween-night load, phone sizes) (Oct 18, 3:20 PM, branch `v157`, not pushed)
+### v=15.7: a friend's test (posters, fake marks, Halloween-night load, phone sizes) (Oct 18, 3:20 PM, live: [937a7f4](https://github.com/bohemianwp/london-trick-or-treat/commit/937a7f4))
+- **Live:** Oct 18, 5:02 PM (Toronto). Peng approved it; `main` was fast-forwarded to [937a7f4](https://github.com/bohemianwp/london-trick-or-treat/commit/937a7f4). Peng had already run `supabase/v156_antiabuse.sql` in Supabase (result `v15.6 anti-abuse ready | 3 | true`). Live checks: all assets at `?v=15.7`, live headless passed 206/206. Live server probe: a temporary pin and post from a test device got `own` for self-👍, self-❤️ and self-vote, and both were deleted 1.6 s later (confirmed gone). The "3 different sessions" rule was not probed live, because test marks can't be deleted with the public key and would show on the map for 2 hours. Screenshot: `halloween_app/screenshots/v157-live.png`.
 Feedback from a friend testing the map, relayed by Peng at 2:39 PM:
 > 1. 海报上的文字信息量较大，我不仔细看或一开始想手机上快速滑过，可能会抓不住核心。建议：1）海报内容再精简？2）将“免费”、“无需登录”和“保护隐私（11月2日删除）”作为核心卖点用更醒目的高亮色块显示。
 > 2.“Street level only”是一个很好的隐私保护设计，但是否仍需防范恶意虚假标记？建议：增加简单的点赞或举报审核，确保真实性？
