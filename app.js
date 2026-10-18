@@ -403,7 +403,7 @@
     if (geo.marker) { map.removeLayer(geo.marker); map.removeLayer(geo.circle); geo.marker = geo.circle = null; }
     updateLocateBtn();
   }
-  function showMe() {
+  function drawMeDot() {   // was a second "showMe", silently replaced by the Show me helper (v15.1 bug): the blue dot never showed
     if (!geo.marker) {
       geo.circle = L.circle(geo.pos, { radius: geo.acc, color: '#2f80ff', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
       geo.marker = L.marker(geo.pos, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -419,7 +419,7 @@
     geo.pos = [p.coords.latitude, p.coords.longitude];
     geo.posAt = Date.now();
     geo.acc = Math.round(p.coords.accuracy || 0);
-    showMe();
+    drawMeDot();
     if (geo.following) { if (first) map.setView(geo.pos, Math.max(map.getZoom(), 16)); else map.panTo(geo.pos, { animate: true }); }
     updateLocateBtn();
     flushFix();
