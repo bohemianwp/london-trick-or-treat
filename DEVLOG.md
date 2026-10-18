@@ -85,7 +85,7 @@ Between 3:31 and 3:52 PM the Mac went offline mid-build. The build finished at a
   - See **v=15.3** below.
 
 ### Cancelled
-- **Promo QR / video v4:** cancelled before any work. `qr.png` was never touched. Earlier promo video drafts (v1–v3) are kept in `halloween_app/` and were never published.
+- **Promo QR / video v4:** cancelled before any work. `qr.png` was never touched. Earlier promo video drafts (v1–v3) are kept in `halloween_app/` and were never published. (Re-requested by Peng on Oct 18, 10:03 AM and made then; see "Promo video v4 + posters" below.)
 
 ## Versions
 
@@ -300,6 +300,16 @@ Peng, 9:27 AM: "核实活动今年是否存在，确保100%真实" ("Verify each
 - **Tests:**
   - Unit tests check the 5 picks, their organizer links, 2026 dates in EN and ZH, the town · km prefixes, a valid `end` on every event, and hiding at the exact minute and day boundaries (Oct 23 6:59/7:00 PM, Oct 26, Oct 31 11:59 PM → Nov 1).
   - Headless runs at 4 `?now=` times: 9/8/5/0 cards, 8/7/4/0 pins, and the empty-state line. Screenshots: `v154-events-layer-{en,zh}.png`, `v154-events-list-{en,zh}(-2).png`.
+
+### Promo video v4 + posters for friends' testing (Oct 18, 10:30 AM)
+Peng, 10:03 AM: "重新在生成个视频和海报吧，我今天就要开始让朋友测试了。" ("Make the video and posters again. I'm starting testing with friends today.")
+Peng, 10:10 AM: "把文案文字一起发给我" ("Send me the copy text too.")
+- **Fresh captures from the live site (v15.5, demo data, 390×844 @3x, EN + 中文):** purple decorations button, the cream "💬 Loved a street in past years? Share it" button with its Show me ring, a past-favourite bubble with 👍 / ❤️, orange score dots, More wrapping onto rows with the Events layer, the Events list (v15.4 picks), a How-to feature card, and the Oct 31 night view (`?now=2026-10-31T19:30`).
+- **Video** `halloween_app/promo_video_v4.mp4`: 1080×1920, 30 fps, H.264 High + AAC 48 kHz, 32.0 s, 13 scenes. Flow: hook → what it does + the two phases → 8 app scenes → gift line → privacy (no login, street level only, deleted by Nov 2) → end card with a large QR, "Testing now: tell us what you think! Guide → 💬 Feedback", "demo data" and the music credit ("Sneaky Snitch", Kevin MacLeod, CC BY 4.0). v3 was 780×1688; v4 uses the requested 1080×1920. Built by `halloween_app/promo4/build_v4.py` from `captions.json`.
+- **Posters** `halloween_app/poster/poster-v154-1080x1920.png` and `poster-v154-1080x1080.png` (`build_v154.py`, `make_v154.sh`): same copy, privacy badges, testing line, new app screenshots, larger QR on the tall poster.
+- **Clean design:** one font family (Noto Sans CJK SC, plus colour emoji), navy background, purple = decorations, cream = past favourites, orange = fun streets (and scores), no yellow, no stale wording (no "🔥 23 now", no ⌖).
+- **QA:** the QR is the plain URL (`https://bohemianwp.github.io/london-trick-or-treat/`, no `?lang`), decoded with OpenCV from both posters and the video's end frames. Every caption was checked against the live app strings. All 235 characters have glyphs (no tofu). 6+ frames were extracted and reviewed. Both posters have no overflow, and the smallest text is 20 px.
+- **Copy for Peng:** `halloween_app/promo/copy_v154.md` has every video caption in order, all poster text, and ready-to-paste posts (WeChat group, RedNote, X, LinkedIn).
 
 ## Issues and fixes
 - **4:51 PM:** the map said "API key required" → OSM tiles with a dark filter.
