@@ -301,6 +301,14 @@ Peng, 9:27 AM: "核实活动今年是否存在，确保100%真实" ("Verify each
   - Unit tests check the 5 picks, their organizer links, 2026 dates in EN and ZH, the town · km prefixes, a valid `end` on every event, and hiding at the exact minute and day boundaries (Oct 23 6:59/7:00 PM, Oct 26, Oct 31 11:59 PM → Nov 1).
   - Headless runs at 4 `?now=` times: 9/8/5/0 cards, 8/7/4/0 pins, and the empty-state line. Screenshots: `v154-events-layer-{en,zh}.png`, `v154-events-list-{en,zh}(-2).png`.
 
+### v=15.5.1 hotfix: the blue "you are here" dot was never drawn (Oct 18, 12:10 PM, [e6b12c4](https://github.com/bohemianwp/london-trick-or-treat/commit/e6b12c4) + [f881698](https://github.com/bohemianwp/london-trick-or-treat/commit/f881698))
+Found while testing v15.6 (the far-away toast check never got a location fix). Not reported by a user. It was live from v15.1 (Oct 18, about 7:50 AM) until 12:09 PM.
+- **Bug:** after allowing location, phones saw no blue dot, and a "This is not available right now" toast appeared instead.
+- **Cause:** `app.js` had two `function showMe` declarations in the same scope: the location helper (draws the dot) and the v15.1 How-to "👀 Show me" helper. In JavaScript the later declaration wins, so every location fix ran the Show me helper with no feature name. That helper closed the sheet, found no target, and showed the toast. The dot was never drawn. Follow-me and marking still had the position, so only the dot and the toast were affected.
+- **Fix:** the location helper is renamed `drawMeDot` ([e6b12c4](https://github.com/bohemianwp/london-trick-or-treat/commit/e6b12c4), 2 lines). The asset cache-buster went to `?v=15.5.1` so phones fetch the new `app.js` ([f881698](https://github.com/bohemianwp/london-trick-or-treat/commit/f881698); there is no service worker).
+- **Verified live:** the page loads `app.js?v=15.5.1`, which contains `drawMeDot`. Headless against the live URL passed 192/192. A 390 px live screenshot with a London location (Wortley Village) shows the blue dot: `halloween_app/screenshots/v1551-medot-live.png`.
+- **Guard (in v15.6, branch `stats`):** a unit test fails if two function declarations in `app.js` share a name, and the headless test checks the blue dot appears after a location fix.
+
 ### Promo video v4 + posters for friends' testing (Oct 18, 10:30 AM)
 Peng, 10:03 AM: "重新在生成个视频和海报吧，我今天就要开始让朋友测试了。" ("Make the video and posters again. I'm starting testing with friends today.")
 Peng, 10:10 AM: "把文案文字一起发给我" ("Send me the copy text too.")
