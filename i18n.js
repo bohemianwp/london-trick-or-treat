@@ -24,7 +24,7 @@
     markedThanks: 'Thanks! You just helped other families find a great street 🎃',
     progNeed: '{n} more marks and this street lights up for everyone!', progNeed1: '1 more mark and this street lights up for everyone!',
     progNeedSome: '1–2 more marks from other families and this street lights up for everyone!',
-    progLit: 'You’re mark #{k} here. This zone is now {bucket} 🔥',
+    progLit: 'You’re mark #{k} here. This zone is now {bucket} {icon}',
     crossed_lit: 'You made it light up! ✨', crossed_lively: 'You made it glow orange! 🧡', crossed_hot: 'You made it glow hot pink! 💖',
     progPractice: '🧪 Practice: this mark stays on your phone and isn’t shared. Sharing opens on Halloween night (Oct 31, 3–11 PM).',
     progTest: '🧪 Test days: shared with other testers, wiped before Halloween.',
@@ -37,6 +37,26 @@
     markCardAuto: 'Closes by itself in a few seconds.',
     markedPractice: 'Practice mark saved on this phone. On Halloween night, marks are shared with everyone.',
     tagsAsk: 'Optional: anything special?',
+    // v13: two phases (banner, explainer, big button)
+    phasePre: '🎃 Now: mark the best decorations · 🔥 Oct 31: mark the most fun streets',
+    phaseOn: 'Halloween is ON! Mark the most fun streets 🔥',
+    phaseTest: '🧪 Test days Oct 17–20: fun-street marks are shared with testers, then wiped',
+    phaseTitle: 'Two ways to help 🎃 🔥', phaseJump: '🔥 What’s different on Oct 31 ↓', giftLine: 'Every mark, like and comment helps another family have a happier, more magical Halloween 🎃',
+    phaseGotIt: 'Got it', phaseSeeDecor: '🎃 See Best decorations',
+    phaseItems: [
+      ['🎃 Now, until Oct 31 at 3 PM', 'Passing a great Halloween display? Tap the purple button “Cool decorations here! 🎃”. Streets that glow purple have the best decorations so far. Nice for an evening walk this week.'],
+      ['🔥 What’s different on Oct 31', [
+        'From 3 PM the big button turns orange: “Great street? Share it! 🎁”. Tap it to mark the most fun streets right now.',
+        'Streets light up live as families mark them (3 or more marks), so you can see where it’s lively.',
+        'Zones count marks from the last {win} minutes, and every mark is deleted after 2 hours, so the map shows what’s happening now.',
+        'Sharing is open 3–11 PM. The 🎃 decorations layer stays visible as a guide.',
+        'Everything shared is deleted after Halloween (by Nov 2).']],
+      ['🧪 Before Oct 31', 'The small orange “Fun street” button is only practice (on test days, Oct 17–20, it is shared with testers). Real fun-street sharing starts Oct 31 at 3 PM.'],
+      ['🔒 What is kept', 'Decoration marks are kept for 14 days and all deleted after Halloween (Nov 2). Fun-street marks are deleted after 2 hours. Street zones only: no names, no photos, no addresses.']
+    ],
+    decorMain: 'Cool decorations here! 🎃', decorSub: 'Passing a great display? Tap to share it',
+    altFunPractice: '🧪 Practice: fun street', altFunTest: '🧪 Test: fun street',
+    nudgeDecor: 'Passing great decorations? Share them. It takes 1 second.',
     // v11: Best decorations layer
     decorBtn: 'Cool decorations here! 🎃', layerDecor: 'Decor', legendDecor: 'Decor',
     decorTitle: '🎃 Best decorations', decorListBtn: '🎃 Best decorations',
@@ -189,10 +209,15 @@
     leafletMissing: 'The map library failed to load. Check your internet connection and reload.',
 
     // Welcome guide, How-to panel, inline hints
-    helpAria: 'How to use this map', guideTitle: 'Welcome! 3 quick tips', guideSkip: 'Skip', guideDone: 'Got it 🎃',
+    helpAria: 'How to use this map', guideTitle: 'Welcome! 4 quick tips', guideSkip: 'Skip', guideDone: 'Got it 🎃',
     guidePrev: 'Previous tip', guideNext: 'Next tip', guideStep: 'Tip {n} of {total}', guideDotAria: 'Go to tip {n}',
     guideLegend: 'Glow colours:',
     guideCards: [
+      ['Now: decorations · Oct 31: fun streets', [
+        '🎃 Until Oct 31 at 3 PM: passing a great display? Tap the purple “Cool decorations here! 🎃”.',
+        '🔥 Oct 31 from 3 PM: the big button turns orange (“Great street? Share it!”). Streets light up live as families mark them, and marks fade after 2 hours.',
+        '🧪 Before that, the small orange “Fun street” button is only practice.',
+        '🔒 Decoration marks are kept 14 days and deleted after Halloween.']],
       ['See where it’s fun!', [
         '🔥 Glowing hexagons are streets families shared with “Great street? Share it!” in the last {win} minutes.',
         '🔢 The number shows how many marks. It appears only at 3 or more.',
@@ -213,6 +238,15 @@
     howtoTitle: 'How to use this map', howtoIntro: 'Short answers. Tap “?” at the top any time to come back here.',
     howtoReplay: '▶ Show the welcome cards again',
     howtoSections: [
+      ['🗓️ Two phases', ['Now until Oct 31 at 3 PM: the big purple button “Cool decorations here! 🎃” shares a street with great decorations.',
+        'Halloween night (Oct 31, 3–11 PM): the big button turns orange, “Great street? Share it! 🎁”, to share fun streets for trick-or-treating.',
+        'Before Oct 31 the small orange “Fun street” button is practice only (shared with testers on test days, Oct 17–20).',
+        'The banner under the countdown always shows the current phase. Tap it for a short explanation.',
+        'Decoration marks are kept 14 days and deleted after Halloween. Fun-street marks are deleted after 2 hours.']],
+      ['🔥 What’s different on Oct 31', ['From 3 PM the big button turns orange: “Great street? Share it! 🎁”. Tap it to mark the most fun streets right now.',
+        'Streets light up live as families mark them (3 or more marks), so you can see where it’s lively.',
+        'Zones count marks from the last {win} minutes, and every mark is deleted after 2 hours, so the map shows what’s happening now.',
+        'Sharing is open 3–11 PM. The 🎃 decorations layer stays visible as a guide.', 'Everything shared is deleted after Halloween (by Nov 2).']],
       ['🎁 The big button', ['“Great street? Share it!” shares where you are right now. One tap, works one-handed.',
         'While the kids knock on doors, tap once to share the street. It takes 1 second.',
         'You collect badges on this phone: 👻 Street Scout (1), 🎃 Neighbourhood Guide (3), 🍬 Halloween Hero (5). No names, no leaderboard.',
@@ -285,7 +319,7 @@
     markedThanks: '谢谢！你刚帮其他家庭找到一条好街 🎃',
     progNeed: '再有 {n} 个标记，这里就会亮起来！', progNeed1: '再有 1 个标记，这里就会亮起来！',
     progNeedSome: '再有 1–2 个其他家庭标记，这里就会亮起来！',
-    progLit: '你是这里第 {k} 个标记，这个区域现在是「{bucket}」🔥',
+    progLit: '你是这里第 {k} 个标记，这个区域现在是「{bucket}」{icon}',
     crossed_lit: '你让这里亮起来了！✨', crossed_lively: '你让它变成橙色了！🧡', crossed_hot: '你让它变成亮粉色了！💖',
     progPractice: '🧪 练习：这个标记只存在你的手机上，不会分享。万圣节当晚（10 月 31 日下午 3 点到晚上 11 点）才开始共享。',
     progTest: '🧪 试用期：会和其他试用者共享，万圣节前清除。',
@@ -298,6 +332,26 @@
     markCardAuto: '几秒后会自动关闭。',
     markedPractice: '练习标记已存在这台手机上。万圣节当晚，标记会和大家共享。',
     tagsAsk: '可选：有什么特别的？',
+    // v13：两个阶段（横幅、说明卡、大按钮）
+    phasePre: '🎃 现在：标记最棒的装饰 · 🔥 10月31日：标记最好玩的街',
+    phaseOn: '万圣节开始啦！标记最好玩的街 🔥',
+    phaseTest: '🧪 试用期 10月17–20日：好玩街道的标记会和试用者共享，之后清除',
+    phaseTitle: '两种帮忙方式 🎃 🔥', phaseJump: '🔥 31号有什么不同 ↓', giftLine: '你的每一次标记、点赞和留言，都在帮助另一个家庭和小朋友过一个更快乐、更难忘的万圣节 🎃',
+    phaseGotIt: '知道了', phaseSeeDecor: '🎃 看最佳装饰',
+    phaseItems: [
+      ['🎃 现在到 10 月 31 日下午 3 点', '路过好看的万圣节装饰？点紫色按钮「这里装饰很棒！🎃」。发紫光的街是目前装饰最棒的地方，这周晚上散步去看正合适。'],
+      ['🔥 31号有什么不同', [
+        '下午 3 点起，大按钮变成橙色：「这条街不错？分享给大家！🎁」。点它标记现在最好玩的街。',
+        '家长们一标记，街道就会实时亮起来（3 个或更多标记），一眼看出哪里热闹。',
+        '热区只统计最近 {win} 分钟的标记，每个标记 2 小时后删除，所以地图显示的是现在的情况。',
+        '分享时间是下午 3 点到晚上 11 点。🎃 装饰图层会一直显示，可以当参考。',
+        '万圣节后（11 月 2 日前）所有共享数据都会删除。']],
+      ['🧪 10 月 31 日之前', '橙色的小按钮「好玩的街」只是练习（试用期 10 月 17–20 日会和试用者共享）。真正分享好玩的街从 10 月 31 日下午 3 点开始。'],
+      ['🔒 会保存什么', '装饰标记保存 14 天，万圣节后（11 月 2 日）全部删除。好玩街道的标记 2 小时后删除。只记录街区：不要名字、不要照片、不要地址。']
+    ],
+    decorMain: '这里装饰很棒！🎃', decorSub: '路过好看的装饰？点一下分享',
+    altFunPractice: '🧪 练习：好玩的街', altFunTest: '🧪 试用：好玩的街',
+    nudgeDecor: '路过好看的装饰？分享一下，只要 1 秒。',
     // v11: 最佳装饰
     decorBtn: '这里装饰很棒！🎃', layerDecor: '装饰', legendDecor: '装饰',
     decorTitle: '🎃 最佳装饰', decorListBtn: '🎃 最佳装饰',
@@ -450,10 +504,15 @@
     leafletMissing: '地图组件没加载出来。请检查网络后刷新页面。',
 
     // Welcome guide, How-to panel, inline hints
-    helpAria: '这个地图怎么用', guideTitle: '欢迎！3 个小提示', guideSkip: '跳过', guideDone: '知道了 🎃',
+    helpAria: '这个地图怎么用', guideTitle: '欢迎！4 个小提示', guideSkip: '跳过', guideDone: '知道了 🎃',
     guidePrev: '上一条', guideNext: '下一条', guideStep: '第 {n} 条，共 {total} 条', guideDotAria: '跳到第 {n} 条',
     guideLegend: '发光颜色：',
     guideCards: [
+      ['现在：装饰 · 10月31日：好玩的街', [
+        '🎃 10 月 31 日下午 3 点之前：路过好看的装饰？点紫色的「这里装饰很棒！🎃」。',
+        '🔥 10 月 31 日下午 3 点起：大按钮变成橙色（「这条街不错？分享给大家！」）。家长们一标记，街道就实时亮起来；标记 2 小时后消失。',
+        '🧪 在那之前，橙色小按钮「好玩的街」只是练习。',
+        '🔒 装饰标记保存 14 天，万圣节后删除。']],
       ['看看哪里好玩！', [
         '🔥 发光的六边形是热区：最近 {win} 分钟有家庭在这里点了「这条街不错？分享给大家！」。',
         '🔢 数字是标记的个数，至少 3 个才会显示。',
@@ -474,6 +533,15 @@
     howtoTitle: '这个地图怎么用', howtoIntro: '简短回答。随时点顶部的「?」回到这里。',
     howtoReplay: '▶ 再看一遍欢迎卡片',
     howtoSections: [
+      ['🗓️ 两个阶段', ['现在到 10 月 31 日下午 3 点：紫色大按钮「这里装饰很棒！🎃」分享装饰好看的街。',
+        '万圣节当晚（10 月 31 日下午 3 点到晚上 11 点）：大按钮变成橙色「这条街不错？分享给大家！🎁」，分享适合讨糖的好玩的街。',
+        '10 月 31 日之前，橙色小按钮「好玩的街」只是练习（试用期 10 月 17–20 日会和试用者共享）。',
+        '倒计时下面的横幅会显示现在是哪个阶段，点它可以看简短说明。',
+        '装饰标记保存 14 天，万圣节后删除。好玩街道的标记 2 小时后删除。']],
+      ['🔥 31号有什么不同', ['下午 3 点起，大按钮变成橙色：「这条街不错？分享给大家！🎁」。点它标记现在最好玩的街。',
+        '家长们一标记，街道就会实时亮起来（3 个或更多标记），一眼看出哪里热闹。',
+        '热区只统计最近 {win} 分钟的标记，每个标记 2 小时后删除，所以地图显示的是现在的情况。',
+        '分享时间是下午 3 点到晚上 11 点。🎃 装饰图层会一直显示，可以当参考。', '万圣节后（11 月 2 日前）所有共享数据都会删除。']],
       ['🎁 大按钮', ['「这条街不错？分享给大家！」会分享你现在的位置。一下就好，单手也能点。',
         '孩子们敲门的时候，点一下就能分享这条街，只要 1 秒。',
         '你会在这台手机上收集徽章：👻 街区侦察员（1）、🎃 社区向导（3）、🍬 万圣节英雄（5）。不用名字，没有排行榜。',

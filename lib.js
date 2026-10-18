@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=12';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=13';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -125,6 +125,7 @@
   var RATE_DEVICE_MS = 5 * 60000, RATE_ZONE_MS = 30 * 60000;
   function clampWindow(w) { w = Number(w) || 45; return Math.min(60, Math.max(30, Math.round(w))); }
   // Zone colour from the number of marks in the window: <3 none, 3–5 teal, 6–14 orange, 15+ hot pink.
+  var BUCKET_ICON = { quiet: '🕯️', lively: '🎉', hot: '🔥' };   // v13: no fire emoji for a quiet zone
   function zoneBucket(n) { return n < MIN_ZONE ? null : n < 6 ? 'quiet' : n < 15 ? 'lively' : 'hot'; }
   // v10: honest feedback after a mark. before/after = this zone's mark count just before / after the mark
   // (null = not visible, i.e. below 3). exact = true only when the phone really knows a below-3 count (local, demo,
@@ -159,7 +160,10 @@
   var DECOR_PRIMARY_FROM = zonedToUtcMs('2026-10-31', '15:00', TZ);   // from here the big button is the fun-street button
   function isDecorOpen(nowMs, demo) { return !!demo || (nowMs >= DECOR_OPEN.start && nowMs < DECOR_OPEN.end); }
   function decorVisible(nowMs, demo) { return !!demo || nowMs < DECOR_PURGE_MS; }        // layer stays visible until the purge
-  function decorPrimary(nowMs, demo) { return isDecorOpen(nowMs, demo) && (demo || nowMs < DECOR_PRIMARY_FROM); }
+  function decorPrimary(nowMs, demo) { return isDecorOpen(nowMs, demo) && nowMs < DECOR_PRIMARY_FROM; }   // demo follows the calendar too
+  // v13: the two phases, for the banner and the big button. 'decor' until Oct 31 3 PM, 'night' until Nov 1 00:00, then 'after'.
+  var NIGHT_END_MS = zonedToUtcMs('2026-11-01', '00:00', TZ);
+  function appPhase(nowMs) { return nowMs < DECOR_PRIMARY_FROM ? 'decor' : nowMs < NIGHT_END_MS ? 'night' : 'after'; }
   // Toronto calendar day 'YYYY-MM-DD' (the server uses the same day for its per-day limits).
   function torontoDay(ms) { return new Date(ms + tzOffsetMin(ms, TZ) * 60000).toISOString().slice(0, 10); }
   function cleanDecorTags(tags) {
@@ -648,7 +652,7 @@
     FEEDBACK_TO: FEEDBACK_TO, FEEDBACK_SUBJECT: FEEDBACK_SUBJECT, MAILTO_MAX: MAILTO_MAX, buildFeedbackMail: buildFeedbackMail,
     GUIDE_KEY: GUIDE_KEY, parseUrlFlags: parseUrlFlags, guideSeen: guideSeen, markGuideSeen: markGuideSeen, shouldShowGuide: shouldShowGuide, shouldShowLangChooser: shouldShowLangChooser, markProgress: markProgress, BADGES: BADGES, badgeFor: badgeFor, newBadge: newBadge, shouldNudge: shouldNudge, NUDGE_MS: NUDGE_MS,
     DECOR_TAGS: DECOR_TAGS, DECOR_ICON: DECOR_ICON, DECOR_OPEN: DECOR_OPEN, DECOR_PURGE_MS: DECOR_PURGE_MS, DECOR_KEEP_MS: DECOR_KEEP_MS,
-    DECOR_MAX_DAY: DECOR_MAX_DAY, DECOR_PRIMARY_FROM: DECOR_PRIMARY_FROM, isDecorOpen: isDecorOpen, decorVisible: decorVisible, decorPrimary: decorPrimary,
+    DECOR_MAX_DAY: DECOR_MAX_DAY, DECOR_PRIMARY_FROM: DECOR_PRIMARY_FROM, isDecorOpen: isDecorOpen, appPhase: appPhase, NIGHT_END_MS: NIGHT_END_MS, BUCKET_ICON: BUCKET_ICON, decorVisible: decorVisible, decorPrimary: decorPrimary,
     torontoDay: torontoDay, cleanDecorTags: cleanDecorTags, decorTagsValid: decorTagsValid, decorRate: decorRate, decorTopTag: decorTopTag,
     aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang
   };

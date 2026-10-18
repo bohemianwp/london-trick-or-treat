@@ -116,7 +116,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.shot('v9-chooser.png');
   await p.click('#langPick [data-pick="en"]'); await sleep(400);
   check('English → chooser closes, saved, English welcome cards appear', await p.ev(`document.getElementById('langPick').hidden && localStorage.getItem('ltot.lang')==='en' && !document.getElementById('guide').hidden`) &&
-    /Glowing hexagons/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+    /Glowing hexagons/.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
   const p2 = await openPage('', { wait: 3000, rawLang: true });
   check('second visit: no chooser again', await p2.ev(`document.getElementById('langPick').hidden`));
   await p2.ev(`localStorage.clear()`);
@@ -139,11 +139,12 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
 {
   const p = await openPage('', { geo: [42.966812, -81.245533] });
   check('page loads with no JS errors (390×844)', realErrors(p).length === 0, realErrors(p).join(' | '));
-  check('first visit: welcome guide with 3 cards', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===3`));
-  check('card 1 explains zones + “Your area isn’t on the map? Mark it!”', /Glowing hexagons/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)) &&
+  check('first visit: welcome guide with 4 cards, card 1 = the two phases (v13)', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===4`) &&
+    /Now: decorations · Oct 31: fun streets/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+  check('card 2 explains zones + “Your area isn’t on the map? Mark it!”', /Glowing hexagons/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
     /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./.test(await p.ev(`document.getElementById('guideTrack').textContent`)));
   await p.shot('v3-guide-en.png');
-  await p.click('#guideNext'); await sleep(350); await p.click('#guideNext'); await sleep(350);
+  for (let i = 0; i < 3; i++) { await p.click('#guideNext'); await sleep(350); }
   check('Got it on the last card closes it and remembers ltot.guideSeen.v2', await p.ev(`!document.getElementById('guideDone').hidden`) &&
     (await p.click('#guideDone'), await sleep(200), await p.ev(`document.getElementById('guide').hidden && localStorage.getItem('ltot.guideSeen.v2')==='done'`)));
   const st = await p.ev('__ltot.state()');
@@ -166,13 +167,21 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#legend .ibtn');
   await p.shot('v3-map-practice.png');
 
-  // the big button creates a mark (one-shot location; first time explains, then asks)
-  await p.click('#markBtn'); await sleep(500);
+  // v13: before Oct 31 3 PM the big button is purple (decorations); the fun-street mark is the small orange practice pill
+  check('v13 phase banner under the countdown: “Now: mark the best decorations · Oct 31: mark the most fun streets”',
+    await p.ev(`!document.getElementById('phaseBanner').hidden && /Now: mark the best decorations · 🔥 Oct 31: mark the most fun streets/.test(document.getElementById('phaseLine').textContent) && document.getElementById('phaseTestLine').hidden`));
+  await p.click('#phaseBanner'); await sleep(250);
+  check('tapping the banner opens the explainer (now / Halloween night / 14 days)', await p.ev(`!document.getElementById('phaseCard').hidden && document.querySelectorAll('#phaseList dt').length===4 && /14 days/.test(document.getElementById('phaseList').textContent)`));
+  check('explainer shows the gift line', await p.ev(`/helps another family have a happier, more magical Halloween/.test(document.getElementById('phaseGift').textContent) && document.getElementById('phaseGift').offsetHeight>0`));
+  await p.click('#phaseOk'); await sleep(150);
+  check('big button = purple decor button, small orange pill = “🧪 Practice: fun street”', await p.ev(`document.getElementById('markBtn').classList.contains('mb-decor') && /Cool decorations here!/.test(document.getElementById('markBtn').textContent) && /Practice: fun street/.test(document.getElementById('altBtn').textContent) && !document.getElementById('altBtn').hidden`));
+  // the fun-street pill creates a mark (one-shot location; first time explains, then asks)
+  await p.click('#altBtn'); await sleep(500);
   await allowLoc(p); await sleep(1500);
   const m1 = await p.ev('__ltot.state()');
   check('big button → a mark is stored (practice, local)', m1.marks === 1 && m1.myMarks === 1, JSON.stringify({ marks: m1.marks, mine: m1.myMarks }));
   await sleep(300);
-  check('v10 “Shared! 🎉” card: thanks + practice line (not shared) + 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3`) &&
+  check('v10 “Shared! 🎉” card: thanks + practice line (not shared) + 3 optional tags', await p.ev(`!document.getElementById('markCard').hidden && document.querySelectorAll('#tagRow .tagbtn').length===3 && !document.getElementById('markCardGift').hidden`) &&
     /helped other families/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && /Practice: this mark stays on your phone/.test(await p.ev(`document.getElementById('markCardProg').textContent`)));
   check('celebration (particles + pulse) played once', (await p.ev('__ltot.state().celebrations')) === 1 && await p.ev(`document.getElementById('markBtn').classList.contains('pop')`));
   await p.shot('v3-marked.png');
@@ -187,9 +196,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('.tabbar [data-tab="mark"]'); await sleep(500);
   check('v11: before Oct 31 3 PM the centre “Mark it!” tab opens 🎃 Best decorations (purple button + lists)',
     await p.ev(`!document.getElementById('panel-decor').hidden && document.getElementById('sheet').dataset.open==='true' && /Cool decorations here!/.test(document.getElementById('decorPanelBtn').textContent)`) &&
-    await p.ev(`!document.getElementById('decorBtn').hidden`));
+    await p.ev(`!document.getElementById('altBtn').hidden`));
   await p.click('.tabbar [data-tab="mark"]'); await sleep(300);
-  await p.click('#markBtn'); await sleep(800);
+  await p.click('#altBtn'); await sleep(800);
   check('big button again → friendly “Already shared” card (5-minute limit)', /share the next one in \d+ min/.test(await p.ev(`document.getElementById('markCardText').textContent`)) && (await p.ev('__ltot.state().marks')) === 1,
     await p.ev(`document.getElementById('markCardText').textContent`));
 
@@ -210,7 +219,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = How-to (14 sections, v11 + decor) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 14 && await p.ev(`!!document.getElementById('guideBoard')`));
+  check('Guide tab = How-to (16 sections, v13 + phases + Oct 31) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 16 && await p.ev(`!!document.getElementById('guideBoard')`));
   await p.click('#guideBoard'); await sleep(200);
   check('Board opens from the Guide tab (secondary)', await p.ev(`!document.getElementById('panel-board').hidden`));
 
@@ -244,7 +253,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const zh = await p.ev(`({ title: document.title, lang: document.documentElement.lang, tabs: [...document.querySelectorAll('.tabbar button')].map(b=>b.textContent).join('|'),
      btn: document.getElementById('markBtn').textContent, legend: document.getElementById('legend').textContent,
      leftovers: [...document.querySelectorAll('[data-i18n]')].filter(n=>n.textContent===n.dataset.i18n).map(n=>n.dataset.i18n) })`);
-  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这条街不错？分享给大家！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
+  check('one-tap Chinese: title, tabs, big button, legend', /万圣节/.test(zh.title) && zh.lang === 'zh-CN' && zh.tabs === '🗺️地图|🚶路线|✨标记！|📖指南' && /这里装饰很棒！/.test(zh.btn) && /超级火爆/.test(zh.legend), zh.tabs + ' / ' + zh.btn);
   check('no untranslated i18n keys on screen', zh.leftovers.length === 0, zh.leftovers.join(','));
   await p.click('.tabbar [data-tab="map"]'); await sleep(200);
   check('Map panel (zh): “你家附近不在地图上？标记它！”', /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/.test(await p.ev(`document.getElementById('panel-map').textContent`)));
@@ -305,7 +314,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
 
   // a real mark in tab A shows in tab B
   const bMarks0 = await b.ev('__ltot.state().marks');
-  await a.click('#markBtn'); await sleep(2000); await allowLoc(a); await sleep(1500);
+  await a.click('#altBtn'); await sleep(2000); await allowLoc(a); await sleep(1500);
   const myId = await a.ev(`(JSON.parse(localStorage.getItem('ltot.demo.mine.marks'))||[]).slice(-1).map(h=>h.id)[0]`);
   check('demo tab A: big button → mark + “Marked!” card', !!myId && await a.ev(`!document.getElementById('markCard').hidden`) && /helped other families find a great street/.test(await a.ev(`document.getElementById('markCardText').textContent`)));
   await sleep(1200);
@@ -410,6 +419,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await dismissGuide(on);
   check('?now=Oct 31 5:30 PM → “Halloween is ON! 🎃” with a pulsing glow', (await on.ev(`document.getElementById('countdown').textContent`)) === 'Halloween is ON! 🎃' &&
     await on.ev(`getComputedStyle(document.querySelector('#countdown .cd-msg')).animationName==='cd-pulse'`));
+  check('v13 ?now=Oct 31 5:30 PM: banner “Halloween is ON! Mark the most fun streets 🔥”, big button orange fun-street, decor = small purple pill',
+    await on.ev(`document.getElementById('phaseLine').textContent==='Halloween is ON! Mark the most fun streets 🔥' && !document.getElementById('markBtn').classList.contains('mb-decor') && /Great street\\? Share it!/.test(document.getElementById('markBtn').textContent) && /Cool decorations here!/.test(document.getElementById('altBtn').textContent)`));
   await on.shot('v6-halloween-on.png');
   const edge = await openPage('?now=2026-10-31T16:59:58-04:00&lang=zh', { wait: 600 });
   const e1 = await edge.ev(`document.getElementById('countdown').dataset.phase`);
@@ -431,7 +442,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D12') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D13') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');
@@ -496,7 +507,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     /满 3 个/.test(await q.ev(`document.getElementById('tourCap').textContent`)), await q.ev(`document.getElementById('tourCap').textContent`));
   await q.shot('v6-tour-4-zh.png');
   const w = await openPage('?guide=1', { wait: 3500 });
-  check('first welcome card has “▶ How to use”', /▶ How to use/.test(await w.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
+  check('first welcome card has “▶ How to use”', /▶ How to use/.test(await w.ev(`document.getElementById('guideTrack').textContent`)));
   await w.click('#guideTourBtn'); await sleep(800);
   check('…and it starts the tour', await w.ev(`document.getElementById('guide').hidden && __ltot.tour.state().active`));
   check('tour pages: no JS errors', [q, w].every((x) => realErrors(x).length === 0), [q, w].map(realErrors).flat().join(' | '));

@@ -527,6 +527,30 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
 #panel-decor h3 { margin: 12px 0 2px; font-size: 15px; }
 .decor-n { flex: 1; min-width: 0; text-align: left; font-weight: 600; line-height: 1.3; }
 
+/* ---------- v13: phase banner (replaces the test-days banner), explainer card, big button by phase ---------- */
+.mc-gift { margin: 6px 0 8px; font-size: 13px; line-height: 1.35; color: #6b4e9b; font-style: italic; }
+.phasebanner { display: block; width: 100%; margin: 0; padding: 4px 10px 5px; border: 0; border-bottom: 1px solid var(--purple);
+  background: linear-gradient(90deg, #22093d, #2a1206); color: #f3e8ff; font: 700 12.5px/1.3 inherit; font-family: inherit; text-align: center; cursor: pointer; }
+.phasebanner[hidden], .phasebanner [hidden] { display: none; }
+.phasebanner[data-phase="night"] { background: #3a1503; border-bottom-color: var(--orange); color: #ffe2c7; }
+.pb-line, .pb-test { display: block; }
+.pb-test { font-size: 11px; font-weight: 600; color: #b8fff3; }
+.phasecard { bottom: auto; top: 50%; transform: translate(-50%, -50%); z-index: 1200; max-height: 80vh; overflow: auto; border-color: var(--purple); }
+.phaselist { margin: 4px 0 12px; }
+.phaselist dt { font-weight: 800; margin-top: 10px; }
+.phaselist dd { margin: 2px 0 0; color: var(--muted); line-height: 1.4; }
+.phaselist dd ul { margin: 2px 0 0; padding-left: 18px; }
+.phaselist dt.flash { color: var(--orange-2); text-shadow: var(--glow-o); }
+.phase-jump { margin: 0 0 4px; border-color: var(--orange); }
+.phasecard { position: absolute; }
+.markbtn.mb-decor { color: #fff; border-color: #e9d5ff; background: radial-gradient(120% 140% at 50% 15%, #d8b4fe 0%, #9333ea 45%, #4c1d95 100%);
+  box-shadow: 0 6px 0 #2e1065, 0 0 22px rgba(168,85,247,.9), 0 0 48px rgba(255,122,24,.25); }
+.markbtn.mb-decor .mb-glow { border-color: rgba(192,132,252,.8); }
+.markbtn.mb-decor .mb-sub { color: #f3e8ff; }
+.fab-decor.fab-fun { border-color: var(--orange); box-shadow: var(--glow-o); background: rgba(58,21,3,.94); color: #ffe2c7; }
+.gbtn-demo.gbtn-decor { color: #fff; border-color: #e9d5ff; background: radial-gradient(120% 140% at 50% 15%, #d8b4fe, #9333ea 45%, #4c1d95);
+  box-shadow: 0 5px 0 #2e1065, 0 0 20px rgba(168,85,247,.8); }
+
 @media (prefers-reduced-motion: reduce) {
   .hud { display: none; }
   .me-dot { animation: none; }

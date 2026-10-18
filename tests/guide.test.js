@@ -20,23 +20,25 @@ test('guide / How-to / hint strings exist in both languages', () => {
     'guideCards', 'howtoTitle', 'howtoIntro', 'howtoReplay', 'howtoSections', 'infoAria', 'hintMark', 'hintLegend', 'notOnMap'];
   for (const k of keys) for (const l of ['en', 'zh']) assert.ok(I18N[l][k], `${l}.${k} missing`);
   for (const l of ['en', 'zh']) {
-    assert.equal(I18N[l].guideCards.length, 3, l + ': exactly 3 welcome cards');
-    assert.equal(I18N[l].howtoSections.length, 14, l + ': 14 How-to sections');
+    assert.equal(I18N[l].guideCards.length, 4, l + ': exactly 4 welcome cards (v13: phases first)');
+    assert.equal(I18N[l].howtoSections.length, 16, l + ': 16 How-to sections');
     for (const c of I18N[l].guideCards) assert.ok(typeof c[0] === 'string' && c[1].length >= 2, l + ' card ' + c[0]);
   }
 });
 
 test('welcome cards and How-to cover the new product (EN + 中文)', () => {
   const cards = I18N.en.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(cards[0], /^See where it’s fun!/); assert.match(cards[0], /Glowing hexagons/); assert.match(cards[0], /3 or more/); assert.match(cards[0], /NEW/);
-  assert.match(cards[0], /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./);
-  assert.match(cards[1], /^Great street\? Share it with one tap!/); assert.match(cards[1], /Great street\? Share it!/); assert.match(cards[1], /While the kids knock on doors/);
-  assert.match(cards[1], /Lots of candy, Great decorations, Crowded/); assert.match(cards[1], /skip/);
-  assert.match(cards[2], /^Plan your walk & stay safe/); assert.match(cards[2], /Show my location/); assert.match(cards[2], /Route/);
-  assert.match(cards[2], /Safety/); assert.match(cards[2], /grown-up/); assert.match(cards[2], /50 m/);
+  assert.match(cards[1], /^See where it’s fun!/); assert.match(cards[1], /Glowing hexagons/); assert.match(cards[1], /3 or more/); assert.match(cards[1], /NEW/);
+  assert.match(cards[1], /Your area isn’t on the map\? Mark it! Once 3 people mark it, it lights up\./);
+  assert.match(cards[2], /^Great street\? Share it with one tap!/); assert.match(cards[2], /Great street\? Share it!/); assert.match(cards[2], /While the kids knock on doors/);
+  assert.match(cards[2], /Lots of candy, Great decorations, Crowded/); assert.match(cards[2], /skip/);
+  assert.match(cards[3], /^Plan your walk & stay safe/); assert.match(cards[3], /Show my location/); assert.match(cards[3], /Route/);
+  assert.match(cards[3], /Safety/); assert.match(cards[3], /grown-up/); assert.match(cards[3], /50 m/);
+  assert.match(cards[0], /^Now: decorations · Oct 31: fun streets/); assert.match(cards[0], /Cool decorations here!/); assert.match(cards[0], /practice/); assert.match(cards[0], /14 days/);
   const zc = I18N.zh.guideCards.map((c) => c[0] + ' ' + c[1].join(' '));
-  assert.match(zc[0], /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/);
-  assert.match(zc[1], /这条街不错？分享给大家！/); assert.match(zc[1], /孩子们敲门的时候/); assert.match(zc[1], /糖很多、装饰超棒、人很多/); assert.match(zc[2], /大人/);
+  assert.match(zc[1], /你家附近不在地图上？标记它！3 个人标记后就会亮起来。/);
+  assert.match(zc[2], /这条街不错？分享给大家！/); assert.match(zc[2], /孩子们敲门的时候/); assert.match(zc[2], /糖很多、装饰超棒、人很多/); assert.match(zc[3], /大人/);
+  assert.match(zc[0], /现在：装饰 · 10月31日：好玩的街/); assert.match(zc[0], /这里装饰很棒！/);
   const howto = I18N.en.howtoSections.map((s) => s[0] + ' ' + s[1].join(' ')).join('\n');
   for (const w of ['big button', 'Great street? Share it!', 'Street Scout', 'Tags', 'Teal = Quiet', 'Orange = Lively', 'Hot pink = Super hot', '🔥 23 marked',
     '3 or more', 'Bottom tabs', 'Mark it!', 'Layer chips', 'Near me', 'Route', 'Suggest an area', 'Board', 'Safety', 'Privacy', '50 m', '2 hours',
@@ -63,7 +65,7 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=12$/, u));
+  own.forEach((u) => assert.match(u, /\?v=13$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 

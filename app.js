@@ -161,8 +161,7 @@
     $('offlineChip').hidden = backend.mode !== 'offline';
     $('demoChip').hidden = !DEMO;
     $('practiceChip').hidden = markMode() !== 'practice';
-    $('testBanner').hidden = markMode() !== 'test';
-    $('testBanner').textContent = t('testBanner');
+    renderPhase();
     document.querySelectorAll('.local-note').forEach(function (n) { n.hidden = backend.mode === 'supabase'; });
   }
   backend.onStatus(renderChips);
@@ -170,7 +169,7 @@
     toast(backend.reason === 'notConfigured' ? t('offlineWhy_notConfigured') : t('offlineWhy'), 7000);
   });
   $('practiceChip').addEventListener('click', function () { toast(t('practiceWhy'), 7000); });
-  $('testBanner').addEventListener('click', function () { toast(t('testWhy'), 8000); });
+  $('phaseBanner').addEventListener('click', openPhaseCard);
 
   // ==== layer chips ====
   var LAYER_ICONS = { zones: '🔥', decor: '🎃', areas: '🧭', events: '📅' };
@@ -520,7 +519,7 @@
     if (after == null && exact) after = exactLocalCount(cell);
     var pr = LIB.markProgress(before, after, exact), txt;
     if (pr.kind === 'lit') {
-      txt = t('progLit', { k: pr.k, bucket: t(BUCKET_KEY[pr.bucket]) });
+      txt = t('progLit', { k: pr.k, bucket: t(BUCKET_KEY[pr.bucket]), icon: LIB.BUCKET_ICON[pr.bucket] });
       if (pr.crossed) txt += ' ' + t('crossed_' + pr.crossed);
       p.classList.toggle('mc-crossed', !!pr.crossed);
       if (pr.crossed) celebrate();
@@ -533,16 +532,38 @@
   function buzz() {                                    // short buzz on Android (iPhone Safari has no vibrate); only after a real tap
     try { var ua = navigator.userActivation; if (navigator.vibrate && !REDUCED && (!ua || ua.hasBeenActive)) navigator.vibrate([30, 40, 60]); } catch (e) { /* not supported */ }
   }
-  var CARD_MS = 4000;
-  function armCardTimer(onEnd, ms) {
-    ms = ms || CARD_MS;
-    clearTimeout(openMarkCard.timer);
+  // v13: cards stay ~8 s. The timer pauses while a finger / mouse / keyboard focus is on the card (e.g. picking a tag)
+  // and resumes when it leaves (at least 2.5 s left). Done / ✕ always close at once.
+  var CARD_MS = 8000;
+  var cardT = { onEnd: null, ms: 0, left: 0, end: 0, paused: false, holds: 0 };
+  function cardBar(frac, ms) {
     var bar = $('markCardBar');
-    bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
-    bar.style.transition = 'width ' + ms + 'ms linear'; bar.style.width = '0%';
-    openMarkCard.timer = setTimeout(onEnd || closeMarkCard, ms);
+    bar.style.transition = 'none'; bar.style.width = (frac * 100).toFixed(2) + '%'; void bar.offsetWidth;
+    if (ms) { bar.style.transition = 'width ' + ms + 'ms linear'; bar.style.width = '0%'; }
   }
-  function holdCard() { clearTimeout(openMarkCard.timer); var bar = $('markCardBar'); bar.style.transition = 'none'; bar.style.width = '0%'; }
+  function runCardTimer() {
+    clearTimeout(openMarkCard.timer);
+    cardT.paused = false; cardT.end = Date.now() + cardT.left;
+    cardBar(cardT.left / cardT.ms, cardT.left);
+    $('markCard').dataset.timer = 'running';
+    openMarkCard.timer = setTimeout(function () { cardT.onEnd(); }, cardT.left);
+  }
+  function armCardTimer(onEnd, ms) {
+    cardT.onEnd = onEnd || closeMarkCard; cardT.ms = cardT.left = ms || CARD_MS; cardT.holds = 0;
+    runCardTimer();
+  }
+  function pauseCard() {
+    if ($('markCard').hidden || cardT.paused || !cardT.onEnd) return;
+    clearTimeout(openMarkCard.timer);
+    cardT.paused = true; cardT.left = Math.max(0, cardT.end - Date.now());
+    cardBar(cardT.left / cardT.ms, 0);
+    $('markCard').dataset.timer = 'paused';
+  }
+  function resumeCard() {
+    if ($('markCard').hidden || !cardT.paused) return;
+    cardT.left = Math.max(cardT.left, 2500);
+    runCardTimer();
+  }
   function openMarkCard(o) {
     var card = $('markCard');
     card.dataset.kind = 'shared';
@@ -553,27 +574,33 @@
     b.hidden = !o.badge;
     if (o.badge) b.textContent = t('badgeNew', { icon: o.badge.icon, name: t(o.badge.key) });
     $('markCardTags').hidden = false;
+    $('markCardGift').hidden = false;
     $('markCardDone').textContent = t('done');
     renderTagRow();
     card.hidden = false;
-    armCardTimer();                                  // closes by itself after ~4 s so the family can keep walking
+    armCardTimer();                                  // closes by itself after ~8 s so the family can keep walking
   }
   function openRateCard(reason, waitMs) {
     var card = $('markCard');
     card.dataset.kind = 'rate';
     $('markCardTitle').textContent = t('rateTitle');
     $('markCardText').textContent = reason === 'zone' ? t('rateZoneFriendly') : t('rateDeviceFriendly', { m: waitText(waitMs) });
-    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardGift').hidden = true; $('markCardTags').hidden = true;
     $('markCardDone').textContent = t('done');
     card.hidden = false;
     armCardTimer();
   }
-  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); pendingDecor = null; }
-  // Touching the card (e.g. to add a tag) keeps it open until Done / ✕. (Decor before sending: a tag tap restarts the countdown.)
-  $('markCard').addEventListener('pointerdown', function (e) {
-    if ($('markCard').dataset.kind === 'decorPending') return;
-    if (!e.target.closest('#markCardDone, #markCardClose')) holdCard();
-  });
+  function closeMarkCard() { $('markCard').hidden = true; clearTimeout(openMarkCard.timer); cardT.onEnd = null; cardT.paused = false; pendingDecor = null; }
+  (function () {
+    var card = $('markCard'), inCard = function (e) { return !e.target.closest('#markCardDone, #markCardClose'); };
+    card.addEventListener('pointerdown', function (e) { if (inCard(e)) pauseCard(); });
+    card.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') pauseCard(); });
+    card.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') resumeCard(); });
+    document.addEventListener('pointerup', function (e) { if (e.pointerType !== 'mouse') setTimeout(resumeCard, 0); });
+    document.addEventListener('pointercancel', function () { setTimeout(resumeCard, 0); });
+    card.addEventListener('focusin', function (e) { if (e.target.closest('.tagbtn')) pauseCard(); });
+    card.addEventListener('focusout', function (e) { if (!card.contains(e.relatedTarget)) resumeCard(); });
+  })();
 
   // ---- personal badges (this phone only; demo keeps its own count)
   function sharedKey() { return STORE.shared + (DEMO ? '.demo' : ''); }
@@ -592,15 +619,15 @@
 
   // ---- gentle hint while waiting at the curb (in-app only, no push, no extra location)
   var lastNudgeAt = 0;
-  function lastMarkAt() { return markHist.reduce(function (m, h) { return Math.max(m, h.t); }, 0); }
+  function lastMarkAt() { return markHist.concat(decorHist).reduce(function (m, h) { return Math.max(m, h.t); }, 0); }
   function checkNudge(force) {
     if (document.visibilityState !== 'visible' || tour && tour.state().active) return;
-    if (!$('markCard').hidden || !$('guide').hidden || !$('langPick').hidden) return;
+    if (!$('markCard').hidden || !$('phaseCard').hidden || !$('guide').hidden || !$('langPick').hidden) return;
     var mm = markMode();
     if (mm === 'demo' && !FLAGS.nudge) return;
     if (!force && !LIB.shouldNudge(mm, lastMarkAt(), lastNudgeAt, Date.now())) return;
     lastNudgeAt = Date.now();
-    $('nudge').textContent = t('nudge'); $('nudge').hidden = false;
+    $('nudge').textContent = t(bigIsDecor() ? 'nudgeDecor' : 'nudge'); $('nudge').hidden = false;
     $('markBtn').classList.add('nudging');
     clearTimeout(checkNudge.timer);
     checkNudge.timer = setTimeout(hideNudge, 9000);
@@ -628,7 +655,7 @@
   }
   $('markCardDone').addEventListener('click', function () { if ($('markCard').dataset.kind === 'decorPending') sendPendingDecor(); else closeMarkCard(); });
   $('markCardClose').addEventListener('click', closeMarkCard);
-  $('markBtn').addEventListener('click', startMark);
+  $('markBtn').addEventListener('click', function () { if (bigIsDecor()) startDecor(); else startMark(); });
   // Small celebration: CSS particles (none with prefers-reduced-motion).
   var celebrations = 0;
   function celebrate() {
@@ -661,21 +688,64 @@
   }
 
   // ==== v11: Best decorations / 最佳装饰 (pre-Halloween layer) ====
-  // One tap on "Cool decorations here! 🎃" opens a short card: optional tags, then it shares by itself after ~4 s
+  // One tap on "Cool decorations here! 🎃" opens a short card: optional tags, then it shares by itself after ~8 s
   // (or at once with "Share now"; ✕ cancels). Zone level only: blurred ~50 m, the hexagon shows at 3+ marks.
-  var DECOR_PEND_MS = 4000;
+  var DECOR_PEND_MS = 8000;
   var decorHist = (lsGet(STORE.decorHist, []) || []).filter(function (h) { return Date.now() - h.t < LIB.DECOR_KEEP_MS; });
   var pendingDecor = null;   // { pos, cell, tags }
-  function renderDecorBtn() {
-    var open = LIB.isDecorOpen(Date.now(), DEMO);
-    $('decorBtn').hidden = !open || !!tourZones;
-    $('decorPanelBtn').disabled = !open;
+  // ---- v13: two phases. Until Oct 31 3 PM the BIG button is the purple decor button and the fun-street mark is a small
+  // orange "practice / test" pill; from Oct 31 3 PM the big button is the orange fun-street button and decor is the pill.
+  function phaseNow() { return Date.now() + (NOW_OFFSET || 0); }           // ?now= previews a phase (display only)
+  function bigIsDecor() { return !tourZones && LIB.appPhase(phaseNow()) === 'decor' && LIB.isDecorOpen(phaseNow(), DEMO); }
+  function renderPhase() {
+    var ph = LIB.appPhase(phaseNow()), test = markMode() === 'test', dec = bigIsDecor();
+    var line = ph === 'decor' ? t('phasePre') : ph === 'night' ? t('phaseOn') : '';
+    $('phaseBanner').hidden = !line && !test;
+    $('phaseBanner').dataset.phase = ph;
+    $('phaseLine').textContent = line; $('phaseLine').hidden = !line;
+    $('phaseTestLine').textContent = t('phaseTest'); $('phaseTestLine').hidden = !test;
+    var b = $('markBtn');
+    b.classList.toggle('mb-decor', dec);
+    b.querySelector('.mb-icon').textContent = dec ? '🎃' : '✨';
+    $('mbMain').textContent = dec ? t('decorMain') : t('markBtn');
+    $('mbSub').textContent = dec ? t('decorSub') : t('markSub');
+    var alt = $('altBtn'), decorOpen = LIB.isDecorOpen(Date.now(), DEMO);
+    alt.classList.toggle('fab-fun', dec);
+    $('altLabel').textContent = dec ? t(test ? 'altFunTest' : 'altFunPractice') : t('decorBtn');
+    alt.hidden = !!tourZones || (!dec && !decorOpen);
+    $('decorPanelBtn').disabled = !decorOpen;
   }
+  function renderDecorBtn() { renderPhase(); }
+  // The banner links to the "What's different on Oct 31" section: a jump button before Halloween, opened right there on the night.
+  function openPhaseCard() {
+    var list = $('phaseList'), win = String(CFG.markWindowMin || 45);
+    list.textContent = '';
+    list.appendChild(el('button', { type: 'button', class: 'btn btn-small phase-jump', text: t('phaseJump'), onclick: function () { jumpOct31(); } }));
+    t('phaseItems').forEach(function (it, i) {
+      var body = Array.isArray(it[1]) ? el('ul', null, it[1].map(function (x) { return el('li', { text: x.replace('{win}', win) }); })) : document.createTextNode(it[1]);
+      list.appendChild(el('dt', { id: i === 1 ? 'phaseOct31' : null, text: it[0] }));
+      list.appendChild(el('dd', null, [body]));
+    });
+    $('phaseDecor').hidden = !LIB.decorVisible(Date.now(), DEMO);
+    closeMarkCard();
+    $('phaseCard').hidden = false;
+    $('phaseOk').focus();
+    if (LIB.appPhase(phaseNow()) !== 'decor') jumpOct31(); else $('phaseCard').scrollTop = 0;
+  }
+  function jumpOct31() {
+    var h = $('phaseOct31'); if (!h) return;
+    $('phaseCard').scrollTop = h.offsetTop - 8;
+    h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash');
+  }
+  function closePhaseCard() { $('phaseCard').hidden = true; }
+  $('phaseOk').addEventListener('click', closePhaseCard);
+  $('phaseClose').addEventListener('click', closePhaseCard);
+  $('phaseDecor').addEventListener('click', function () { closePhaseCard(); openTab('decor'); });
   function startDecor() {
     map.closePopup();
     if (!LIB.isDecorOpen(Date.now(), DEMO)) { toast(t('decorClosed'), 6000); return; }
     if (narrow()) setSheetOpen(false);
-    var btn = $('decorBtn');
+    var btn = bigIsDecor() ? $('markBtn') : $('altBtn');
     btn.classList.add('busy');
     oneShot(function (pos) {
       btn.classList.remove('busy');
@@ -692,7 +762,7 @@
     card.dataset.kind = 'rate';
     $('markCardTitle').textContent = t('rateTitle');
     $('markCardText').textContent = t(reason === 'day' ? 'decorRateDay' : 'decorRateZone');
-    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardTags').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardBadge').hidden = true; $('markCardGift').hidden = true; $('markCardTags').hidden = true;
     $('markCardDone').textContent = t('done');
     card.hidden = false;
     armCardTimer();
@@ -706,7 +776,7 @@
     card.dataset.kind = 'decorPending';
     $('markCardTitle').textContent = t('decorPendTitle');
     $('markCardText').textContent = t('decorPending');
-    $('markCardProg').textContent = ''; $('markCardProg').className = 'mc-prog'; $('markCardBadge').hidden = true;
+    $('markCardProg').textContent = ''; $('markCardProg').className = 'mc-prog'; $('markCardBadge').hidden = true; $('markCardGift').hidden = true;
     $('markCardTags').hidden = false;
     $('markCardDone').textContent = t('decorShareNow');
     renderTagRow();
@@ -720,8 +790,7 @@
         if (!pendingDecor) return;
         var i = pendingDecor.tags.indexOf(tag);
         if (i >= 0) pendingDecor.tags.splice(i, 1); else pendingDecor.tags.push(tag);
-        renderTagRow();
-        armCardTimer(sendPendingDecor, 3000);              // a tag tap gives a little more time, then it shares by itself
+        renderTagRow();                                      // the timer is paused while the finger is down, then resumes
       } }, [el('span', { class: 'tg-i', text: LIB.DECOR_ICON[tag] }), t('dtag_' + tag)]));
     });
   }
@@ -743,6 +812,7 @@
       $('markCardText').textContent = t('decorThanks');
       $('markCardProg').textContent = '…';
       $('markCardTags').hidden = true;
+      $('markCardGift').hidden = false;
       $('markCardDone').textContent = t('done');
       celebrate(); buzz();
       armCardTimer();
@@ -829,7 +899,7 @@
     zs.slice(0, 10).forEach(function (z) { city.appendChild(decorRow(z, nc.from === 'map' ? null : nc)); });
     city.dataset.count = String(zs.length);
   }
-  $('decorBtn').addEventListener('click', startDecor);
+  $('altBtn').addEventListener('click', function () { if (bigIsDecor()) startMark(); else startDecor(); });
   $('decorPanelBtn').addEventListener('click', startDecor);
   $('openDecor').addEventListener('click', function () { openTab('decor'); });
 
@@ -1302,7 +1372,7 @@
     var b = e.target.closest('button');
     if (!b) return;
     // centre tab = the same flow as the big button; before Oct 31 3 PM it opens Best decorations
-    if (b.dataset.tab === 'mark') { if (LIB.decorPrimary(Date.now(), DEMO)) toggleTab('decor'); else startMark(); return; }
+    if (b.dataset.tab === 'mark') { if (bigIsDecor()) toggleTab('decor'); else startMark(); return; }
     if ((TAB_OF[currentTab] || currentTab) === b.dataset.tab && $('sheet').dataset.open === 'true') setSheetOpen(false);
     else openTab(b.dataset.tab);
   });
@@ -1359,7 +1429,7 @@
     if (currentTab === 'near') renderNear();
     if (currentTab === 'feedback') updateFeedback();
     renderChips(); renderSharedChip();
-    if (!$('nudge').hidden) $('nudge').textContent = t('nudge');
+    if (!$('nudge').hidden) $('nudge').textContent = t(bigIsDecor() ? 'nudgeDecor' : 'nudge');
     updateCount('postBody', 'postCount');
     updateLocateBtn();
     if (mode) $('modeText').textContent = t(MODE_TEXT[mode]);
@@ -1435,7 +1505,7 @@
     if (n >= LIB.MIN_ZONE) tourZones.push(tourZone(TOUR_SPOT, n, null, true, now));   // 3+ rule applies to the demo too
     if (zoneLayer) zoneLayer.setData(tourZones);
     if (decorLayer) decorLayer.setData([]);
-    $('decorBtn').hidden = true;
+    renderPhase();
   }
   function tourReset() {
     tourStore = { marks: [TOUR_SPOT.slice(), TOUR_SPOT.slice()] };   // 2 marks: not shown yet
@@ -1502,12 +1572,13 @@
         el('h2', { id: 'gcardH' + i, text: c[0] }),
         el('ul', { class: 'glist' }, c[1].map(function (line) { return el('li', { text: line }); }))
       ]);
-      if (i === 0) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
+      if (i === 0) card.appendChild(el('div', { class: 'gbtn-demo gbtn-decor', 'aria-hidden': 'true' }, [el('span', { text: '🎃 ' + t('decorMain') })]));
+      if (i === 1) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
         return el('span', null, [el('i', { class: 'lg lg-' + k }), t(BUCKET_KEY[k])]);
       }))));
-      if (i === 0) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
+      if (i === 1) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
         onclick: function () { closeGuide('done'); startTour(); } }));
-      if (i === 1) card.appendChild(el('div', { class: 'gbtn-demo', 'aria-hidden': 'true' }, [el('span', { text: '✨ ' + t('markBtn') })]));
+      if (i === 2) card.appendChild(el('div', { class: 'gbtn-demo', 'aria-hidden': 'true' }, [el('span', { text: '✨ ' + t('markBtn') })]));
       track.appendChild(card);
       dotBox.appendChild(el('button', { type: 'button', class: 'gdot', 'aria-label': t('guideDotAria', { n: i + 1 }), onclick: function () { guideGo(i); } }));
     });
@@ -1605,7 +1676,7 @@
       $(b.getAttribute('aria-controls')).hidden = !open;
     });
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHints(null); closeMarkCard(); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHints(null); closeMarkCard(); closePhaseCard(); } });
 
   // ?demo=1: frame every visible demo zone (3+ marks) and suggestion so no hexagon or badge sits under the chips, legend or Mark button.
   function fitDemoZones() {
@@ -1677,13 +1748,14 @@
                                                  base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
     refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
     openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, tour: tour, startTour: startTour, appNow: appNow,
-    feedbackMail: feedbackMail, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
+    feedbackMail: feedbackMail, openPhaseCard: openPhaseCard, pauseCard: pauseCard, resumeCard: resumeCard, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
       return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
                  return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };
                }), suggested: data.suggested.length, posts: data.posts.fun.length + data.posts.decor.length,
                decorZones: data.decorZones.map(function (z) { return { cell: z.cell, count: z.count, topTag: z.topTag }; }),
                decorShared: backend.decorShared(), decorMissing: !!backend.decorMissing, myDecor: decorHist.length,
+               phase: LIB.appPhase(phaseNow()), bigIsDecor: bigIsDecor(),
                myMarks: markHist.length, celebrations: celebrations, layers: Object.assign({}, layerOn), tab: currentTab };
     }
   };
