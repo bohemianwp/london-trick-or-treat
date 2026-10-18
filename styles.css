@@ -513,7 +513,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; min-h
 }
 /* ---------- v11: Best decorations layer (purple, distinct from teal / orange / pink fun zones) ---------- */
 .fab-decor { top: 112px; border-color: var(--purple); box-shadow: var(--glow-p); background: rgba(40,14,66,.94); font-size: 14px; cursor: pointer; }
-.fab-decor[hidden] { display: none; }
+.fab-decor[hidden], .popup-open .fab-decor { display: none; }
 .fab-decor.busy { opacity: .7; }
 .zone-decor { fill: var(--purple); stroke: #e9d5ff; fill-opacity: .36; stroke-width: 2.5px; stroke-dasharray: 2 4; stroke-linecap: round;
   filter: drop-shadow(0 0 6px rgba(168,85,247,.95)); animation: zpulse 3.6s ease-in-out infinite; }

@@ -131,6 +131,7 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   }).addTo(map);
 
+  var POP_TL = L.point(12, 190), POP_BR = L.point(12, 120);   // popups open below the top-right buttons
   var HEX = window.TOT_HEX;
   var grid = HEX ? HEX.makeGrid() : LIB.makeGrid(null);
   var baseLayer = HEX ? HEX.createBaseLayer(grid) : null;
@@ -241,7 +242,7 @@
         .bindTooltip(shortName(a) + ' · ' + t('suggestedTag'), { permanent: true, direction: 'center', className: 'area-label' })
         .on('click', function (e) {
           if (mode) handleMapTap(e.latlng);
-          else L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(areaPopup(a)).openOn(map);
+          else L.popup({ maxWidth: 300, autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR }).setLatLng(e.latlng).setContent(areaPopup(a)).openOn(map);
         })
         .addTo(layers.areas);
     });
@@ -254,7 +255,7 @@
         .bindTooltip('💜 ' + t('communityTag'), { permanent: true, direction: 'center', className: 'area-label community-label' })
         .on('click', function (e) {
           if (mode) { handleMapTap(e.latlng); return; }
-          L.popup({ maxWidth: 260 }).setLatLng(e.latlng).setContent(el('div', { class: 'pop' }, [
+          L.popup({ maxWidth: 260, autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR }).setLatLng(e.latlng).setContent(el('div', { class: 'pop' }, [
             el('div', { class: 'pop-kicker', text: '💜 ' + t('communityTag') }),
             el('div', { class: 'pop-sub', text: t('communityN', { n: s.n }) }),
             s.reasons.length ? el('ul', { class: 'type-list' }, s.reasons.map(function (r) { return el('li', { text: '“' + r + '”' }); })) : null,
@@ -442,6 +443,9 @@
     return true;
   }
   map.on('click', function (e) { handleMapTap(e.latlng); });
+  // An open popup gets the top-right corner: the purple decor button steps aside until it closes.
+  map.on('popupopen', function () { map.getContainer().parentNode.classList.add('popup-open'); });
+  map.on('popupclose', function () { map.getContainer().parentNode.classList.remove('popup-open'); });
 
   // ==== MARK IT! ====
   var markHist = LIB.pruneHistory(lsGet(STORE.markHist, []), Date.now());
@@ -785,7 +789,7 @@
   function decorPopup(z, ll) {
     if (mode) { handleMapTap(ll); return; }
     var c = grid.center(z.cell);
-    L.popup({ maxWidth: 260 }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
+    L.popup({ maxWidth: 260, autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
       el('div', { class: 'pop-title', text: t('decorZoneTitle') }),
       el('div', { class: 'mono-num', text: t('decorInfo', { n: z.count }) }),
       z.topTag ? el('div', { text: LIB.DECOR_ICON[z.topTag] + ' ' + t('dtag_' + z.topTag) }) : null,
@@ -840,7 +844,7 @@
   function zonePopup(z, ll) {
     if (mode) { handleMapTap(ll); return; }
     var c = grid.center(z.cell);
-    L.popup({ maxWidth: 260 }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
+    L.popup({ maxWidth: 260, autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR }).setLatLng(ll).setContent(el('div', { class: 'pop' }, [
       el('div', { class: 'pop-title', text: (z.bucket === 'hot' ? '🔥 ' : z.bucket === 'lively' ? '🎉 ' : '✨ ') + t(BUCKET_KEY[z.bucket]) +
         (z.isNew ? ' · ' + t('newBadge') : '') }),
       el('div', { class: 'mono-num', text: t('zoneInfo', { n: z.count, m: CFG.markWindowMin }) }),
