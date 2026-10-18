@@ -312,9 +312,10 @@ Found while testing v15.6 (the far-away toast check never got a location fix). N
 - **Cause:** `app.js` had two `function showMe` declarations in the same scope: the location helper (draws the dot) and the v15.1 How-to "👀 Show me" helper. In JavaScript the later declaration wins, so every location fix ran the Show me helper with no feature name. That helper closed the sheet, found no target, and showed the toast. The dot was never drawn. Follow-me and marking still had the position, so only the dot and the toast were affected.
 - **Fix:** the location helper is renamed `drawMeDot` ([e6b12c4](https://github.com/bohemianwp/london-trick-or-treat/commit/e6b12c4), 2 lines). The asset cache-buster went to `?v=15.5.1` so phones fetch the new `app.js` ([f881698](https://github.com/bohemianwp/london-trick-or-treat/commit/f881698); there is no service worker).
 - **Verified live:** the page loads `app.js?v=15.5.1`, which contains `drawMeDot`. Headless against the live URL passed 192/192. A 390 px live screenshot with a London location (Wortley Village) shows the blue dot: `halloween_app/screenshots/v1551-medot-live.png`.
-- **Guard (in v15.6, branch `stats`):** a unit test fails if two function declarations in `app.js` share a name, and the headless test checks the blue dot appears after a location fix.
-### v=15.6: usage stats only the developer can see, a London-only note, and the "you are here" dot (Oct 18, 12:30 PM, branch `stats`, not pushed)
+- **Guard (in v15.6):** a unit test fails if two function declarations in `app.js` share a name, and the headless test checks the blue dot appears after a location fix.
+### v=15.6: usage stats only the developer can see, a London-only note, and the "you are here" dot (Oct 18, 12:30 PM, live: [10e6425](https://github.com/bohemianwp/london-trick-or-treat/commit/10e6425))
 - **Live:** Oct 18, 12:30 PM (Toronto). Peng approved it, and `main` was fast-forwarded to `stats`: [10e6425](https://github.com/bohemianwp/london-trick-or-treat/commit/10e6425). Live checks: all assets at `?v=15.6`, the GoatCounter tag is present, live headless passed 203/203, and the page-load and `ev-lang-en`/`ev-lang-zh` pings went to `ltot-london.goatcounter.com` (headless Chrome is flagged as a bot with `b=153`, so those test hits should not count).
+- **Usage stats installed:** Peng ran `v155_usage_stats.sql` in Supabase (result `v15.5 usage stats ready | 1 | true`). `tools/usage_report.mjs` works against the live DB.
 Peng, 11:04–11:46 AM: "哪里可以分析用户得使用情况吗" … "仅仅开发者我能看" ("Where can I analyze how users use it?" … "Only I, the developer, can see it.")
 - **Private usage report.**
   - `supabase/v155_usage_stats.sql` adds `public.usage_stats(p_token, p_since)`. It returns aggregate counts only:
@@ -343,6 +344,44 @@ Peng, 11:50 AM: "注明一下这个程序仅为伦敦区域使用，不提供其
 Found while testing: the duplicate `showMe` hid the blue "you are here" dot. It shipped first as the **v=15.5.1 hotfix** (see above). v15.6 adds the guards: a unit test forbids duplicate function names in app.js, and the headless test checks the blue dot appears.
 - Tests: unit 125/125, headless 203/203 (new: chooser note, Guide note EN/ZH, far-away toast EN/ZH, GoatCounter event stub, blue dot, no toast in London). `APP_VERSION v=15.6`.
 - Screenshots: `halloween_app/screenshots/v156-chooser.png`, `v156-guide-{en,zh}.png`, `v156-toast-{en,zh}.png`.
+
+### v=15.7: a friend's test (posters, fake marks, Halloween-night load, phone sizes) (Oct 18, 3:20 PM, branch `v157`, not pushed)
+Feedback from a friend testing the map, relayed by Peng at 2:39 PM:
+> 1. 海报上的文字信息量较大，我不仔细看或一开始想手机上快速滑过，可能会抓不住核心。建议：1）海报内容再精简？2）将“免费”、“无需登录”和“保护隐私（11月2日删除）”作为核心卖点用更醒目的高亮色块显示。
+> 2.“Street level only”是一个很好的隐私保护设计，但是否仍需防范恶意虚假标记？建议：增加简单的点赞或举报审核，确保真实性？
+> 3.在万圣节当晚流量集中爆发时，如果有大量用户同时请求标记、点赞或评论，建议注意数据同步的性能
+> 4.面向带孩子的家长，建议不同手机型号尺寸测试，看看底部的功能栏在不同尺寸的手机屏幕上显示是否正常，是否容易误触，（我用苹果15 pro测试感觉很方便）
+
+In English:
+1. The poster has a lot of text. If I don't read carefully, or just scroll past on my phone, I may miss the main point. Suggestions: make the poster shorter, and show "Free", "No sign-up" and "Private (deleted Nov 2)" as the key selling points in bright highlighted blocks.
+2. "Street level only" is a good privacy design, but do we still need to guard against fake marks? Suggestion: add a simple like or report check to keep it real.
+3. On Halloween night, when lots of people mark, like or comment at the same time, watch the performance of data syncing.
+4. For parents with kids, test different phone sizes: does the bottom bar look right on different screens, and is it easy to tap by mistake? (On my iPhone 15 Pro it felt easy to use.)
+
+What changed:
+- **1 · Posters (no app change):** new `poster-v156-1080x1920.png` and `poster-v156-1080x1080.png` made from the live v15.6 map. Each has a short title, one line on what the map does, and 3 big solid badges: 🎁 Free / 免费 (orange), 🔓 No sign-up / 无需登录 (purple), 🔒 Private, deleted Nov 2 / 保护隐私，11月2日全部删除 (cream). The QR code is the same one (plain URL, decodes from both posters). Text went from 82 English words + 147 Chinese characters to 29 + 50. All text is AA contrast (7.7:1 or more on the badges), with no yellow. Shorter captions are in `halloween_app/promo/copy_v156.md`.
+- **2 · Fake marks: audit, then 3 small rules** (`supabase/v156_antiabuse.sql`, not run yet):
+  - Already in place: 1 mark per session every 5 min; the same zone once per 30 min; a zone shows only at 3+ marks in 45 min; marks deleted after 2 h; global brakes. Board: 5 pins, 20 replies, 200 reactions and 20 reports per phone per day; 👍/❤️ once each per phone per pin; 3 different phones' reports hide a pin or reply. Old posts board: 5 posts per hour, 60 votes and 30 reports per phone per hour.
+  - Gaps found: 3 marks from only 2 sessions could light a zone; a phone could 👍/❤️ its own pin; a phone could vote for its own post.
+  - **New:** a zone lights up only with marks from **3 different sessions**; **no 👍/❤️ on your own pin**; **no vote on your own post** (server code `own`, and the app says so in EN and ZH before even asking the server). Same function names and grants, so older app versions keep working.
+  - Honest limit: without accounts, a script that keeps making new random ids can still send marks (bounded by the global brakes and the 2-hour deletion). A per-network (IP-hash) cap would help but means handling IP addresses, so it is a privacy decision for Peng, not done.
+  - Tested in PGlite: 24/24 (it first shows each gap on the live schema, then runs the fix twice), plus 150/150 for the full `schema.sql`.
+- **3 · Halloween-night load:**
+  - A safe live test (20 virtual phones for 60 s, read-only plus probes the server rejects, nothing stored) reached 134.8 requests/s with 0 errors, p50 48 ms, p95 151 ms, p99 1.5 s. Answers are gzipped. The free tier has no request cap; egress (5 GB a month) is the real limit.
+  - Estimate for 500 phones (60 % with the app open): the old schedule makes about 3,400 requests/min (57/s); v15.7 makes about 1,340 requests/min (22/s).
+  - **Changes:**
+    - polling is jittered (45 s ±20 %), so phones drift apart;
+    - zones refresh every poll, but the board, decorations, suggestions and posts only every ~3rd poll;
+    - unlocking the phone re-asks only the zones, at most every 30 s;
+    - the offline retry is jittered (90–150 s);
+    - **offline queue:** a Halloween mark made while the server can't be reached is kept (blurred, max 5, 15 min) and sent when it is back.
+  - Tool: `tests/load_halloween.mjs` (`--estimate`, `--safe` capped at 25 VUs, `--full` refuses the production project).
+- **4 · Phone sizes:**
+  - Checked 320×568, 375×667, 390×844, 430×932, 360×800 and 412×915, in EN and ZH, with iOS/Android safe areas emulated. Bottom-bar targets are 70–98 × 56 pt with 8 pt gaps. The bar sits above the home indicator, and no labels wrap or clip.
+  - **Fixed:** on Oct 31 the bottom-bar "Mark it!" tab used to share a mark **at once**, so a slip from Route or Guide sent a mark. Now it opens a sheet with the big orange button and a 2-hour note. The big map button stays one tap.
+  - **Fixed:** at 320 px in English the legend wrapped to two lines and covered the zoom "−". It is now one line.
+  - Contact sheets: `halloween_app/screenshots/v157-sizes-{en,zh}.png`.
+- **Tests:** 136 unit tests, local headless 206/206 (new: the night Mark sheet and the 320 px check), PGlite 24/24 + 150/150 + 25/25. The own-JS size budget was raised to 340 KB (now 322.6 KB, 117 KB gzipped with CSS).
 
 ### Promo video v4 + posters for friends' testing (Oct 18, 10:30 AM)
 Peng, 10:03 AM: "重新在生成个视频和海报吧，我今天就要开始让朋友测试了。" ("Make the video and posters again. I'm starting testing with friends today.")

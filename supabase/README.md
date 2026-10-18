@@ -167,3 +167,16 @@ Details in the main [README](../README.md). 详见主 [README](../README.md)。
   `node tools/usage_report.mjs 2026-10-17` (since that day). It reads the token from `~/.secrets/ltot_stats_token` (chmod 600).
   **Never commit or share the token.** To rotate it, make a new one and re-run the insert with its sha256.
 - Tested in PGlite: `tests/sql_usage_pglite_check.mjs` (same setup as `sql_pglite_check.mjs`).
+
+---
+
+## v15.7 · Anti-abuse tightening · 防虚假标记小调整 (`v156_antiabuse.sql`)
+- Run `supabase/v156_antiabuse.sql` ONCE in SQL Editor → New query → paste → Run (safe to run again). The last result row
+  should be `v15.6 anti-abuse ready | 3 | true`. It replaces 3 functions only (same names, arguments and grants), no tables, no data:
+  1. `zone_counts`: a zone lights up only with 3+ marks from **3+ different sessions** (before: any 3 marks).
+  2. `fav_react`: no 👍/❤️ on your own pin (raises `own`).
+  3. `vote_post`: no vote on your own post (raises `own`).
+- The app (v15.7) shows a friendly line for `own` in EN + ZH and already checks it on the phone; older app versions keep working
+  (they show the general error text for `own`).
+- Tested in PGlite: `tests/sql_antiabuse_pglite_check.mjs` loads the live schema, shows each gap, runs the file twice, then
+  attacks it as `anon` (24/24). `schema.sql` contains the same 3 functions (a unit test checks they are byte-identical).

@@ -72,7 +72,7 @@ async function openPage(path, opts = {}) {
   if (opts.block) await s('Network.setBlockedURLs', { urls: opts.block });
   if (opts.config) await s('Fetch.enable', { patterns: [{ urlPattern: '*config.js*' }] });
   if (opts.reducedMotion) await s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  await s('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await s('Emulation.setDeviceMetricsOverride', { width: opts.width || 390, height: opts.height || 844, deviceScaleFactor: 2, mobile: true });
   await s('Emulation.setTouchEmulationEnabled', { enabled: true });
   if (opts.geo) await s('Emulation.setGeolocationOverride', { latitude: opts.geo[0], longitude: opts.geo[1], accuracy: 10 });
   // v9: ?lang= is saved now. Outside the chooser checks (opts.rawLang), each page starts in English unless its URL says ?lang=.
@@ -670,6 +670,15 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('v15 ?now=Oct 31 5:30 PM: banner “🔥 Share fun streets until 11 PM” (no 2nd “Halloween is ON”), big orange button, decor = small pill, main chip = Fun streets',
     await on.ev(`document.getElementById('phaseLine').textContent==='🔥 Share fun streets until 11 PM' && !document.getElementById('markBtn').classList.contains('mb-decor') && /Fun street\\? Share it/.test(document.getElementById('markBtn').textContent) && /Great decorations\\?/.test(document.getElementById('altBtn').textContent) && !document.querySelector('.lchip[data-layer="zones"]').hidden && document.querySelector('.lchip[data-layer="decor"]').hidden && !document.querySelector('.tab-mark').classList.contains('tab-decor')`));
   await on.shot('v6-halloween-on.png');
+  {   // v15.7: on the night the bottom-bar Mark tab opens a sheet with the big share button; it never sends a mark by itself
+    const m0 = await on.ev('__ltot.state().marks');
+    await on.click('.tabbar [data-tab="mark"]'); await sleep(500);
+    check('v15.7 Oct 31: the “Mark it!” tab opens the share sheet (orange button + 2-hour note) and sends nothing by itself',
+      await on.ev(`!document.getElementById('panel-mark').hidden && document.getElementById('sheet').dataset.open==='true' && /Fun street\\? Share it/.test(document.getElementById('markPanelBtn').textContent) && /2 hours/.test(document.getElementById('panel-mark').textContent)`) &&
+      (await on.ev('__ltot.state().marks')) === m0, String(m0));
+    await on.click('.tabbar [data-tab="mark"]'); await sleep(300);
+    check('v15.7: tapping the tab again closes the sheet', await on.ev(`document.getElementById('sheet').dataset.open!=='true'`));
+  }
   const edge = await openPage('?now=2026-10-31T16:59:58-04:00&lang=zh', { wait: 600 });
   const e1 = await edge.ev(`document.getElementById('countdown').dataset.phase`);
   await sleep(2600);
@@ -677,6 +686,16 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const after = await openPage('?now=2026-11-01T00:00:05-04:00', { wait: 2500 });
   check('after Nov 1 midnight → “see you next Halloween”', /See you next Halloween/.test(await after.ev(`document.getElementById('countdown').textContent`)));
   check('countdown pages: no JS errors', [p, z, on, edge, after].every((x) => realErrors(x).length === 0), [p, z, on, edge, after].map(realErrors).flat().join(' | '));
+}
+
+// =========================================================== 7b. v15.7: 320 px phone (iPhone SE 1st gen)
+{
+  const se = await openPage('?demo=1', { wait: 2500, width: 320, height: 568 });
+  await dismissGuide(se);
+  const r = await se.ev(`(function(){var l=document.getElementById('legend').getBoundingClientRect(),z=document.querySelector('.leaflet-control-zoom').getBoundingClientRect();
+    var bs=[...document.querySelectorAll('.tabbar button')].map(function(b){return b.getBoundingClientRect();});
+    return {legendH:Math.round(l.height), overlap:l.top<z.bottom&&l.left<z.right, minW:Math.min.apply(null,bs.map(function(b){return b.width;})), minH:Math.min.apply(null,bs.map(function(b){return b.height;})), overflow:document.documentElement.scrollWidth>innerWidth+1};})()`);
+  check('v15.7 320×568: legend on one line, not over the zoom buttons; tab targets ≥ 44×44; no sideways scroll', r.legendH <= 40 && !r.overlap && r.minW >= 44 && r.minH >= 44 && !r.overflow, JSON.stringify(r));
 }
 
 // =========================================================== 8. v=6: feedback panel (mailto + copy)

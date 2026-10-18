@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=15.6';                      // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=15.7';                      // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -241,16 +241,18 @@
       if (m.createdAt > nowMs || nowMs - m.createdAt > MARK_KEEP_MS) return;
       var c = m.cell || (cellFn ? cellFn(m.lat, m.lng) : null);
       if (!c) return;
-      var z = cells[c] || (cells[c] = { cell: c, count: 0, tags: {}, times: [] });
+      var z = cells[c] || (cells[c] = { cell: c, count: 0, tags: {}, times: [], who: {} });
       z.times.push(m.createdAt);
       if (m.createdAt <= cut) return;
       z.count++;
+      z.who[m.sidHash || m.id || ('m' + z.count)] = 1;           // v15.7: distinct sessions (marks without one count alone)
       cleanTags(m.tags).forEach(function (t) { z.tags[t] = (z.tags[t] || 0) + 1; });
     });
     var out = [];
     Object.keys(cells).forEach(function (k) {
       var z = cells[k];
-      if (z.count < MIN_ZONE) return;                         // 3+ rule: nothing below that leaves this function
+      if (z.count < MIN_ZONE || Object.keys(z.who).length < MIN_ZONE) return;   // 3+ marks from 3+ sessions: nothing below that leaves this function
+      delete z.who;
       z.times.sort(function (a, b) { return a - b; });
       z.firstLitAt = z.times[MIN_ZONE - 1];
       delete z.times;
@@ -472,6 +474,19 @@
   // v15.6: is a point within ~25 km of London, Ontario? (the map only covers London; used for a one-line toast, never stored)
   function nearLondon(lat, lng) { return isFinite(lat) && isFinite(lng) && lat >= 42.70 && lat <= 43.25 && lng >= -81.75 && lng <= -80.80; }
   // v15.6: GoatCounter event path for a key tap: lowercase letters, digits and dashes only (no personal data can fit)
+  // v15.7 load: spread requests out. jitterMs(45000, 0.2) → 36–54 s. pollPlan decides what a poll or an unlock fetches:
+  // 'all' when the slow layers are older than slowMs, else 'zones' when the zones are older than minZonesMs, else 'none'.
+  function jitterMs(ms, f, rnd) { f = f == null ? 0.2 : f; return Math.round(ms * (1 - f + (rnd || Math.random)() * 2 * f)); }
+  function pollPlan(nowMs, lastFullMs, lastZonesMs, slowMs, minZonesMs) {
+    if (!lastFullMs || nowMs - lastFullMs >= slowMs) return 'all';
+    if (!lastZonesMs || nowMs - lastZonesMs >= (minZonesMs || 0)) return 'zones';
+    return 'none';
+  }
+  // Offline queue for live marks: keep at most 5, each for 15 minutes; returns the ones still worth sending.
+  var MARK_QUEUE_MAX = 5, MARK_QUEUE_MS = 15 * 60000;
+  function markQueueFresh(q, nowMs) {
+    return (Array.isArray(q) ? q : []).filter(function (m) { return m && nowMs - m.at >= 0 && nowMs - m.at < MARK_QUEUE_MS; }).slice(-MARK_QUEUE_MAX);
+  }
   function gcPath(name) { var n = String(name || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40); return n ? 'ev-' + n : null; }
   function isFavOpen(nowMs, demo) { return isDecorOpen(nowMs, demo); }
   function favVisible(nowMs, demo) { return decorVisible(nowMs, demo); }
@@ -734,7 +749,7 @@
     torontoDay: torontoDay, cleanDecorTags: cleanDecorTags, decorTagsValid: decorTagsValid, decorRate: decorRate, decorTopTag: decorTopTag,
     aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang,
     FAV_TAGS: FAV_TAGS, FAV_ICON: FAV_ICON, FAV_LAT_STEP: FAV_LAT_STEP, FAV_LNG_STEP: FAV_LNG_STEP, FAV_MAX: FAV_MAX, FAV_REPLY_MAX: FAV_REPLY_MAX,
-    FAV_MAX_DAY: FAV_MAX_DAY, FAV_REPLY_MAX_DAY: FAV_REPLY_MAX_DAY, FAV_HIDE_AT: FAV_HIDE_AT, reportLeft: reportLeft, nearLondon: nearLondon, gcPath: gcPath, FAV_FAMILIES_MIN: FAV_FAMILIES_MIN,
+    FAV_MAX_DAY: FAV_MAX_DAY, FAV_REPLY_MAX_DAY: FAV_REPLY_MAX_DAY, FAV_HIDE_AT: FAV_HIDE_AT, reportLeft: reportLeft, nearLondon: nearLondon, gcPath: gcPath, jitterMs: jitterMs, pollPlan: pollPlan, markQueueFresh: markQueueFresh, MARK_QUEUE_MS: MARK_QUEUE_MS, FAV_FAMILIES_MIN: FAV_FAMILIES_MIN,
     isFavOpen: isFavOpen, favVisible: favVisible, favSnap: favSnap, checkFavText: checkFavText, favScale: favScale, clusterFav: clusterFav,
     favFamilies: favFamilies, favTonight: favTonight, favRateOk: favRateOk
   };

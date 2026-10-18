@@ -6,7 +6,7 @@
    Every method returns a Promise.
    Privacy: sendMark() blurs the position (~50 m grid + jitter) BEFORE either adapter sees it, so the raw position
    is never stored or sent. Zones come back only when they have 3+ marks.
-   Errors carry err.code: invalid | forbidden | rate | closed | outside | text:<empty|tooLong|url|email|phone|profanity> */
+   Errors carry err.code: invalid | forbidden | rate | closed | outside | own | text:<empty|tooLong|url|email|phone|profanity> */
 (function (root, factory) {
   var B = factory(root, root.TOT_LIB || (typeof require === 'function' ? require('./lib.js') : null));
   if (typeof module === 'object' && module.exports) module.exports = B;
@@ -247,6 +247,7 @@
       if (!p) return fail('invalid');
       if (!LIB.isFavOpen(this.now(), this.demo)) return fail('closed');
       var dev = LIB.sha256Hex('fav:' + device);
+      if (p.dev === dev) return fail('own');                                 // v15.7: same rule as the server
       var added = !f.reactions.some(function (r) { return r.pin === id && r.dev === dev && r.kind === kind; });
       if (added) {
         f.reactions.push({ pin: id, dev: dev, kind: kind, createdAt: this.now() });
@@ -321,7 +322,7 @@
     });
   }
   // Our RPCs raise exceptions whose message starts with one of these codes; anything else is a network/server problem.
-  var CODE_RE = /^(invalid|forbidden|rate|closed|outside|text:[a-zA-Z]+)\b/;
+  var CODE_RE = /^(invalid|forbidden|rate|closed|outside|own|text:[a-zA-Z]+)\b/;   // v15.7: + own
   function unwrap(res) {
     if (res.error && (res.error.code === 'PGRST202' || /Could not find the function/i.test(res.error.message || ''))) {
       var me = new Error('missing'); me.code = 'missing'; throw me;          // RPC not installed yet (SQL not run)
@@ -443,14 +444,37 @@
     if (opts.remote || (isConfigured(cfg) && !opts.demo)) { remote = opts.remote || new SupabaseAdapter(cfg); api.mode = 'supabase'; }
     var timeoutMs = opts.timeoutMs || 5000;
 
+    // v15.7: retry about every 2 minutes with ±25 % jitter, so phones that dropped together don't all come back at once.
+    function scheduleRetry() {
+      retry = setTimeout(function () {
+        withTimeout(remote.ping(), timeoutMs).then(function () { retry = null; setMode('supabase'); flushMarks(); }, scheduleRetry);
+      }, LIB.jitterMs(opts.retryMs || 120000, 0.25));
+      if (retry.unref) retry.unref();                 // Node tests: don't keep the process alive
+    }
     function goOffline(err) {
       if (api.mode !== 'offline') setMode('offline', err && err.message);
       if (retry || !remote) return;
-      retry = setInterval(function () {
-        withTimeout(remote.ping(), timeoutMs).then(function () { clearInterval(retry); retry = null; setMode('supabase'); }, function () { /* still down */ });
-      }, opts.retryMs || 120000);
-      if (retry.unref) retry.unref();                 // Node tests: don't keep the process alive
+      scheduleRetry();
     }
+    // v15.7 offline queue: a live mark made while the server is unreachable is kept (blurred, max 5, 15 min) and sent
+    // once the server answers again. It still counts on this phone right away, as before.
+    var QKEY = cacheKey + 'pendingMarks';
+    function queueMark(m, token) {
+      if (!remote || !api.isLive()) return;
+      var q = LIB.markQueueFresh(cached('pendingMarks'), now());
+      q.push({ m: m, token: token, at: now() });
+      cache('pendingMarks', LIB.markQueueFresh(q, now()));
+    }
+    function flushMarks() {
+      var q = LIB.markQueueFresh(cached('pendingMarks'), now());
+      try { localStorage.removeItem(QKEY); } catch (e) { /* ignore */ }
+      if (!q.length || !api.isLive()) return Promise.resolve(0);
+      return q.reduce(function (p, it) {
+        return p.then(function (n) { return withTimeout(remote.sendMark(it.m, it.token), timeoutMs).then(function () { return n + 1; }, function () { return n; }); });
+      }, Promise.resolve(0)).then(function (n) { api.flushedMarks = (api.flushedMarks || 0) + n; return n; });
+    }
+    api.pendingMarks = function () { return LIB.markQueueFresh(cached('pendingMarks'), now()).length; };
+    api.flushMarks = flushMarks;
     function viaLocal(name, args) {
       var p = local[name].apply(local, args);
       if (name === 'listPosts') return p.then(function (l) { return cached('posts.' + (args[0] || '')).concat(l); });
@@ -461,6 +485,7 @@
     METHODS.forEach(function (name) {
       api[name] = function () {
         var args = arguments;
+        if (name === 'sendMark' && api.mode === 'offline') queueMark(args[0], args[1]);
         if (api.mode !== 'supabase' || (LIVE_METHODS[name] && !api.isLive()) || (DECOR_METHODS[name] && api.decorMissing)) return viaLocal(name, args);
         return withTimeout(remote[name].apply(remote, args), timeoutMs).then(function (res) {
           if (name === 'listPosts') cache('posts.' + (args[0] || ''), res);
@@ -472,6 +497,7 @@
           if (err && err.code === 'missing' && DECOR_METHODS[name]) { api.decorMissing = true; return viaLocal(name, args); }
           if (err && err.validation) throw err;
           goOffline(err);
+          if (name === 'sendMark') queueMark(args[0], args[1]);
           return viaLocal(name, args);
         });
       };

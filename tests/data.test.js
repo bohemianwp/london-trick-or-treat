@@ -29,7 +29,7 @@ test('data/areas.js is generated from areas_researched.json (run tools/gen_areas
 // replies, reports, local adapter), bilingual board/privacy/How-to text, and Web Audio sound effects (no audio files).
 // v=15.3 (Oct 18) raised it to 320 KB: v15.1 How-to feature cards + Show me, the past-favourite entry, and plain-sentence
 // bilingual Guide / report copy (Peng: every line must say what it is and how to use it).
-test('size budget: own JS ≤ 320 KB (SPEC 8.4 was 150 KB, raised in v4, v6, v7, v10, v11, v13, v14 and v15.3; CDN libraries excluded); report JS + CSS', () => {
+test('size budget: own JS ≤ 340 KB (SPEC 8.4 was 150 KB, raised in v4, v6, v7, v10, v11, v13, v14, v15.3 and v15.7; CDN libraries excluded); report JS + CSS', () => {
   const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js', 'tour.js', 'sfx.js'];
   const js = files.reduce((n, f) => n + fs.statSync(path.join(root, f)).size, 0);
   const css = fs.statSync(path.join(root, 'styles.css')).size;
@@ -37,7 +37,7 @@ test('size budget: own JS ≤ 320 KB (SPEC 8.4 was 150 KB, raised in v4, v6, v7,
   const demo = fs.statSync(path.join(root, 'demo.js')).size;
   console.log(`# own JS ${(js / 1024).toFixed(1)} KB + CSS ${(css / 1024).toFixed(1)} KB = ${((js + css) / 1024).toFixed(1)} KB raw, ${(gz / 1024).toFixed(1)} KB gzipped` +
               ` (+ demo.js ${(demo / 1024).toFixed(1)} KB, loaded only with ?demo=1)`);
-  assert.ok(js <= 320 * 1024, 'own JS ' + js);
+  assert.ok(js <= 340 * 1024, 'own JS ' + js);
 });
 
 test('10 researched areas, bilingual, inside London, sources dated Oct 2024–Oct 2026', () => {

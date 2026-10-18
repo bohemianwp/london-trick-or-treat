@@ -1005,3 +1005,12 @@ body.has-favshare .markcard:not(.phasecard) { bottom: 130px; }
 /* v15.6 (Peng 11:50): London-only note. Small grey line, AA on the panel (#a7b2c5 on #162033 ≈ 7.6:1) */
 .area-note { margin: 12px 0 0; color: var(--muted); font-size: var(--fs-s); text-align: center; }
 .langpick-area { margin-top: -4px; }
+
+/* v15.7 phone sizes: on 320 px phones (iPhone SE 1st gen) keep the legend on one line so it never covers the
+   zoom buttons or the pill on the right; and the night "Mark it!" sheet button in the Halloween orange. */
+@media (max-width: 340px) {
+  .legend { gap: 4px 6px; padding: 6px 8px; }
+  .legend span { gap: 3px; white-space: nowrap; }
+  .legend .lg { width: 12px; height: 11px; }
+}
+.mark-big { min-height: 60px; font-size: var(--fs-m); font-weight: var(--fw-b); background: var(--orange); border-color: var(--orange); color: var(--on-accent); margin: 4px 0 8px; box-shadow: none; }

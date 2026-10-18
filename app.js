@@ -1014,7 +1014,9 @@
       ])
     ])).openOn(map);
   }
+  var lastZonesAt = 0, lastFullAt = 0;     // v15.7 load: when the zones / all layers were last asked for
   function refreshZones() {
+    lastZonesAt = Date.now();
     return backend.listZones(CFG.markWindowMin, grid.cell).then(function (zones) {
       data.zones = zones.filter(function (z) { return isCell(z.cell); });
       data.zonesAt = Date.now();
@@ -1335,6 +1337,7 @@
       [kind === 'like' ? '👍 ' : '❤️ ', el('b', { class: 'mono-num', text: String(n || 0) })]);
   }
   function doFavReact(p, kind, btn) {
+    if (favTokens[p.id]) { toast(t('err_own'), 3000); return; }          // v15.7: no 👍/❤️ on your own pin (the server says 'own' too)
     if (kind === 'like' ? p.myLike : p.myHeart) { toast(t('favAlready'), 1800); return; }
     btn.disabled = true;
     backend.favReact(DEVICE, p.id, kind).then(function (r) {
@@ -1547,6 +1550,7 @@
     });
   }
   function doVote(p) {
+    if (myPostTokens[p.id]) { toast(t('err_own'), 3000); return; }       // v15.7: no voting for your own post
     if (myVotes[p.id]) { toast(t('alreadyVoted')); return; }
     backend.vote(p.id, DEVICE).then(function (r) {
       myVotes[p.id] = 1; lsSet(STORE.votes, myVotes);
@@ -1577,6 +1581,7 @@
   var refreshing = null;
   function refreshAll() {
     if (refreshing) return refreshing;
+    lastFullAt = Date.now();
     refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested(), refreshDecor(), refreshFav()]).then(function () { refreshing = null; }, function () { refreshing = null; });
     return refreshing;
   }
@@ -1587,14 +1592,24 @@
     if (!zonesShared()) refreshZones();
     if (!backend.decorShared()) refreshDecor();
   }, LOCAL_RECOUNT_MS);
-  setInterval(function () {
-    if (document.visibilityState === 'visible') refreshAll();
-    renderChips();
-    if (lang + '|' + liveEvents().map(function (e) { return e.id; }).join() !== eventsKey) renderEvents();   // an event just ended
-  }, CFG.pollSec * 1000);
+  // v15.7 load: every poll (pollSec ±20 %, so phones drift apart) asks for the zones; the slower layers (board, decor,
+  // suggestions, posts) only every ~3rd poll. Unlocking the phone refreshes the zones at most every 30 s.
+  var POLL_MS = CFG.pollSec * 1000, SLOW_MS = Math.round(POLL_MS * 2.7), UNLOCK_ZONES_MS = 30000;
+  function pollBy(plan) { if (plan === 'all') refreshAll(); else if (plan === 'zones') refreshZones(); }
+  (function pollTick() {
+    setTimeout(function () {
+      if (document.visibilityState === 'visible') pollBy(LIB.pollPlan(Date.now(), lastFullAt, lastZonesAt, SLOW_MS, 0));
+      renderChips();
+      if (lang + '|' + liveEvents().map(function (e) { return e.id; }).join() !== eventsKey) renderEvents();   // an event just ended
+      pollTick();
+    }, LIB.jitterMs(POLL_MS, 0.2));
+  })();
   var changeTimer;
   backend.onChange(function () { clearTimeout(changeTimer); changeTimer = setTimeout(refreshAll, 250); });
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshAll(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') pollBy(LIB.pollPlan(Date.now(), lastFullAt, lastZonesAt, SLOW_MS, UNLOCK_ZONES_MS));
+  });
+  backend.onStatus(function (m) { if (m === 'supabase') setTimeout(refreshAll, LIB.jitterMs(3000, 0.5)); });   // back online: catch up once
 
   // ==== safety, countdown, privacy ====
   function renderTips() {
@@ -1673,7 +1688,7 @@
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
-  var PANELS = ['map', 'near', 'decor', 'fav', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
+  var PANELS = ['map', 'near', 'decor', 'mark', 'fav', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
   var TAB_OF = { decor: 'mark', near: 'map', fav: 'guide', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
   function markCurrent() {
     var open = $('sheet').dataset.open === 'true', tab = TAB_OF[currentTab] || currentTab;
@@ -1700,11 +1715,13 @@
   document.querySelector('.tabbar').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
-    // centre tab = the same flow as the big button; before Oct 31 3 PM it opens Best decorations
-    if (b.dataset.tab === 'mark') { if (bigIsDecor()) toggleTab('decor'); else startMark(); return; }
+    // centre tab: before Oct 31 3 PM it opens Best decorations; on the night (v15.7) a sheet with the big share button,
+    // so a thumb that slips off Route/Guide never sends a mark by itself. The big map button stays one tap.
+    if (b.dataset.tab === 'mark') { toggleTab(bigIsDecor() ? 'decor' : 'mark'); return; }
     if ((TAB_OF[currentTab] || currentTab) === b.dataset.tab && $('sheet').dataset.open === 'true') setSheetOpen(false);
     else openTab(b.dataset.tab);
   });
+  $('markPanelBtn').addEventListener('click', function () { startMark(); });
   $('sheetHandle').addEventListener('click', function () {
     if ($('sheet').dataset.open === 'true') setSheetOpen(false); else openTab(currentTab || 'map');
   });

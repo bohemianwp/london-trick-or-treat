@@ -14,7 +14,7 @@
 --   * Suggestions ("this neighbourhood should be on the map"): one per hex per phone, 3 per phone per day,
 --     shown only once 3 different phones suggest the same hex.
 -- Errors are raised with short codes the app understands:
---   invalid | forbidden | rate | closed | outside | text:<empty|tooLong|url|email|phone|profanity>
+--   invalid | forbidden | rate | closed | outside | own | text:<empty|tooLong|url|email|phone|profanity>
 -- =====================================================================================
 
 create extension if not exists pgcrypto with schema extensions;
@@ -209,6 +209,9 @@ begin
   if p_voter is null or char_length(p_voter) not between 8 and 64 then raise exception 'invalid'; end if;
   if not exists (select 1 from public.posts where id = p_post_id and not hidden) then raise exception 'invalid'; end if;
   v_who := public._ltot_hash('voter:' || p_voter);
+  if exists (select 1 from public.posts where id = p_post_id and author_hash = v_who) then
+    raise exception 'own';                       -- v15.7: no voting for your own post
+  end if;
   if (select count(*) from public.votes where voter = v_who and created_at > now() - interval '1 hour') >= 60 then
     raise exception 'rate';
   end if;
@@ -326,11 +329,11 @@ begin
   perform public._ltot_cleanup_marks();
   return query
     with w as (
-      select m.h3_r8 as hx, m.tags as tg
+      select m.h3_r8 as hx, m.tags as tg, m.session_hash as sid
         from public.marks m
        where m.created_at > now() - make_interval(mins => v_w)
-    ), lit as (
-      select w.hx, count(*)::int as cnt from w group by w.hx having count(*) >= 3
+    ), lit as (                                   -- v15.7: 3+ marks from 3+ different sessions
+      select w.hx, count(*)::int as cnt from w group by w.hx having count(*) >= 3 and count(distinct w.sid) >= 3
     ), tagc as (
       select w.hx, t.tag, count(*)::int as cnt
         from w cross join lateral unnest(w.tg) as t(tag)
@@ -684,6 +687,9 @@ begin
   if not exists (select 1 from public.fav_pins f where f.id = p_pin and not f.hidden) then raise exception 'invalid'; end if;
   if not public._ltot_fav_open() then raise exception 'closed'; end if;
   v_dev := public._ltot_hash('fav:' || p_device);
+  if exists (select 1 from public.fav_pins f where f.id = p_pin and f.device_hash = v_dev) then
+    raise exception 'own';                       -- v15.7: no 👍/❤️ on your own pin
+  end if;
   if (select count(*) from public.fav_reactions r where r.device_hash = v_dev and r.created_at >= public._ltot_today_start()) >= 200 then
     raise exception 'rate';
   end if;
