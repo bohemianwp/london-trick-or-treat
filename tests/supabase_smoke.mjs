@@ -4,7 +4,8 @@
 // Checks: RPC input validation, RLS (anon cannot read votes/reports/marks/suggestions/secrets or write tables
 //         directly, cannot call internal helpers), one vote per device, 3 reports hide a post, send_mark
 //         window/box/tag checks, zone privacy floor (n ≥ 3, no hashes or points), suggestion rules,
-//         v11 decor RPCs (skipped with a note until supabase/v11_decor.sql is run; creates no decor rows).
+//         v11 decor RPCs (skipped with a note until supabase/v11_decor.sql is run; creates no decor rows),
+//         v14 board RPCs (skipped until supabase/v14_board.sql is run; its one test pin is deleted again).
 // Rows it leaves behind: the test post is deleted again (its votes/reports go with it). ONE suggestion row
 // remains (device 'smoke-test-<random>', a random non-H3 hex id, so it can never light up a real zone) —
 // anon cannot delete suggestions; supabase/cleanup.sql removes it. No marks are created (send_mark is only
@@ -35,6 +36,7 @@ let pass = 0, fail = 0;
 function check(name, ok, detail) { ok ? pass++ : fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); }
 const rand = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const DEV = 'smoke-test-' + rand(8), TOKEN = rand(20);
+const NO_ROWS = process.env.SMOKE_NO_ROWS === '1';   // skip every write that leaves or briefly shows a row
 
 // ---- RLS: direct table access
 for (const t of ['votes', 'reports', 'marks', 'suggestions']) {
@@ -107,6 +109,51 @@ else {
   check('decor_counts returns only h3_r8, n, top_tag, top_tag_n', drows && drows.every((r) => JSON.stringify(Object.keys(r).sort()) === '["h3_r8","n","top_tag","top_tag_n"]'));
 }
 
+// ---- v14 board "Best streets from past years" (only after supabase/v14_board.sql was run; skipped with a note otherwise).
+// Without SMOKE_NO_ROWS=1 it creates ONE pin + one 👍 + one reply and deletes them again with their tokens (nothing left behind).
+const fl0 = await rpc('fav_list', { p_device: DEV });
+if (missingFn(fl0)) console.log('(board: fav_* RPCs not installed yet. Run supabase/v14_board.sql, then run this again. Board checks skipped.)');
+else {
+  for (const t of ['fav_pins', 'fav_replies', 'fav_reactions', 'fav_reports']) {
+    const r = await rest('GET', t + '?select=*&limit=1');
+    check(`anon cannot read ${t}`, r.status === 401 || r.status === 403, 'HTTP ' + r.status);
+  }
+  check('anon cannot insert into fav_pins directly', (await rest('POST', 'fav_pins', { device_hash: 'a', lat: 42.98, lng: -81.24, tag: 'candy', token_hash: 'b' })).status >= 400);
+  check('anon cannot call _ltot_cleanup_fav / _ltot_fav_text', (await rpc('_ltot_cleanup_fav')).status >= 400 && (await rpc('_ltot_fav_text', { p: 'x', p_optional: true, p_max: 80 })).status >= 400);
+  const frows = Array.isArray(fl0.data) ? fl0.data : null;
+  check('fav_list returns only safe columns', frows && frows.every((r) => JSON.stringify(Object.keys(r).sort()) === '["body","created_at","families","hearts","id","lat","likes","lng","my_heart","my_like","replies","tag"]'), `HTTP ${fl0.status}, ${frows ? frows.length : '?'} rows`);
+  check('fav_list families: null or ≥ 3 (aggregate only)', frows && frows.every((r) => r.families === null || r.families >= 3));
+  const favC = (lat, lng, tag, body) => rpc('fav_create', { p_device: DEV, p_lat: lat, p_lng: lng, p_tag: tag, p_body: body, p_token: TOKEN });
+  check('fav_create rejects Toronto (outside)', /outside/.test(errMsg(await favC(43.65, -79.38, 'candy', null))));
+  check('fav_create needs a preset tag (invalid)', /invalid/.test(errMsg(await favC(42.98, -81.24, 'pizza', null))));
+  check('fav_create rejects phone numbers', /text:phone/.test(errMsg(await favC(42.98, -81.24, 'candy', 'call 519-555-1234'))));
+  check('fav_create rejects house numbers / addresses', /text:address/.test(errMsg(await favC(42.98, -81.24, 'candy', 'house 7 has candy'))) && /text:address/.test(errMsg(await favC(42.98, -81.24, 'candy', '大街12号'))));
+  check('fav_create rejects profanity (zh)', /text:profanity/.test(errMsg(await favC(42.98, -81.24, 'candy', '草泥马'))));
+  check('fav_create rejects > 80 chars', /text:tooLong/.test(errMsg(await favC(42.98, -81.24, 'candy', 'x'.repeat(81)))));
+  const fake = '00000000-0000-4000-8000-000000000000';
+  check('fav_react / fav_reply on an unknown pin → invalid', /invalid/.test(errMsg(await rpc('fav_react', { p_device: DEV, p_pin: fake, p_kind: 'like' }))) &&
+    /invalid/.test(errMsg(await rpc('fav_reply', { p_device: DEV, p_pin: fake, p_body: 'hi', p_token: TOKEN }))));
+  if (NO_ROWS) console.log('(SMOKE_NO_ROWS=1: skipped the create → like → reply → delete round trip)');
+  else {
+    const c = await favC(42.98761, -81.24322, 'walking', 'Smoke test pin (deleted in seconds)');
+    const pin = c.data && c.data.id;
+    check('fav_create works and snaps to the ~50 m grid', c.status === 200 && !!pin && Math.abs(c.data.lat - 42.9876) < 1e-6 && Math.abs(c.data.lng - -81.243) < 1e-6, JSON.stringify(c.data) + ' ' + errMsg(c));
+    if (pin) {
+      const r1 = (await rpc('fav_react', { p_device: 'smoke-test-liker-1', p_pin: pin, p_kind: 'like' })).data;
+      const r2 = (await rpc('fav_react', { p_device: 'smoke-test-liker-1', p_pin: pin, p_kind: 'like' })).data;
+      check('👍 once per device', r1 && r1.added === true && r1.likes === 1 && r2 && r2.added === false && r2.likes === 1, JSON.stringify([r1, r2]));
+      const rep = await rpc('fav_reply', { p_device: DEV, p_pin: pin, p_body: 'Smoke test reply', p_token: TOKEN });
+      check('fav_reply works', rep.status === 200 && typeof rep.data === 'string', errMsg(rep));
+      const reps = await rpc('fav_replies', { p_pin: pin });
+      check('fav_replies returns only id, body, created_at', Array.isArray(reps.data) && reps.data.length === 1 && JSON.stringify(Object.keys(reps.data[0]).sort()) === '["body","created_at","id"]');
+      check('fav_delete with a wrong token is refused', /forbidden/.test(errMsg(await rpc('fav_delete', { p_kind: 'pin', p_id: pin, p_token: rand(20) }))));
+      check('fav_delete (reply, then pin) with the right token', (await rpc('fav_delete', { p_kind: 'reply', p_id: rep.data, p_token: TOKEN })).status === 200 &&
+        (await rpc('fav_delete', { p_kind: 'pin', p_id: pin, p_token: TOKEN })).status === 200);
+      check('the smoke pin is gone', !((await rpc('fav_list', {})).data || []).some((r) => r.id === pin));
+    }
+  }
+}
+
 // ---- neighbourhood suggestions
 const SHEX = rand(8).slice(0, 15);                // random 15-hex id, not a real H3 cell
 const suggest = (dev, lat, lng, reason) => rpc('suggest_area', { p_device: dev, p_h3: SHEX, p_lat: lat, p_lng: lng, p_reason: reason });
@@ -116,7 +163,6 @@ check('suggest_area rejects phone numbers (text:phone)', /text:phone/.test(await
 check('suggest_area rejects > 80 chars (text:tooLong)', /text:tooLong/.test(await sErr('x'.repeat(81))));
 check('suggest_area rejects Toronto (outside)', /outside/.test(await sErr(null, 43.65, -79.38)));
 // SMOKE_NO_ROWS=1 skips the one valid suggestion (anon cannot delete it), so the run leaves nothing behind.
-const NO_ROWS = process.env.SMOKE_NO_ROWS === '1';
 const s1 = NO_ROWS ? { status: 0 } : await suggest(DEV, 42.98, -81.24, 'Smoke test');
 if (NO_ROWS) console.log('(SMOKE_NO_ROWS=1: skipped the valid-suggestion write and the duplicate check)');
 else {

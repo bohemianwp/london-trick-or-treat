@@ -18,7 +18,8 @@
   var SB_SRI = 'sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK';
   var METHODS = ['listPosts', 'createPost', 'vote', 'report', 'deletePost',
                  'sendMark', 'tagMark', 'liveZoneCounts', 'suggestArea', 'communitySuggested', 'sendDecor', 'decorCounts'];
-  var DECOR_METHODS = { sendDecor: 1, decorCounts: 1 };   // v11: if the server has no decor RPCs yet, these stay on this phone
+  var DECOR_METHODS = { sendDecor: 1, decorCounts: 1 };
+  var FAV_METHODS = ['favList', 'favCreate', 'favReact', 'favReply', 'favReplies', 'favReport', 'favDelete'];   // v14 board (own wrapper below)   // v11: if the server has no decor RPCs yet, these stay on this phone
   var LIVE_METHODS = { sendMark: 1, tagMark: 1, liveZoneCounts: 1 };   // outside the live window these stay local (practice)
   var HOUR = 3600000;
 
@@ -199,7 +200,105 @@
         return { cell: z.cell, count: z.count, topTag: z.topTag, topTagN: z.topTagN };
       }));
     },
-    decorCountIn: function (cell) { return this._pruneDecor().filter(function (x) { return x.cell === cell; }).length; }
+    decorCountIn: function (cell) { return this._pruneDecor().filter(function (x) { return x.cell === cell; }).length; },
+
+    // ---------------- v14 board "Best streets from past years" (same contract as the fav_* RPCs)
+    _fav: function () {
+      var f = this._get('fav', null) || { pins: [], replies: [], reactions: [], reports: [] };
+      if (!this.demo && this.now() >= LIB.DECOR_PURGE_MS && (f.pins.length || f.replies.length)) {   // Nov 2: everything goes
+        f = { pins: [], replies: [], reactions: [], reports: [] }; this._set('fav', f);
+      }
+      return f;
+    },
+    favList: function (device) {
+      var f = this._fav(), me = device ? LIB.sha256Hex('fav:' + device) : null;
+      var rows = f.pins.filter(function (p) { return p.reports < LIB.FAV_HIDE_AT; }).map(function (p) {
+        var rx = f.reactions.filter(function (r) { return r.pin === p.id; });
+        var has = function (k) { return !!me && rx.some(function (r) { return r.dev === me && r.kind === k; }); };
+        return { id: p.id, lat: p.lat, lng: p.lng, tag: p.tag, body: p.body, likes: p.likes, hearts: p.hearts,
+                 replies: f.replies.filter(function (r) { return r.pin === p.id && r.reports < LIB.FAV_HIDE_AT; }).length,
+                 families: p.families != null ? p.families : LIB.favFamilies(p.dev, rx.map(function (r) { return r.dev; })),
+                 myLike: has('like'), myHeart: has('heart'), createdAt: p.createdAt };
+      });
+      rows.sort(function (a, b) { return ((b.likes + b.hearts) - (a.likes + a.hearts)) || (b.createdAt - a.createdAt); });
+      return ok(rows.slice(0, 500));
+    },
+    favCreate: function (pin, token) {
+      var now = this.now();
+      if (!pin || !pin.device || String(pin.device).length < 8 || !token || token.length < 16) return fail('invalid');
+      if (LIB.FAV_TAGS.indexOf(pin.tag) < 0) return fail('invalid');
+      if (!LIB.inLondonBox(+pin.lat, +pin.lng)) return fail('outside');
+      if (!LIB.isFavOpen(now, this.demo)) return fail('closed');
+      var tc = LIB.checkFavText(pin.body, LIB.FAV_MAX, true);
+      if (!tc.ok) return fail('text:' + tc.error);
+      var pos = LIB.favSnap(pin.lat, pin.lng), dev = LIB.sha256Hex('fav:' + pin.device), f = this._fav();
+      var mine = f.pins.filter(function (p) { return p.dev === dev; });
+      if (!LIB.favRateOk(mine.map(function (p) { return p.createdAt; }), now, LIB.FAV_MAX_DAY)) return fail('rate');
+      if (mine.some(function (p) { return p.lat === pos[0] && p.lng === pos[1]; })) return fail('rate');
+      var rec = { id: LIB.uuid(), dev: dev, lat: pos[0], lng: pos[1], tag: pin.tag, body: tc.text || null, likes: 0, hearts: 0, reports: 0,
+                  tokenHash: LIB.sha256Hex(token), createdAt: now };
+      f.pins.push(rec);
+      this._set('fav', f);
+      return ok({ id: rec.id, lat: rec.lat, lng: rec.lng });
+    },
+    favReact: function (device, id, kind) {
+      if (!device || String(device).length < 8 || (kind !== 'like' && kind !== 'heart')) return fail('invalid');
+      var f = this._fav(), p = f.pins.filter(function (x) { return x.id === id && x.reports < LIB.FAV_HIDE_AT; })[0];
+      if (!p) return fail('invalid');
+      if (!LIB.isFavOpen(this.now(), this.demo)) return fail('closed');
+      var dev = LIB.sha256Hex('fav:' + device);
+      var added = !f.reactions.some(function (r) { return r.pin === id && r.dev === dev && r.kind === kind; });
+      if (added) {
+        f.reactions.push({ pin: id, dev: dev, kind: kind, createdAt: this.now() });
+        if (kind === 'like') p.likes++; else p.hearts++;
+        if (p.families != null) p.families++;           // demo pins carry a seeded count
+        this._set('fav', f);
+      }
+      return ok({ likes: p.likes, hearts: p.hearts, added: added });
+    },
+    favReply: function (device, id, body, token) {
+      var now = this.now();
+      if (!device || String(device).length < 8 || !token || token.length < 16) return fail('invalid');
+      var f = this._fav();
+      if (!f.pins.some(function (x) { return x.id === id && x.reports < LIB.FAV_HIDE_AT; })) return fail('invalid');
+      if (!LIB.isFavOpen(now, this.demo)) return fail('closed');
+      var tc = LIB.checkFavText(body, LIB.FAV_REPLY_MAX, false);
+      if (!tc.ok) return fail('text:' + tc.error);
+      var dev = LIB.sha256Hex('fav:' + device);
+      if (!LIB.favRateOk(f.replies.filter(function (r) { return r.dev === dev; }).map(function (r) { return r.createdAt; }), now, LIB.FAV_REPLY_MAX_DAY)) return fail('rate');
+      if (f.replies.filter(function (r) { return r.pin === id; }).length >= 50) return fail('rate');
+      var rec = { id: LIB.uuid(), pin: id, dev: dev, body: tc.text, reports: 0, tokenHash: LIB.sha256Hex(token), createdAt: now };
+      f.replies.push(rec);
+      this._set('fav', f);
+      return ok({ id: rec.id });
+    },
+    favReplies: function (id) {
+      var f = this._fav();
+      return ok(f.replies.filter(function (r) { return r.pin === id && r.reports < LIB.FAV_HIDE_AT; })
+        .sort(function (a, b) { return a.createdAt - b.createdAt; }).slice(0, 50)
+        .map(function (r) { return { id: r.id, body: r.body, createdAt: r.createdAt }; }));
+    },
+    favReport: function (device, kind, id) {
+      if (!device || String(device).length < 8 || (kind !== 'pin' && kind !== 'reply')) return fail('invalid');
+      var f = this._fav(), list = kind === 'pin' ? f.pins : f.replies, x = list.filter(function (y) { return y.id === id; })[0];
+      if (!x) return fail('invalid');
+      var dev = LIB.sha256Hex('fav:' + device);
+      if (f.reports.some(function (r) { return r.target === id && r.dev === dev; })) return ok({ count: -1, already: true });
+      f.reports.push({ target: id, kind: kind, dev: dev, createdAt: this.now() });
+      x.reports++;
+      this._set('fav', f);
+      return ok({ count: x.reports });
+    },
+    favDelete: function (kind, id, token) {
+      var f = this._fav(), h = LIB.sha256Hex(token || ''), key = kind === 'pin' ? 'pins' : kind === 'reply' ? 'replies' : null;
+      if (!key) return fail('invalid');
+      var before = f[key].length;
+      f[key] = f[key].filter(function (x) { return !(x.id === id && x.tokenHash === h); });
+      if (f[key].length === before) return fail('forbidden');
+      if (kind === 'pin') { f.replies = f.replies.filter(function (r) { return r.pin !== id; }); f.reactions = f.reactions.filter(function (r) { return r.pin !== id; }); }
+      this._set('fav', f);
+      return ok(true);
+    }
   };
   // ==== SupabaseAdapter ====
   function loadScript(src, sri) {
@@ -291,7 +390,32 @@
       return this.rpc('decor_counts', {}).then(function (rows) {
         return rows.map(function (r) { return { cell: r.h3_r8, count: r.n, topTag: r.top_tag, topTagN: r.top_tag_n }; });
       });
-    }
+    },
+    // v14 board
+    favList: function (device) {
+      return this.rpc('fav_list', { p_device: device || null }).then(function (rows) {
+        return rows.map(function (r) {
+          return { id: r.id, lat: r.lat, lng: r.lng, tag: r.tag, body: r.body, likes: r.likes, hearts: r.hearts, replies: r.replies,
+                   families: r.families, myLike: !!r.my_like, myHeart: !!r.my_heart, createdAt: Date.parse(r.created_at) };
+        });
+      });
+    },
+    favCreate: function (pin, token) {
+      return this.rpc('fav_create', { p_device: pin.device, p_lat: pin.lat, p_lng: pin.lng, p_tag: pin.tag, p_body: pin.body || null, p_token: token });
+    },
+    favReact: function (device, id, kind) { return this.rpc('fav_react', { p_device: device, p_pin: id, p_kind: kind }); },
+    favReply: function (device, id, body, token) {
+      return this.rpc('fav_reply', { p_device: device, p_pin: id, p_body: body, p_token: token }).then(function (rid) { return { id: rid }; });
+    },
+    favReplies: function (id) {
+      return this.rpc('fav_replies', { p_pin: id }).then(function (rows) {
+        return rows.map(function (r) { return { id: r.id, body: r.body, createdAt: Date.parse(r.created_at) }; });
+      });
+    },
+    favReport: function (device, kind, id) {
+      return this.rpc('fav_report', { p_device: device, p_kind: kind, p_id: id }).then(function (n) { return { count: n, already: n === -1 }; });
+    },
+    favDelete: function (kind, id, token) { return this.rpc('fav_delete', { p_kind: kind, p_id: id, p_token: token }); }
   };
 
   // ==== Resilient wrapper with automatic local fallback ====
@@ -367,6 +491,31 @@
       if (!LIB.inLondonBox(b[0], b[1])) return fail('outside');
       return rawDecor({ device: d.device, lat: b[0], lng: b[1], cell: cellFn ? cellFn(b[0], b[1]) : d.cell, tags: d.tags || [] });
     };
+    // v14 board. Behind cfg.favBoard (default on) AND the server: until supabase/v14_board.sql is run the RPCs are
+    // missing (PGRST202), favAvailable() turns false and the app hides the whole board. Harmless before the SQL.
+    // Local/demo mode keeps it in this browser. If the shared server is down, the list shows the last copy and writes wait.
+    api.favMissing = false;
+    api.favConfirmed = false;                          // true once the board answered (server list OK, or local/demo mode)
+    api.favAvailable = function () { return cfg.favBoard !== false && !api.favMissing; };
+    api.favShared = function () { return api.mode === 'supabase' && api.favAvailable(); };
+    FAV_METHODS.forEach(function (name) {
+      api[name] = function () {
+        var args = arguments, isList = name === 'favList';
+        if (cfg.favBoard === false) return isList ? ok([]) : fail('closed');
+        if (!remote || (api.mode === 'local')) { api.favConfirmed = true; return local[name].apply(local, args); }
+        if (api.favMissing) return isList ? ok([]) : fail('missing');
+        if (api.mode !== 'supabase') return isList ? ok(cached('fav')) : fail('offline');
+        return withTimeout(remote[name].apply(remote, args), timeoutMs).then(function (res) {
+          if (isList) { cache('fav', res); api.favConfirmed = true; }
+          return res;
+        }, function (err) {
+          if (err && err.code === 'missing') { api.favMissing = true; statusFns.forEach(function (f) { f(api.mode, 'favMissing'); }); return isList ? [] : fail('missing'); }
+          if (err && err.validation) throw err;
+          goOffline(err);
+          return isList ? cached('fav') : fail('offline');
+        });
+      };
+    });
     // Is decor sharing really reaching other families? false while the server SQL is missing, offline or local-only.
     api.decorShared = function () { return api.mode === 'supabase' && !api.decorMissing; };
     api.listDecor = function (cellFn) { return api.decorCounts(cellFn).then(function (rows) { return LIB.decorateDecor(rows); }); };
@@ -376,5 +525,5 @@
     return api;
   }
 
-  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS, LIVE_METHODS: LIVE_METHODS, DECOR_METHODS: DECOR_METHODS };
+  return { LocalAdapter: LocalAdapter, SupabaseAdapter: SupabaseAdapter, createBackend: createBackend, isConfigured: isConfigured, METHODS: METHODS, LIVE_METHODS: LIVE_METHODS, DECOR_METHODS: DECOR_METHODS, FAV_METHODS: FAV_METHODS };
 });

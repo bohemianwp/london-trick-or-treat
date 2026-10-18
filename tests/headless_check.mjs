@@ -169,9 +169,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
 
   // v13: before Oct 31 3 PM the big button is purple (decorations); the fun-street mark is the small orange practice pill
   check('v13 phase banner under the countdown: “Now: mark the best decorations · Oct 31: mark the most fun streets”',
-    await p.ev(`!document.getElementById('phaseBanner').hidden && /Now: mark the best decorations · 🔥 Oct 31: mark the most fun streets/.test(document.getElementById('phaseLine').textContent) && document.getElementById('phaseTestLine').hidden`));
+    await p.ev(`!document.getElementById('phaseBanner').hidden && /Now: mark (the best )?decorations( \\+ share past favourites 💬)? · 🔥 Oct 31: mark the most fun streets/.test(document.getElementById('phaseLine').textContent) && document.getElementById('phaseTestLine').hidden`));
   await p.click('#phaseBanner'); await sleep(250);
-  check('tapping the banner opens the explainer (now / Halloween night / 14 days)', await p.ev(`!document.getElementById('phaseCard').hidden && document.querySelectorAll('#phaseList dt').length===4 && /14 days/.test(document.getElementById('phaseList').textContent)`));
+  check('tapping the banner opens the explainer (now / Halloween night / 14 days; +past-years board item when on)', await p.ev(`!document.getElementById('phaseCard').hidden && document.querySelectorAll('#phaseList dt').length===(__ltot.state().favOn?5:4) && /14 days/.test(document.getElementById('phaseList').textContent)`));
   check('explainer shows the gift line', await p.ev(`/helps another family have a happier, more magical Halloween/.test(document.getElementById('phaseGift').textContent) && document.getElementById('phaseGift').offsetHeight>0`));
   await p.click('#phaseOk'); await sleep(150);
   check('big button = purple decor button, small orange pill = “🧪 Practice: fun street”', await p.ev(`document.getElementById('markBtn').classList.contains('mb-decor') && /Cool decorations here!/.test(document.getElementById('markBtn').textContent) && /Practice: fun street/.test(document.getElementById('altBtn').textContent) && !document.getElementById('altBtn').hidden`));
@@ -219,9 +219,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = How-to (16 sections, v13 + phases + Oct 31) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 16 && await p.ev(`!!document.getElementById('guideBoard')`));
+  check('Guide tab = How-to (16 sections, v13 + phases + Oct 31; +board +sounds = 18 in v14) + Board + Safety buttons', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === ((await p.ev('__ltot.state().favOn')) ? 18 : 17) && await p.ev(`!!document.getElementById('guideBoard')`));
   await p.click('#guideBoard'); await sleep(200);
-  check('Board opens from the Guide tab (secondary)', await p.ev(`!document.getElementById('panel-board').hidden`));
+  check('Board opens from the Guide tab (v14: past-years board when on, else parent board)', await p.ev(`__ltot.state().favOn ? !document.getElementById('panel-fav').hidden : !document.getElementById('panel-board').hidden`));
 
   // area popup = "Suggested" base layer
   const pop = await p.ev(`(function(){var c; __ltot.map.eachLayer(function(l){ if(!c && l.options && l.options.className==='area-circle') c=l; });
@@ -261,7 +261,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await p.click('#safetyBtn'); await sleep(200);
   check('safety panel: 11 tips incl. “go with a grown-up” and Teal Pumpkin', (await p.ev('document.querySelectorAll("#tipList li").length')) === 11 && /跟大人一起去/.test(await p.ev(`document.getElementById('tipList').textContent`)) && /Teal Pumpkin/.test(await p.ev(`document.getElementById('tipList').textContent`)));
   await p.click('#panel-safety .privacy-link'); await sleep(200);
-  check('privacy page (zh) with 13 sections (v7: test days + no tracking, v11: decoration marks) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === 13 && /装饰标记/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
+  check('privacy page (zh) with 13 sections (+1 past-years board in v14 when on) and the privacy contact (v9)', (await p.ev('document.querySelectorAll("#privacyList dt").length')) === ((await p.ev('__ltot.state().favOn')) ? 14 : 13) && /装饰标记/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /PIPEDA/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)) && /sisy\+halloween@mail\.grokbot\.com/.test(await p.ev(`document.getElementById('panel-privacy').textContent`)));
   await p.click('#langBtn'); await sleep(300);
   check('still no JS errors after all interactions', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('no Supabase library downloaded in local mode', !p.requests.some((u) => /supabase/.test(u)));
@@ -300,7 +300,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   await a.shot('v3-demo-zones.png');
   await a.ev(`__ltot.map.setView([42.9655, -81.2440], 14, {animate:false})`); await sleep(800);
   const full = await a.ev(`[...document.querySelectorAll('.zbadge')].map(b=>b.textContent)`);
-  check('street zoom: full badge “🔥 23 marked”', full.some((t) => /^🔥 23 marked/.test(t)), full.join(' | '));
+  check('street zoom: full badge “🔥 23+ marked” (demo ticks up)', full.some((t) => /^🔥 2\d marked/.test(t)), full.join(' | '));
   await a.shot('v3-demo-street.png');
   await a.ev(`__ltot.map.setView([42.985, -81.29], 12, {animate:false})`); await sleep(500);
   check('zones are SVG paths with CSS pulse classes (no per-frame JS)', await a.ev(`document.querySelectorAll('path.zone-hot').length>=1 && document.querySelectorAll('path.zone-lively').length>=1 && document.querySelectorAll('path.zone-quiet').length>=1 && getComputedStyle(document.querySelector('path.zone-hot')).animationName==='zflash'`));
@@ -347,6 +347,57 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('demo tabs: no JS errors', [a, b, n, nz].every((x) => realErrors(x).length === 0), [a, b, n, nz].map(realErrors).flat().join(' | '));
 }
 
+// =========================================================== 2b. v14: "Best streets from past years" board (demo) + sounds
+{
+  const p = await openPage('?demo=1', { wait: 5000 });
+  await dismissGuide(p);
+  const st = await p.ev('__ltot.state()');
+  check('v14 board on in demo: 💬 Past best layer chip, banner mentions past favourites', st.favOn && st.favPins === 6 &&
+    await p.ev(`!!document.querySelector('[data-layer="fav"]') && /share past favourites/.test(document.getElementById('phaseLine').textContent)`), JSON.stringify({ favOn: st.favOn, n: st.favPins }));
+  await p.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false})`); await sleep(700);
+  const b16 = await p.ev(`[...document.querySelectorAll('.favb')].map(function(b){return {t:b.textContent, s:parseFloat(b.style.getPropertyValue('--s'))};})`);
+  check('zoomed in: speech bubbles with tag icon, short note and 👍/❤️ counts; bigger with more likes', b16.length >= 5 && b16.some((b) => /^🏆Best street every year!…👍 14 ❤️ 9$/.test(b.t)) &&
+    Math.max(...b16.map((b) => b.s)) > Math.min(...b16.map((b) => b.s)), b16.map((b) => b.t + '@' + b.s).slice(0, 3).join(' | '));
+  await p.ev(`__ltot.map.setView([42.975, -81.26], 12, {animate:false})`); await sleep(700);
+  const b12 = await p.ev(`[...document.querySelectorAll('.favb')].map(function(b){return b.textContent;})`);
+  check('zoomed out: nearby pins cluster (“💬 n”), no long text', b12.some((t) => /^💬\d+$/.test(t)) && b12.length < 6 && !b12.some((t) => /Best street/.test(t)), b12.join(' | '));
+  await p.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false}); __ltot.favPopup(__ltot.favPins()[0])`); await sleep(700);
+  check('bubble popup: tag, note, families (aggregate) and 👍/❤️/reply/report', await p.ev(`(function(){var t=document.querySelector('.pop-fav').textContent;return /Most festive/.test(t)&&/21 families remember this street/.test(t)&&/Replies \\(2\\)/.test(t)&&!!document.querySelector('.pop-fav .fav-rx[data-kind="heart"]')&&/Report/.test(t);})()`));
+  await p.click('.fav-rx[data-kind="like"]'); await sleep(500);
+  const toast1 = await p.ev(`document.getElementById('toast').textContent`);
+  check('👍 counts once, shows a short gift toast', await p.ev(`document.querySelector('.fav-rx[data-kind="like"] b').textContent==='15'`) && /another family/.test(toast1), toast1);
+  await p.click('.fav-rx[data-kind="like"]'); await sleep(400);
+  check('second 👍 from the same phone does not count', await p.ev(`document.querySelector('.fav-rx[data-kind="like"] b').textContent==='15' && /already/.test(document.getElementById('toast').textContent)`));
+  await p.ev(`(function(){var i=document.querySelector('.fav-reply-in'); i.value='Call 519 555 1234'; document.querySelector('.fav-replyrow .btn').click();})()`); await sleep(300);
+  check('reply filter: phone numbers refused', /Phone numbers are not allowed/.test(await p.ev(`document.querySelector('.pop-fav .err').textContent`)));
+  await p.ev(`(function(){var i=document.querySelector('.fav-reply-in'); i.value='So much fun!'; document.querySelector('.fav-replyrow .btn').click();})()`); await sleep(700);
+  check('short reply posts and shows', /So much fun!/.test(await p.ev(`document.querySelector('.fav-replies').textContent`)));
+  await p.ev(`__ltot.map.closePopup(); __ltot.openTab('fav')`); await sleep(400);
+  check('🏆 panel: Best streets from past years + Most loved list', await p.ev(`!document.getElementById('panel-fav').hidden && document.querySelectorAll('#favList .fav-row').length===6`));
+  await p.ev(`__ltot.openFavForm([42.9601, -81.2410])`); await sleep(300);
+  await p.click('#favSend'); await sleep(200);
+  check('post form: a preset tag is required', /Pick one/.test(await p.ev(`document.getElementById('favErr').textContent`)));
+  await p.ev(`document.querySelector('#favTags [data-tag="candy"]').click(); document.getElementById('favNote').value='Lots of candy at 1234 Elm'; document.getElementById('favSend').click()`); await sleep(300);
+  check('post form: house numbers refused', /No house numbers/.test(await p.ev(`document.getElementById('favErr').textContent`)));
+  await p.ev(`document.getElementById('favNote').value='Full-size bars every year'; document.getElementById('favSend').click()`); await sleep(900);
+  const mine = await p.ev(`(function(){var x=__ltot.favPins().filter(function(q){return q.body==='Full-size bars every year';})[0]; return x?{lat:x.lat,lng:x.lng}:null;})()`);
+  check('pin posted, snapped to the ~50 m street grid, popup shows “yours” + Delete', !!mine && mine.lat === 42.96015 && mine.lng === -81.2412 &&
+    await p.ev(`/yours/.test(document.querySelector('.pop-fav').textContent) && /Delete/.test(document.querySelector('.pop-fav').textContent)`), JSON.stringify(mine));
+  check('sound: 🔊 in the top bar, ON by default', await p.ev(`document.getElementById('soundBtn').textContent==='🔊' && __ltot.SFX.isOn()`));
+  await p.click('#soundBtn'); await sleep(200);
+  check('sound: tap → 🔇, remembered in localStorage, bilingual label', await p.ev(`document.getElementById('soundBtn').textContent==='🔇' && localStorage.getItem('ltot.sound')==='0' && /Sound off/.test(document.getElementById('soundBtn').getAttribute('aria-label'))`));
+  await p.click('#soundBtn'); await sleep(200);
+  check('How-to has the board and the sounds sections', await p.ev(`(function(){var t=document.getElementById('howtoList').textContent;return /Best streets from past years/.test(t)&&/🔊 Sounds/.test(t);})()`));
+  check('privacy notice mentions the past-years board', /Past-years board/.test(await p.ev(`document.getElementById('privacyList').textContent`)));
+  check('v14 board page: no JS errors', realErrors(p).length === 0, realErrors(p).join(' | '));
+  const n = await openPage('?demo=1&now=2026-10-31T17:30:00-04:00&lang=zh', { wait: 5000 });
+  await dismissGuide(n);
+  await n.ev(`__ltot.map.setView([42.9672, -81.2449], 16, {animate:false}); __ltot.favPopup(__ltot.favPins()[0])`); await sleep(700);
+  const night = await n.ev(`document.querySelector('.pop-fav').textContent`);
+  check('Oct 31 (zh): memory + tonight prompt, both counts when the zone is lit', /\d+ 个家庭说这里往年难忘/.test(night) && /今晚：\d+ 个标记/.test(night) && /今晚怎么样？点一下分享！/.test(night), night.slice(0, 90));
+  check('Oct 31 bubbles say “🏆 n · 🔥 现在 n”', /🏆 \d+ · 🔥 现在 \d+/.test(await n.ev(`[...document.querySelectorAll('.favb')].map(function(b){return b.textContent;}).join('|')`)));
+}
+
 // =========================================================== 3. h3-js blocked → local hex grid fallback
 {
   const p = await openPage('?demo=1', { block: ['*h3-js*'], wait: 5000 });
@@ -370,6 +421,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   const p = await openPage('', { config: cfg, wait: 8000 });
   check('supabase-js lazy-loaded from CDN (SRI ok) only when configured', p.requests.some((u) => /supabase-js@2\.118\.0/.test(u)) && await p.ev(`!!(window.supabase && window.supabase.createClient)`));
   check('unreachable server → “Offline mode” chip', await p.ev(`__ltot.backend.mode==='offline' && !document.getElementById('offlineChip').hidden`));
+  check('v14: the board stays hidden until the server has answered (no 💬 chip)', await p.ev(`!__ltot.state().favOn && !document.querySelector('[data-layer="fav"]')`));
   await p.ev(`__ltot.openTab('board'); document.getElementById('postBody').value='works offline'; document.getElementById('postBtn').click()`); await sleep(800);
   check('board still works offline (saved locally)', /works offline/.test(await p.ev(`document.getElementById('postList').textContent`)));
   check('no unexpected JS errors in offline mode', realErrors(p).length === 0, realErrors(p).join(' | '));
@@ -442,7 +494,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D13') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D14') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');

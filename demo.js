@@ -33,6 +33,15 @@
     ['Westmount must-see', 42.9465, -81.2930, 4, 'mustsee'],
     ['Huron Heights (only 2: stays hidden)', 43.0180, -81.2150, 2, 'lights']
   ];
+  // v14 board demo: [lat, lng, tag, note, likes, hearts, families, replies]
+  var FAV = [
+    [42.9672, -81.2449, 'festive', 'Best street every year! Whole block goes all out 🎃 / 每年都超有气氛！', 14, 9, 21, ['So true, we go every year!', '同意！小朋友超喜欢']],
+    [42.9606, -81.2466, 'littlekids', 'Gentle and friendly, perfect for toddlers / 很适合小小孩', 6, 5, 9, ['Thanks for the tip!']],
+    [42.9989, -81.2470, 'candy', 'Full-size bars on this stretch in 2024 🍫', 8, 2, 11, []],
+    [42.9420, -81.2655, 'walking', 'Wide sidewalks, easy stroller loop / 人行道宽，推车方便', 3, 1, 4, []],
+    [43.0101, -81.3352, 'festive', 'Huge light show last year ✨', 4, 4, 6, []],
+    [42.9050, -81.2995, 'candy', '', 1, 0, null, []]
+  ];
   var SUGGEST = [
     [43.0262, -81.2765, 'Lots of porch lights on our crescent'],
     [43.0262, -81.2765, '很多人家装饰，街道安静'],
@@ -96,6 +105,19 @@
       local._set('posts', posts);
       local._set('demoSeeded', true);
     }
+    if (!local._get('demoFavSeeded', false)) {
+      var f = local._get('fav', null) || { pins: [], replies: [], reactions: [], reports: [] };
+      FAV.forEach(function (x, i) {
+        var pos = LIB.favSnap(x[0], x[1]), id = 'demo-fav-' + i;
+        f.pins.push({ id: id, dev: 'demo-fav-dev-' + i, lat: pos[0], lng: pos[1], tag: x[2], body: x[3] || null, likes: x[4], hearts: x[5],
+                      families: x[6], reports: 0, tokenHash: 'demo', createdAt: now - (i + 2) * 3600000 });
+        x[7].forEach(function (b, j) {
+          f.replies.push({ id: id + '-r' + j, pin: id, dev: 'demo-r' + j, body: b, reports: 0, tokenHash: 'demo', createdAt: now - (i + 1) * 3600000 + j * 60000 });
+        });
+      });
+      local._set('fav', f);
+      local._set('demoFavSeeded', true);
+    }
     start(local, grid);
   }
   // A new fake mark every ~4 s, mostly in the hot zones, so counts tick up while you watch.
@@ -112,5 +134,5 @@
     if (timer) return;
     timer = setInterval(function () { if (root.document && root.document.visibilityState === 'visible') tick(local, grid); }, 4000);
   }
-  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES, SUGGEST: SUGGEST, DECOR: DECOR };
+  root.TOT_DEMO = { seed: seed, tick: function () { /* start() drives the ticks */ }, addOne: tick, ZONES: ZONES, SUGGEST: SUGGEST, DECOR: DECOR, FAV: FAV };
 })(typeof self !== 'undefined' ? self : this);

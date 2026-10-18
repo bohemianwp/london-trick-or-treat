@@ -65,12 +65,12 @@ test('index.html: 4 tabs with Mark it! in the centre, big button ≥ 64 px, hint
   for (const gone of ['addHouseBtn', 'filterChips', 'shareBtn', 'houseDialog', 'shareToggle', 'panel-live', 'panel-pins']) assert.doesNotMatch(html, new RegExp(gone));
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css)[^"]*)"/g)].map((m) => m[1]);
   assert.ok(own.length >= 8, own.join());
-  own.forEach((u) => assert.match(u, /\?v=13$/, u));
+  own.forEach((u) => assert.match(u, /\?v=14$/, u));
   assert.doesNotMatch(html, /\?v=[345]\b/);
 });
 
 test('URL params: ?guide=1, ?howto=1, ?lang=zh|en, ?demo=1, ?near=1', () => {
-  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null, nudge: false, decor: false };
+  const none = { guide: false, howto: false, lang: null, demo: false, near: false, feedback: false, tour: false, tourStep: null, nudge: false, decor: false, fav: false };
   assert.deepEqual(L.parseUrlFlags(''), none);
   assert.deepEqual(L.parseUrlFlags('?guide=1'), { ...none, guide: true });
   assert.deepEqual(L.parseUrlFlags('?howto=1&lang=zh'), { ...none, howto: true, lang: 'zh' });

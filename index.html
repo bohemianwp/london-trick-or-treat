@@ -11,7 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <header class="topbar">
@@ -23,6 +23,7 @@
     <button id="safetyBtn" class="chip" type="button" data-i18n="safetyBtn">🦺 Safety</button>
     <button id="tourBtn" class="chip chip-help chip-tour" type="button" aria-controls="tour">▶</button>
     <button id="helpBtn" class="chip chip-help" type="button" aria-label="How to use this map" aria-controls="panel-guide">?</button>
+    <button id="soundBtn" class="chip chip-icon chip-sound" type="button" aria-pressed="true">🔊</button>
     <button id="langBtn" class="chip" type="button">中文</button>
   </header>
   <div id="countdown" class="countdown" role="timer"></div>
@@ -85,6 +86,7 @@
       <p id="phaseGift" class="mc-gift" data-i18n="giftLine"></p>
       <div class="row row-tight">
         <button id="phaseDecor" class="btn btn-decor" type="button" data-i18n="phaseSeeDecor">🎃 See Best decorations</button>
+        <button id="phaseFav" class="btn" type="button" data-i18n="favOpenBtn" hidden>💬 Share a past favourite</button>
         <button id="phaseOk" class="btn btn-primary" type="button" data-i18n="phaseGotIt">Got it</button>
       </div>
     </div>
@@ -138,6 +140,19 @@
         <ul id="decorCityList" class="near-list"></ul>
         <p class="hint" data-i18n="decorIntro"></p>
         <p class="hint" data-i18n="decorFunNote"></p>
+      </div>
+
+      <!-- BEST STREETS FROM PAST YEARS (v14) -->
+      <div class="panel" id="panel-fav" hidden>
+        <h2 data-i18n="favTitle">💬 Best streets from past years</h2>
+        <p class="hint" data-i18n="favIntro"></p>
+        <button id="favPinBtn" class="btn btn-primary btn-block" type="button" data-i18n="favPinBtn">📍 Pin a favourite street</button>
+        <p id="favStatus" class="info" hidden></p>
+        <h3 data-i18n="favTop">Most loved</h3>
+        <ul id="favList" class="near-list"></ul>
+        <p class="hint" data-i18n="favRules"></p>
+        <p class="hint mc-gift" data-i18n="giftLine"></p>
+        <button id="favBoardLink" class="btn btn-small btn-ghost" type="button" data-i18n="favBoardLink">🏆 Parent board (text posts)</button>
       </div>
 
       <!-- ROUTE -->
@@ -278,6 +293,21 @@
     </div>
   </dialog>
 
+  <dialog id="favDialog" class="dialog">
+    <h2 data-i18n="favFormTitle">Best street from past years</h2>
+    <div class="label" data-i18n="favTagLabel">What made it great? Pick one:</div>
+    <div id="favTags" class="favtags" role="radiogroup"></div>
+    <label class="label" for="favNote" data-i18n="favNoteLabel">A few words (optional, 80 max)</label>
+    <textarea id="favNote" maxlength="80" rows="2"></textarea>
+    <div class="row row-tight"><span class="warn-inline" data-i18n="noNames"></span><span id="favCount" class="mono-num count"></span></div>
+    <p class="hint" data-i18n="favRules"></p>
+    <div id="favErr" class="err" role="alert" hidden></div>
+    <div class="row">
+      <button id="favCancel" class="btn" type="button" data-i18n="cancel">Cancel</button>
+      <button id="favSend" class="btn btn-primary" type="button" data-i18n="favPost">Post</button>
+    </div>
+  </dialog>
+
   <dialog id="suggestDialog" class="dialog">
     <h2 data-i18n="suggestTitle">Suggest this area</h2>
     <p class="hint" data-i18n="suggestHelp"></p>
@@ -345,13 +375,14 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js"
           integrity="sha384-btAksX4N/Qw1lEPyJQdtZC59TR3dvM7HgYngL8bCs7Dtysie9D3TiJ0GGFZBbXAy" crossorigin="anonymous"></script>
-  <script defer src="config.js?v=13"></script>
-  <script defer src="lib.js?v=13"></script>
-  <script defer src="i18n.js?v=13"></script>
-  <script defer src="data/areas.js?v=13"></script>
-  <script defer src="backend.js?v=13"></script>
-  <script defer src="hex.js?v=13"></script>
-  <script defer src="tour.js?v=13"></script>
-  <script defer src="app.js?v=13"></script>
+  <script defer src="config.js?v=14"></script>
+  <script defer src="lib.js?v=14"></script>
+  <script defer src="i18n.js?v=14"></script>
+  <script defer src="data/areas.js?v=14"></script>
+  <script defer src="backend.js?v=14"></script>
+  <script defer src="hex.js?v=14"></script>
+  <script defer src="sfx.js?v=14"></script>
+  <script defer src="tour.js?v=14"></script>
+  <script defer src="app.js?v=14"></script>
 </body>
 </html>

@@ -29,8 +29,8 @@ const oldGone = await one(`select to_regclass('public.markers') is null and to_r
 ok('v2 tables markers/live_dots do not exist', oldGone.gone);
 const anonFns = (await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute') order by 1`)).rows.map(r => r.proname);
-const wantFns = ['community_suggested', 'create_post', 'decor_counts', 'delete_post', 'report_post', 'send_decor', 'send_mark', 'suggest_area', 'tag_mark', 'vote_post', 'zone_counts'];
-ok('anon may execute exactly the 11 public RPCs (v11: + send_decor, decor_counts)', JSON.stringify(anonFns) === JSON.stringify(wantFns), anonFns.join(','));
+const wantFns = ['community_suggested', 'create_post', 'decor_counts', 'delete_post', 'fav_create', 'fav_delete', 'fav_list', 'fav_react', 'fav_replies', 'fav_reply', 'fav_report', 'report_post', 'send_decor', 'send_mark', 'suggest_area', 'tag_mark', 'vote_post', 'zone_counts'];
+ok('anon may execute exactly the 18 public RPCs (v11: + send_decor, decor_counts; v14: + 7 fav_*)', JSON.stringify(anonFns) === JSON.stringify(wantFns), anonFns.join(','));
 
 await db.exec('set role anon');
 const V = 'device-aaaa-1111', T = 'token-'.padEnd(40, 'x');
@@ -225,6 +225,82 @@ else {
   await dcounts();
   ok('decor marks older than 14 days are deleted on the next decor_counts call', (await asRoot('select count(*)::int as n from decor_marks where h3_r8=$1', [DB.h])).rows[0].n === 0);
 }
+// ---------------------------------------------------------------- v14 board ("Best streets from past years / 往年最佳街区")
+for (const t of ['fav_pins', 'fav_replies', 'fav_reactions', 'fav_reports']) {
+  ok(`anon cannot select ${t}`, /permission denied/.test(await err(`select * from ${t}`)));
+}
+ok('anon cannot insert fav_pins directly', /permission denied/.test(await err(`insert into fav_pins(device_hash,lat,lng,tag,token_hash) values ('a',42.98,-81.24,'candy','b')`)));
+ok('anon cannot update fav_pins (no fake likes)', /permission denied/.test(await err(`update fav_pins set likes = 999`)));
+ok('anon cannot call the fav helpers', /permission denied/.test(await err(`select _ltot_cleanup_fav()`)) && /permission denied/.test(await err(`select _ltot_fav_text('x', true, 80)`))
+  && /permission denied/.test(await err(`select _ltot_fav_open()`)) && /permission denied/.test(await err(`select _ltot_fav_snap(1, 1)`)));
+const favOpen = nowMs >= Date.parse('2026-10-17T04:00:00Z') && nowMs < Date.parse('2026-11-01T04:00:00Z');
+ok(`_ltot_fav_open() is ${favOpen} right now (Oct 17 – Oct 31 Toronto)`, (await asRoot('select public._ltot_fav_open() as v')).rows[0].v === favOpen);
+const fdev = (i) => `fav-device-${i}`.padEnd(20, 'f'), ftok = (i) => `fav-token-${i}`.padEnd(32, 't');
+const fav = (i, lat, lng, tag, body = null) => db.query(`select fav_create($1,$2,$3,$4,$5,$6) as r`, [fdev(i), lat, lng, tag, body, ftok(i)]);
+const favErr = (i, lat, lng, tag, body = null) => err(`select fav_create($1,$2,$3,$4,$5,$6)`, [fdev(i), lat, lng, tag, body, ftok(i)]);
+const flist = async (d = null) => (await db.query('select * from fav_list($1)', [d])).rows;
+if (!favOpen) ok('fav_create closed outside Oct 17 – Oct 31', /closed/.test(await favErr(1, 42.98, -81.24, 'candy')));
+else {
+  const r1 = (await fav(1, 42.987654, -81.243219, 'festive', 'Best street every year!')).rows[0].r;
+  ok('fav_create snaps the pin to the ~50 m grid (never a house)', Math.abs(r1.lat - Math.round(42.987654 / 0.00045) * 0.00045) < 1e-5 && Math.abs(r1.lng - Math.round(-81.243219 / 0.0006) * 0.0006) < 1e-5, JSON.stringify(r1));
+  const st = (await asRoot('select lat, lng, device_hash from fav_pins where id=$1', [r1.id])).rows[0];
+  ok('stored position = the snapped one; device stored only as a 64-char hash', st.lat === r1.lat && st.lng === r1.lng && st.device_hash.length === 64 && !st.device_hash.includes('fav-device'), JSON.stringify(st));
+  ok('fav_create needs a preset tag', /invalid/.test(await favErr(1, 42.98, -81.24, null, 'hi')) && /invalid/.test(await favErr(1, 42.98, -81.24, 'pizza', 'hi')));
+  ok('fav_create note is optional', (await favErr(1, 42.97, -81.25, 'candy')) === null);
+  ok('fav_create rejects > 80 chars', /text:tooLong/.test(await favErr(1, 42.96, -81.25, 'candy', 'x'.repeat(81))));
+  ok('fav_create rejects outside London', /outside/.test(await favErr(1, 43.65, -79.38, 'candy')));
+  const bad = [['call 519-555-1234', 'phone'], ['５１９５５５１２３４', 'phone'], ['text me at mom@mail.com', 'email'], ['see www.spam.com', 'url'],
+    ['123 Elm Street is great', 'address'], ['the house at 1234', 'address'], ['house 7 has candy', 'address'], ['#42 gives full bars', 'address'],
+    ['N6A 1B2 area', 'address'], ['大街12号最好', 'address'], ['１２３号', 'address'], ['门牌很好找', 'address'],
+    ['this street is shit', 'profanity'], ['wtf so good', 'profanity'], ['傻逼', 'profanity'], ['草泥马', 'profanity']];
+  for (const [b, code] of bad) ok(`fav text rejects “${b}” → text:${code}`, new RegExp('text:' + code).test(await favErr(2, 42.95, -81.26, 'candy', b) || ''));
+  const good = ['Best in 2023 and 2024!', '#1 street for little kids', 'Busy 5:30-8:30', '这条街每年都超有气氛', 'Lots of candy, easy sidewalks'];
+  for (const [k, g] of good.entries()) ok(`fav text allows “${g}”`, (await favErr(3, 42.94 + k * 0.002, -81.27, 'festive', g)) === null);
+  // 5 pins per phone per day (device 3 already has 5)
+  ok('5 pins per phone per Toronto day, 6th → rate', /rate/.test(await favErr(3, 42.93, -81.28, 'walking') || ''));
+  ok('same phone, same snapped spot → rate', /rate/.test(await favErr(1, 42.98766, -81.24322, 'candy') || ''));
+  // reactions
+  const react = (i, k) => one(`select fav_react($1,$2,$3) as r`, [fdev(i), r1.id, k]).then(x => x.r);
+  const a = await react(10, 'like'), b = await react(10, 'like'), c = await react(10, 'heart'), d = await react(11, 'like');
+  ok('👍 once per phone; ❤️ is separate; counts go up', a.added && a.likes === 1 && !b.added && b.likes === 1 && c.hearts === 1 && d.likes === 2, JSON.stringify([a, b, c, d]));
+  ok('fav_react rejects unknown kinds', /invalid/.test(await err(`select fav_react($1,$2,'star')`, [fdev(10), r1.id])));
+  let L = await flist(fdev(10));
+  let p1 = L.find(r => r.id === r1.id);
+  ok('fav_list shows my reactions and the counts', p1?.likes === 2 && p1?.hearts === 1 && p1?.my_like === true && p1?.my_heart === true, JSON.stringify(p1));
+  ok('fav_list returns only safe columns', JSON.stringify(Object.keys(p1 || {}).sort()) === '["body","created_at","families","hearts","id","lat","likes","lng","my_heart","my_like","replies","tag"]', Object.keys(p1 || {}).join(','));
+  ok('families = 3 distinct phones (author + 2 reactors)', p1?.families === 3, String(p1?.families));
+  const p2 = L.find(r => r.body === 'Busy 5:30-8:30');
+  ok('families hidden (null) below 3', p2 && p2.families === null, JSON.stringify(p2));
+  ok('most liked first', L[0].id === r1.id);
+  // replies
+  const reply = (i, body) => err(`select fav_reply($1,$2,$3,$4)`, [fdev(i), r1.id, body, ftok(i)]);
+  ok('fav_reply accepts a short reply', (await reply(20, 'Agreed, so much fun!')) === null);
+  ok('fav_reply rejects > 60 chars and empty', /text:tooLong/.test(await reply(20, 'y'.repeat(61)) || '') && /text:empty/.test(await reply(20, '  ') || ''));
+  ok('fav_reply filters too (phone, address)', /text:phone/.test(await reply(20, '519 555 1234') || '') && /text:address/.test(await reply(20, 'try 4567') || ''));
+  for (let k = 0; k < 20; k++) await reply(21, 'nice ' + k);
+  ok('20 replies per phone per day, 21st → rate', /rate/.test(await reply(21, 'one more') || ''));
+  const reps = (await db.query('select * from fav_replies($1)', [r1.id])).rows;
+  ok('fav_replies lists them oldest first, only id/body/created_at', reps.length === 21 && reps[0].body === 'Agreed, so much fun!' && JSON.stringify(Object.keys(reps[0]).sort()) === '["body","created_at","id"]', `${reps.length}`);
+  // reports: 3 hide
+  const rid = reps[1].id;
+  for (const i of [30, 31]) await one(`select fav_report($1,'reply',$2)`, [fdev(i), rid]);
+  ok('duplicate report → -1', (await one(`select fav_report($1,'reply',$2) as n`, [fdev(30), rid])).n === -1);
+  ok('2 reports: reply still visible', (await db.query('select * from fav_replies($1)', [r1.id])).rows.some(r => r.id === rid));
+  await one(`select fav_report($1,'reply',$2)`, [fdev(32), rid]);
+  ok('3 reports hide the reply', !(await db.query('select * from fav_replies($1)', [r1.id])).rows.some(r => r.id === rid));
+  const victim = L.find(r => r.body === 'Lots of candy, easy sidewalks').id;
+  for (const i of [30, 31, 32]) await one(`select fav_report($1,'pin',$2)`, [fdev(i), victim]);
+  ok('3 reports hide the pin from fav_list', !(await flist()).some(r => r.id === victim));
+  ok('cannot react to / reply on a hidden pin', /invalid/.test(await err(`select fav_react($1,$2,'like')`, [fdev(40), victim])) && /invalid/.test(await err(`select fav_reply($1,$2,'hi',$3)`, [fdev(40), victim, ftok(40)])));
+  // delete own
+  const mine = L.find(r => r.body === 'Best in 2023 and 2024!').id;
+  ok('fav_delete needs the token', /forbidden/.test(await err(`select fav_delete('pin',$1,'wrong-token-wrong-token')`, [mine])) && !(await err(`select fav_delete('pin',$1,$2)`, [mine, ftok(3)])));
+  ok('deleted pin is gone', !(await flist()).some(r => r.id === mine));
+  // Nov 2 purge (pretend: run the purge body with a fake clock)
+}
+const favPurge = (await asRoot(`select prosrc from pg_proc where proname = '_ltot_cleanup_fav'`)).rows[0]?.prosrc || '';
+ok('_ltot_cleanup_fav deletes every fav_* table from Nov 2, 2026 00:00 Toronto', /2026-11-02 00:00:00 America\/Toronto/.test(favPurge) && ['fav_reports', 'fav_reactions', 'fav_replies', 'fav_pins'].every(t => favPurge.includes('delete from public.' + t)));
+ok('fav_create/react/reply/list/replies all call the purge first', (await asRoot(`select count(*)::int as n from pg_proc where proname in ('fav_create','fav_react','fav_reply','fav_report','fav_list','fav_replies') and prosrc like '%_ltot_cleanup_fav()%'`)).rows[0].n === 6);
 const purgeSrc = (await asRoot(`select prosrc from pg_proc where proname = '_ltot_cleanup_decor'`)).rows[0]?.prosrc || '';
 ok('_ltot_cleanup_decor deletes everything from Nov 2, 2026 00:00 Toronto', /2026-11-02 00:00:00 America\/Toronto/.test(purgeSrc) && /14 days/.test(purgeSrc));
 await db.exec('reset role');
@@ -232,11 +308,11 @@ await db.exec('reset role');
 // cleanup.sql runs
 const cleanup = readFileSync(process.argv[3], 'utf8');
 await db.exec(cleanup);
-ok('cleanup.sql empties every table', (await one(`select (select count(*) from marks)+(select count(*) from decor_marks)+(select count(*) from suggestions)+(select count(*) from posts)+(select count(*) from votes)+(select count(*) from reports) as n`)).n == 0);
+ok('cleanup.sql empties every table (v14: + fav_*)', (await one(`select (select count(*) from fav_pins)+(select count(*) from fav_replies)+(select count(*) from fav_reactions)+(select count(*) from fav_reports)+(select count(*) from marks)+(select count(*) from decor_marks)+(select count(*) from suggestions)+(select count(*) from posts)+(select count(*) from votes)+(select count(*) from reports) as n`)).n == 0);
 // The optional "drop everything" part (Step B) must name the right signatures.
 const stepB = cleanup.split('-- Step B')[1].split('\n').filter(l => /^-- (drop|  )/.test(l)).map(l => l.slice(3)).join('\n');
 const dropErr = await errx(stepB);
 const left = (await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`)).n;
-ok('cleanup.sql Step B (uncommented) removes every function and table', dropErr === null && left === 0 && (await one(`select to_regclass('public.marks') as t`)).t === null && (await one(`select to_regclass('public.decor_marks') as t`)).t === null, dropErr || `${left} functions left`);
+ok('cleanup.sql Step B (uncommented) removes every function and table', dropErr === null && left === 0 && (await one(`select to_regclass('public.marks') as t`)).t === null && (await one(`select to_regclass('public.decor_marks') as t`)).t === null && (await one(`select to_regclass('public.fav_pins') as t`)).t === null, dropErr || `${left} functions left`);
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

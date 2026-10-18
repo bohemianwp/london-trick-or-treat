@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=13';                    // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=14';                    // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -450,6 +450,66 @@
   }
   function charCount(s) { return Array.from(String(s || '')).length; }
 
+  // ==== v14: "Best streets from past years / 往年最佳街区" board ====
+  // A pin on a street (snapped to a ~50 m grid, never a house), a required preset tag, an optional note ≤ 80 chars,
+  // replies ≤ 60, 👍/❤️ once each per phone. Writes Oct 17 – Nov 1 00:00 Toronto; everything deleted Nov 2 00:00.
+  var FAV_TAGS = ['festive', 'candy', 'littlekids', 'walking'];
+  var FAV_ICON = { festive: '🏆', candy: '🍬', littlekids: '👨‍👩‍👧', walking: '🚶' };
+  var FAV_LAT_STEP = 0.00045, FAV_LNG_STEP = 0.0006, FAV_MAX = 80, FAV_REPLY_MAX = 60, FAV_MAX_DAY = 5, FAV_REPLY_MAX_DAY = 20, FAV_HIDE_AT = 3, FAV_FAMILIES_MIN = 3;
+  function isFavOpen(nowMs, demo) { return isDecorOpen(nowMs, demo); }
+  function favVisible(nowMs, demo) { return decorVisible(nowMs, demo); }
+  // Same as the server's _ltot_fav_snap: round to the grid, 5 decimals.
+  function favSnap(lat, lng) {
+    var f = function (v, st) { return Math.round(Math.round(v / st) * st * 1e5) / 1e5; };
+    return [f(+lat, FAV_LAT_STEP), f(+lng, FAV_LNG_STEP)];
+  }
+  var FW = '０１２３４５６７８９＠．／＃：＋', AS = '0123456789@./#:+';
+  function fullToAscii(s) { return String(s).replace(/[０-９＠．／＃：＋]/g, function (c) { return AS[FW.indexOf(c)]; }); }
+  var FAV_BAD_EN = /\b(dick|cock|pussy|piss|fag|nazi|kys|stfu|wtf)\b|kill\s+(yo)?u?r?self/i;
+  var FAV_BAD_ZH = /(煞笔|沙比|傻b|傻B|草泥马|艹你|婊子|贱人|賤人|王八蛋|狗日|滚蛋|尼玛|妈的|媽的|死全家|废物|白痴)/;
+  // Mirrors _ltot_fav_text: the shared rules plus house numbers, postal codes and a longer word list (EN + ZH).
+  function checkFavText(text, max, optional) {
+    var r = checkText(fullToAscii(text == null ? '' : text), { max: max, optional: optional });
+    if (!r.ok || !r.text) return r;
+    var s = r.text, noYears = s.replace(/(^|[^0-9])(19|20)[0-9]{2}(?![0-9])/g, '$1');
+    if (/#\s*[0-9]{2,}/.test(s) || /\b(no|num|number)\.?\s*#?\s*[0-9]{2,}/i.test(s) || /\b(house|home|apt|unit|suite|lot|address|addr)\.?\s*#?\s*[0-9]/i.test(s) ||
+        /[0-9]\s*(号|號|栋|棟|单元|單元|室|门牌|門牌)/.test(s) || /(门牌|門牌|地址)/.test(s) || /[a-z][0-9][a-z]\s?[0-9][a-z][0-9]/i.test(s) ||
+        /(^|[^0-9])[0-9]{3,5}(?![0-9])/.test(noYears)) return { ok: false, error: 'address' };
+    if (FAV_BAD_EN.test(s) || FAV_BAD_ZH.test(s)) return { ok: false, error: 'profanity' };
+    return r;
+  }
+  // Bubbles grow with 👍 + ❤️ (1× … 1.6×).
+  function favScale(likes, hearts) { return Math.round((1 + Math.min(0.6, Math.log2(1 + (likes || 0) + (hearts || 0)) * 0.15)) * 100) / 100; }
+  // Group pins whose projected points share a cellPx × cellPx square. project(lat, lng) -> {x, y}.
+  function clusterFav(pins, project, cellPx) {
+    var groups = {}, order = [];
+    pins.forEach(function (p) {
+      var pt = project(p.lat, p.lng), k = Math.floor(pt.x / cellPx) + ':' + Math.floor(pt.y / cellPx);
+      if (!groups[k]) { groups[k] = { pins: [], lat: 0, lng: 0, score: 0 }; order.push(k); }
+      groups[k].pins.push(p);
+    });
+    return order.map(function (k) {
+      var g = groups[k], n = g.pins.length;
+      g.lat = g.pins.reduce(function (a, p) { return a + p.lat; }, 0) / n;
+      g.lng = g.pins.reduce(function (a, p) { return a + p.lng; }, 0) / n;
+      g.score = g.pins.reduce(function (a, p) { return a + (p.likes || 0) + (p.hearts || 0); }, 0);
+      g.pins.sort(function (a, b) { return ((b.likes + b.hearts) - (a.likes + a.hearts)) || (b.createdAt - a.createdAt); });
+      return g;
+    });
+  }
+  // Families who remember a pin: distinct phones (author + 👍/❤️). Aggregate only; null below 3.
+  function favFamilies(authorHash, reactorHashes) {
+    var set = {}; set[authorHash] = 1; (reactorHashes || []).forEach(function (h) { set[h] = 1; });
+    var n = Object.keys(set).length;
+    return n >= FAV_FAMILIES_MIN ? n : null;
+  }
+  // Oct 31 3–11 PM: the bubble also asks "How is it tonight?" (taps lead into the fun-street mark).
+  function favTonight(nowMs, cfg) { return isLiveOpen(nowMs, cfg || {}, false) && nowMs >= DECOR_PRIMARY_FROM && nowMs < NIGHT_END_MS; }
+  function favRateOk(times, nowMs, max) {
+    var day = torontoDay(nowMs);
+    return times.filter(function (t) { return torontoDay(t) === day; }).length < max;
+  }
+
   // ==== board ====
   function visiblePosts(posts) { return posts.filter(function (p) { return (p.reports || 0) < 3 && !p.hidden; }); }
   function sortPosts(posts, how) {
@@ -573,7 +633,7 @@
     function on(v) { return v === '1' || v === 'true' || v === 'yes'; }
     var l = (q.lang || '').split(/[-_]/)[0];
     var step = parseInt(q.tourstep, 10);
-    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near), nudge: on(q.nudge), decor: on(q.decor),
+    return { guide: on(q.guide), howto: on(q.howto), lang: l === 'zh' || l === 'en' ? l : null, demo: on(q.demo), near: on(q.near), nudge: on(q.nudge), decor: on(q.decor), fav: on(q.fav),
              feedback: on(q.feedback), tour: on(q.tour), tourStep: step >= 1 ? step : null };
   }
   function guideSeen(storage) { try { return !!(storage && storage.getItem(GUIDE_KEY)); } catch (e) { return false; } }
@@ -654,6 +714,10 @@
     DECOR_TAGS: DECOR_TAGS, DECOR_ICON: DECOR_ICON, DECOR_OPEN: DECOR_OPEN, DECOR_PURGE_MS: DECOR_PURGE_MS, DECOR_KEEP_MS: DECOR_KEEP_MS,
     DECOR_MAX_DAY: DECOR_MAX_DAY, DECOR_PRIMARY_FROM: DECOR_PRIMARY_FROM, isDecorOpen: isDecorOpen, appPhase: appPhase, NIGHT_END_MS: NIGHT_END_MS, BUCKET_ICON: BUCKET_ICON, decorVisible: decorVisible, decorPrimary: decorPrimary,
     torontoDay: torontoDay, cleanDecorTags: cleanDecorTags, decorTagsValid: decorTagsValid, decorRate: decorRate, decorTopTag: decorTopTag,
-    aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang
+    aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang,
+    FAV_TAGS: FAV_TAGS, FAV_ICON: FAV_ICON, FAV_LAT_STEP: FAV_LAT_STEP, FAV_LNG_STEP: FAV_LNG_STEP, FAV_MAX: FAV_MAX, FAV_REPLY_MAX: FAV_REPLY_MAX,
+    FAV_MAX_DAY: FAV_MAX_DAY, FAV_REPLY_MAX_DAY: FAV_REPLY_MAX_DAY, FAV_HIDE_AT: FAV_HIDE_AT, FAV_FAMILIES_MIN: FAV_FAMILIES_MIN,
+    isFavOpen: isFavOpen, favVisible: favVisible, favSnap: favSnap, checkFavText: checkFavText, favScale: favScale, clusterFav: clusterFav,
+    favFamilies: favFamilies, favTonight: favTonight, favRateOk: favRateOk
   };
 });

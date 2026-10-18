@@ -26,6 +26,10 @@
                    Local/demo mode re-counts every 12 s and instantly when another tab marks.
                    本地/演示模式每 12 秒重算一次，别的标签页一标记就立刻更新。
 
+   favBoard        v14 board "Best streets from past years / 往年最佳街区" (true/false). It stays hidden by itself until the
+                   server has the board (supabase/v14_board.sql); set false to switch it off completely.
+                   v14「往年最佳街区」留言板。服务器还没运行 v14_board.sql 时会自动隐藏；设成 false 就完全关闭。
+
    A zone (hexagon) shows only when it has 3 or more marks — this is fixed, not a setting.
    一个热区（六边形）至少 3 个标记才会显示——这是固定的隐私规则，不能改。
 
@@ -41,5 +45,6 @@ window.TOT_CONFIG = {
   liveWindow: { date: '2026-10-31', start: '15:00', end: '23:00', tz: 'America/Toronto' },
   testWindow: { from: '2026-10-17', to: '2026-10-20', tz: 'America/Toronto' },   // shared test days (whole days, inclusive); remove after the test
   markWindowMin: 45,           // 30–60
-  pollSec: 45                  // 30–60
+  pollSec: 45,                 // 30–60
+  favBoard: true               // v14 "Best streets from past years" board. Hidden by itself until supabase/v14_board.sql is run; false = always off
 };

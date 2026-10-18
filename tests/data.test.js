@@ -25,15 +25,17 @@ test('data/areas.js is generated from areas_researched.json (run tools/gen_areas
 // v=10 (Oct 17) raised it to 220 KB: parent-focused share button, honest progress card, badges, curb hint (bilingual).
 // v=11/12 (Oct 17) raised it to 250 KB: Best decorations layer (decor marks, purple zones, list panel, bilingual guide/privacy text).
 // v=13 (Oct 17) raised it to 270 KB: two-phase banner + explainer, welcome card and How-to sections (bilingual text), 8 s card timer.
-test('size budget: own JS ≤ 270 KB (SPEC 8.4 was 150 KB, raised in v4, v6, v7, v10, v11 and v13; CDN libraries excluded); report JS + CSS', () => {
-  const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js', 'tour.js'];
+// v=14 (Oct 17) raised it to 310 KB, now counting sfx.js too: "Best streets from past years" board (bubbles, clustering, post form,
+// replies, reports, local adapter), bilingual board/privacy/How-to text, and Web Audio sound effects (no audio files).
+test('size budget: own JS ≤ 310 KB (SPEC 8.4 was 150 KB, raised in v4, v6, v7, v10, v11, v13 and v14; CDN libraries excluded); report JS + CSS', () => {
+  const files = ['app.js', 'lib.js', 'backend.js', 'hex.js', 'i18n.js', 'config.js', 'data/areas.js', 'tour.js', 'sfx.js'];
   const js = files.reduce((n, f) => n + fs.statSync(path.join(root, f)).size, 0);
   const css = fs.statSync(path.join(root, 'styles.css')).size;
   const gz = require('node:zlib').gzipSync(Buffer.concat(files.concat('styles.css').map((f) => fs.readFileSync(path.join(root, f)))), { level: 9 }).length;
   const demo = fs.statSync(path.join(root, 'demo.js')).size;
   console.log(`# own JS ${(js / 1024).toFixed(1)} KB + CSS ${(css / 1024).toFixed(1)} KB = ${((js + css) / 1024).toFixed(1)} KB raw, ${(gz / 1024).toFixed(1)} KB gzipped` +
               ` (+ demo.js ${(demo / 1024).toFixed(1)} KB, loaded only with ?demo=1)`);
-  assert.ok(js <= 270 * 1024, 'own JS ' + js);
+  assert.ok(js <= 310 * 1024, 'own JS ' + js);
 });
 
 test('10 researched areas, bilingual, inside London, sources dated Oct 2024–Oct 2026', () => {

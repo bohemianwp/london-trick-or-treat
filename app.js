@@ -16,7 +16,7 @@
   var DEMO = FLAGS.demo;
   var DEMO_HOME = [42.9628, -81.2390];                // ?demo=1&near=1 centres "Near me" here (Old South, near Wortley Rd)
   var P = DEMO ? 'ltot.demo.' : 'ltot.v3.';           // demo data never mixes with real data
-  var STORE = { shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
+  var STORE = { favTokens: P + 'mine.fav', favReports: P + 'mine.favReports', sound: 'ltot.sound', shared: 'ltot.sharedCount', lang: 'ltot.lang', locOk: 'ltot.locExplained', device: 'ltot.device', layers: 'ltot.v3.layers', markHint: 'ltot.markHintSeen',
                 session: P + 'session', markHist: P + 'mine.marks', suggestHist: P + 'mine.suggest',
                 postTokens: P + 'mine.posts', decorHist: P + 'mine.decor', votes: P + 'mine.votes', reports: P + 'mine.reports' };
   var PACE = { 'u5': 1.5, '5-8': 2.0, '9-12': 2.5, 'teen': 3.0 };   // km/h including door stops
@@ -26,6 +26,8 @@
   var EVENTS = ((RAW.meta || {}).events || []);
   var AREA_BY_ID = {};
   AREAS.forEach(function (a) { AREA_BY_ID[a.id] = a; });
+  // v14: tiny Web Audio sounds (sfx.js). They play only right after a tap and respect the 🔊/🔇 toggle.
+  var SFX = window.TOT_SFX || { play: function () { return false; }, isOn: function () { return false; }, toggle: function () { return false; } };
   var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ==== i18n ====
@@ -139,7 +141,10 @@
     avoid: function () { return zoneLayer && map.hasLayer(zoneLayer) ? zoneLayer.rects : []; } }) : null;
   var zoneLayer = HEX ? HEX.createZoneLayer(grid, { onTap: zonePopup, badgeHtml: badgeHtml,
     onLayout: function () { if (decorLayer && map.hasLayer(decorLayer)) decorLayer.setData(decorLayer.zones); } }) : null;
+  map.createPane('favPane'); map.getPane('favPane').style.zIndex = 610;   // v14 bubbles: above the hexagons and pins
+  var favLayer = L.layerGroup();
   var layers = {
+    fav: favLayer,
     zones: zoneLayer || L.layerGroup(),
     decor: decorLayer || L.layerGroup(),
     areas: L.layerGroup(),
@@ -148,7 +153,7 @@
   if (baseLayer) baseLayer.addTo(layers.areas);         // faint planning score lives with the "Suggested" base layer
   var mineLayer = L.layerGroup().addTo(map);            // sparkles where *I* marked (this phone only)
   var routeLayer = L.layerGroup().addTo(map);
-  var layerOn = Object.assign({ zones: true, decor: true, areas: true, events: true }, lsGet(STORE.layers, {}));
+  var layerOn = Object.assign({ fav: true, zones: true, decor: true, areas: true, events: true }, lsGet(STORE.layers, {}));
 
   function sheetHeight() { var s = $('sheet'); return s.dataset.open === 'true' && narrow() ? s.offsetHeight : 0; }
   function focusBounds(b) { map.fitBounds(b, { paddingTopLeft: [20, 110], paddingBottomRight: [20, sheetHeight() + 20], maxZoom: 16 }); }
@@ -161,6 +166,7 @@
     $('offlineChip').hidden = backend.mode !== 'offline';
     $('demoChip').hidden = !DEMO;
     $('practiceChip').hidden = markMode() !== 'practice';
+    document.querySelector('.topbar').classList.toggle('crowded', !$('offlineChip').hidden && !$('practiceChip').hidden);   // v14: room for 🔊
     renderPhase();
     document.querySelectorAll('.local-note').forEach(function (n) { n.hidden = backend.mode === 'supabase'; });
   }
@@ -172,12 +178,12 @@
   $('phaseBanner').addEventListener('click', openPhaseCard);
 
   // ==== layer chips ====
-  var LAYER_ICONS = { zones: '🔥', decor: '🎃', areas: '🧭', events: '📅' };
-  var LAYER_KEYS = { zones: 'layerZones', decor: 'layerDecor', areas: 'layerAreas', events: 'layerEvents' };
+  var LAYER_ICONS = { zones: '🔥', decor: '🎃', fav: '💬', areas: '🧭', events: '📅' };
+  var LAYER_KEYS = { zones: 'layerZones', decor: 'layerDecor', fav: 'layerFav', areas: 'layerAreas', events: 'layerEvents' };
   function decorLayerShown() { return LIB.decorVisible(Date.now(), DEMO); }
   function applyLayers() {
     Object.keys(layers).forEach(function (k) {
-      var on = !!layerOn[k] && (k !== 'decor' || decorLayerShown());
+      var on = !!layerOn[k] && (k !== 'decor' || decorLayerShown()) && (k !== 'fav' || favOn());
       if (on && !map.hasLayer(layers[k])) layers[k].addTo(map);
       if (!on && map.hasLayer(layers[k])) map.removeLayer(layers[k]);
     });
@@ -191,6 +197,7 @@
     bar.setAttribute('aria-label', t('layers'));
     Object.keys(LAYER_ICONS).forEach(function (k) {
       if (k === 'decor' && !decorLayerShown()) return;
+      if (k === 'fav' && !favOn()) return;
       bar.insertBefore(el('button', { type: 'button', class: 'lchip', 'aria-pressed': String(!!layerOn[k]), 'data-layer': k,
         onclick: function () { setLayer(k, !layerOn[k]); } }, [el('span', { class: 'li', text: LAYER_ICONS[k] }), t(LAYER_KEYS[k])]), nearChip);
     });
@@ -423,7 +430,7 @@
 
   // ==== map tap modes ====
   var mode = null; // 'start' | 'mark' | 'suggest' | null
-  var MODE_TEXT = { start: 'tapForStart', mark: 'tapForMark', suggest: 'tapForSuggest', decor: 'decorTapMap' };
+  var MODE_TEXT = { start: 'tapForStart', mark: 'tapForMark', suggest: 'tapForSuggest', decor: 'decorTapMap', fav: 'favTapMap' };
   function setMode(m) {
     mode = m;
     $('modeBanner').hidden = !m;
@@ -439,6 +446,7 @@
     if (m === 'mark') doMark([ll.lat, ll.lng]);
     if (m === 'suggest') openSuggest([ll.lat, ll.lng]);
     if (m === 'decor') pendDecor([ll.lat, ll.lng]);
+    if (m === 'fav') openFavForm([ll.lat, ll.lng]);
     return true;
   }
   map.on('click', function (e) { handleMapTap(e.latlng); });
@@ -491,6 +499,8 @@
       }
       celebrate();
       buzz();
+      SFX.play('boo');                                 // soft playful ghost; a new badge adds a tiny fanfare
+      if (badge) SFX.play('fanfare', 700);
       hideNudge();
       openMarkCard({ mode: mm, badge: badge });
       renderMine();
@@ -699,7 +709,7 @@
   function bigIsDecor() { return !tourZones && LIB.appPhase(phaseNow()) === 'decor' && LIB.isDecorOpen(phaseNow(), DEMO); }
   function renderPhase() {
     var ph = LIB.appPhase(phaseNow()), test = markMode() === 'test', dec = bigIsDecor();
-    var line = ph === 'decor' ? t('phasePre') : ph === 'night' ? t('phaseOn') : '';
+    var line = ph === 'decor' ? t(favOn() ? 'phasePreFav' : 'phasePre') : ph === 'night' ? t('phaseOn') : '';
     $('phaseBanner').hidden = !line && !test;
     $('phaseBanner').dataset.phase = ph;
     $('phaseLine').textContent = line; $('phaseLine').hidden = !line;
@@ -721,12 +731,18 @@
     var list = $('phaseList'), win = String(CFG.markWindowMin || 45);
     list.textContent = '';
     list.appendChild(el('button', { type: 'button', class: 'btn btn-small phase-jump', text: t('phaseJump'), onclick: function () { jumpOct31(); } }));
-    t('phaseItems').forEach(function (it, i) {
+    var items = t('phaseItems').slice(), oct31 = items[1][0];
+    if (favOn()) {                                      // v14: the past-years board, and what it does on Oct 31
+      items[1] = [items[1][0], items[1][1].concat(t('phaseOct31Fav'))];
+      items.splice(1, 0, t('phaseFavItem'));
+    }
+    items.forEach(function (it) {
       var body = Array.isArray(it[1]) ? el('ul', null, it[1].map(function (x) { return el('li', { text: x.replace('{win}', win) }); })) : document.createTextNode(it[1]);
-      list.appendChild(el('dt', { id: i === 1 ? 'phaseOct31' : null, text: it[0] }));
+      list.appendChild(el('dt', { id: it[0] === oct31 ? 'phaseOct31' : null, text: it[0] }));
       list.appendChild(el('dd', null, [body]));
     });
     $('phaseDecor').hidden = !LIB.decorVisible(Date.now(), DEMO);
+    $('phaseFav').hidden = !favOn();
     closeMarkCard();
     $('phaseCard').hidden = false;
     $('phaseOk').focus();
@@ -814,7 +830,7 @@
       $('markCardTags').hidden = true;
       $('markCardGift').hidden = false;
       $('markCardDone').textContent = t('done');
-      celebrate(); buzz();
+      celebrate(); buzz(); SFX.play('twinkle');
       armCardTimer();
       refreshDecor().then(function () { showDecorProgress(d.cell, before); });
     }, function (e) {
@@ -1187,6 +1203,216 @@
       .then(function () { btn.disabled = false; });
   });
 
+  // ==== v14: "Best streets from past years / 往年最佳街区" board ====
+  // Speech bubbles on streets (snapped to ~50 m, never a house). Hidden until the server has the board (v14_board.sql):
+  // favReady turns true only after the first list call succeeds, so a missing server never flashes anything.
+  var favPins = [], favReady = false, pendingFav = null, favTag = null, giftI = 0;
+  var favTokens = lsGet(STORE.favTokens, {}), favReportedMine = lsGet(STORE.favReports, {});
+  function favOn() { return favReady && backend.favAvailable() && LIB.favVisible(Date.now(), DEMO); }
+  function favTonightNow() { return LIB.favTonight(phaseNow(), CFG); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function trunc(s, n) { var a = Array.from(String(s || '')); return a.length > n ? a.slice(0, n - 1).join('') + '…' : a.join(''); }
+  function favZone(p) { var c = grid.cell(p.lat, p.lng); return (tourZones || data.zones).filter(function (z) { return z.cell === c; })[0] || null; }
+  function giftToast() { var m = t('giftToasts'); toast(m[giftI++ % m.length], 1800); }
+  function favErrText(e, max) {
+    var c = (e && e.code) || '';
+    if (c === 'rate') return t('favRate');
+    if (c === 'closed') return t('favClosed');
+    if (c === 'text:tooLong') return t('err_tooLong' + (max || 80));
+    return errText(e);
+  }
+  function favBubbleHtml(p, tonight, full) {
+    // User text is escaped; everything else is our own strings and numbers.
+    var line2, z = tonight ? favZone(p) : null;
+    if (tonight) line2 = (p.families ? '🏆 ' + p.families + ' · ' : '') + (z ? '🔥 ' + esc(t('favBubbleNow', { n: z.count })) : '🔥 ' + esc(t('favBubbleAsk')));
+    else line2 = '👍 ' + (p.likes || 0) + ' ❤️ ' + (p.hearts || 0);
+    return '<div class="favb' + (tonight ? ' favb-night' : '') + (favTokens[p.id] ? ' favb-mine' : '') + '" style="--s:' + LIB.favScale(p.likes, p.hearts) + '">' +
+      '<div class="fb-l1"><i>' + LIB.FAV_ICON[p.tag] + '</i>' + (full && p.body ? '<span class="fb-t">' + esc(trunc(p.body, 24)) + '</span>' : '') + '</div>' +
+      '<div class="fb-l2 mono-num">' + line2 + '</div></div>';
+  }
+  function renderFavLayer() {
+    favLayer.clearLayers();
+    if (!favOn() || tourZones) return;
+    var zm = map.getZoom(), tonight = favTonightNow(), full = zm >= 15;
+    var groups = full ? favPins.map(function (p) { return { pins: [p], lat: p.lat, lng: p.lng }; })
+      : LIB.clusterFav(favPins, function (la, ln) { return map.project([la, ln], zm); }, 72);
+    groups.forEach(function (g) {
+      var p = g.pins[0], many = g.pins.length > 1;
+      var html = many ? '<div class="favb favb-cluster" style="--s:' + LIB.favScale(g.score, 0) + '"><div class="fb-l1"><i>💬</i><b class="mono-num">' + g.pins.length + '</b></div></div>'
+        : favBubbleHtml(p, tonight, full);
+      L.marker([g.lat, g.lng], { pane: 'favPane', keyboard: true, title: many ? t('favCluster', { n: g.pins.length }) : t('ftag_' + p.tag),
+        icon: L.divIcon({ className: 'favicon', html: html, iconSize: null }) })
+        .on('click', function (e) {
+          if (mode) { handleMapTap(e.latlng); return; }
+          if (many) map.flyTo([g.lat, g.lng], Math.min(16, Math.max(zm + 2, 15)), { duration: REDUCED ? 0 : 0.6 });
+          else favPopup(p);
+        }).addTo(favLayer);
+    });
+  }
+  function reactBtn(p, kind) {
+    var on = kind === 'like' ? p.myLike : p.myHeart, n = kind === 'like' ? p.likes : p.hearts;
+    return el('button', { type: 'button', class: 'btn btn-small fav-rx' + (on ? ' on' : ''), 'aria-pressed': String(!!on), 'data-kind': kind,
+      'aria-label': t(kind === 'like' ? 'favLike' : 'favHeart'), onclick: function (e) { doFavReact(p, kind, e.currentTarget); } },
+      [kind === 'like' ? '👍 ' : '❤️ ', el('b', { class: 'mono-num', text: String(n || 0) })]);
+  }
+  function doFavReact(p, kind, btn) {
+    if (kind === 'like' ? p.myLike : p.myHeart) { toast(t('favAlready'), 1800); return; }
+    btn.disabled = true;
+    backend.favReact(DEVICE, p.id, kind).then(function (r) {
+      p.likes = r.likes; p.hearts = r.hearts;
+      if (kind === 'like') p.myLike = true; else p.myHeart = true;
+      btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
+      btn.querySelector('b').textContent = String(kind === 'like' ? r.likes : r.hearts);
+      if (r.added) { giftToast(); SFX.play('chime'); } else toast(t('favAlready'), 1800);
+      renderFavLayer(); if (currentTab === 'fav') renderFavList();
+    }, function (e) { toast(favErrText(e), 4000); }).then(function () { btn.disabled = false; });
+  }
+  function doFavReport(kind, id, after) {
+    if (favReportedMine[id]) { toast(t('favAlreadyReported'), 2500); return; }
+    backend.favReport(DEVICE, kind, id).then(function (r) {
+      favReportedMine[id] = 1; lsSet(STORE.favReports, favReportedMine);
+      toast(r && r.already ? t('favAlreadyReported') : t('favReported'), 3000);
+      if (after) after();
+    }, function (e) { toast(favErrText(e), 4000); });
+  }
+  function loadReplies(p, ul) {
+    backend.favReplies(p.id).then(function (list) {
+      ul.textContent = '';
+      if (!list.length) ul.appendChild(el('li', { class: 'pop-small', text: t('favNoReplies') }));
+      list.forEach(function (r) {
+        var mine = !!favTokens['r:' + r.id];
+        ul.appendChild(el('li', { class: 'fav-reply' }, [
+          el('span', { class: 'fr-body', text: r.body }),
+          el('small', { class: 'mono-num', text: ' · ' + ago(r.createdAt) }),
+          mine ? el('button', { type: 'button', class: 'fr-x', 'aria-label': t('del'), text: '✕', onclick: function () {
+            backend.favDelete('reply', r.id, favTokens['r:' + r.id]).then(function () { delete favTokens['r:' + r.id]; lsSet(STORE.favTokens, favTokens); p.replies = Math.max(0, p.replies - 1); loadReplies(p, ul); }, function (e) { toast(favErrText(e), 4000); });
+          } }) : el('button', { type: 'button', class: 'fr-x', 'aria-label': t('report'), title: t('report'), text: '⚑', onclick: function () { doFavReport('reply', r.id, function () { loadReplies(p, ul); }); } })
+        ]));
+      });
+    }, function () { /* keep */ });
+  }
+  function favPopup(p) {
+    var mine = !!favTokens[p.id], tonight = favTonightNow(), z = tonight ? favZone(p) : null;
+    var ul = el('ul', { class: 'fav-replies' });
+    var inp = el('input', { type: 'text', class: 'fav-reply-in', maxlength: '60', placeholder: t('favReplyPh'), 'aria-label': t('favReplyPh') });
+    var err = el('div', { class: 'err', role: 'alert', hidden: 'hidden' });
+    var send = el('button', { type: 'button', class: 'btn btn-small btn-primary', text: t('favReplySend'), onclick: function () {
+      var chk = LIB.checkFavText(inp.value, LIB.FAV_REPLY_MAX, false);
+      var showE = function (m) { err.textContent = m; err.hidden = !m; };
+      if (!chk.ok) { showE(chk.error === 'tooLong' ? t('err_tooLong60') : t('err_' + chk.error)); return; }
+      var token = LIB.randomHex(40);
+      send.disabled = true;
+      backend.favReply(DEVICE, p.id, chk.text, token).then(function (r) {
+        favTokens['r:' + r.id] = token; lsSet(STORE.favTokens, favTokens);
+        inp.value = ''; showE(''); p.replies = (p.replies || 0) + 1;
+        giftToast(); SFX.play('chime');
+        loadReplies(p, ul);
+      }, function (e) { showE(favErrText(e, 60)); }).then(function () { send.disabled = false; });
+    } });
+    inp.addEventListener('input', function () { err.hidden = true; });
+    var mem = p.families ? t('favMemory', { n: p.families }) : null;
+    var box = el('div', { class: 'pop pop-fav' }, [
+      el('div', { class: 'pop-title', text: LIB.FAV_ICON[p.tag] + ' ' + t('ftag_' + p.tag) + (mine ? ' · ' + t('favMine') : '') }),
+      p.body ? el('p', { class: 'pop-p fav-body', text: p.body }) : null,
+      tonight ? el('button', { type: 'button', class: 'btn btn-primary btn-block fav-tonight', onclick: function () { map.closePopup(); startMark(); } }, [
+        mem ? el('span', { class: 'ft-line', text: mem }) : null,
+        z ? el('span', { class: 'ft-line', text: t('favTonightLit', { n: z.count, bucket: t(BUCKET_KEY[z.bucket]), icon: LIB.BUCKET_ICON[z.bucket] }) }) : null,
+        el('span', { class: 'ft-ask', text: t('favTonightAsk') })
+      ]) : (mem ? el('div', { class: 'pop-sub fav-mem', text: mem }) : null),
+      el('div', { class: 'row row-tight fav-rxrow' }, [reactBtn(p, 'like'), reactBtn(p, 'heart'), el('small', { class: 'pop-small mono-num', text: ago(p.createdAt) })]),
+      el('div', { class: 'pop-label', text: t('favReplies', { n: p.replies || 0 }) }),
+      ul,
+      el('div', { class: 'fav-replyrow' }, [inp, send]), err,
+      el('div', { class: 'row row-tight' }, [mine
+        ? el('button', { type: 'button', class: 'btn btn-small btn-danger', text: t('del'), onclick: function () {
+            if (!window.confirm(t('favConfirmDel'))) return;
+            backend.favDelete('pin', p.id, favTokens[p.id]).then(function () { delete favTokens[p.id]; lsSet(STORE.favTokens, favTokens); map.closePopup(); refreshFav(); }, function (e) { toast(favErrText(e), 4000); });
+          } })
+        : el('button', { type: 'button', class: 'btn btn-small btn-ghost', text: t('favReport'), onclick: function () { doFavReport('pin', p.id, function () { map.closePopup(); refreshFav(); }); } })])
+    ]);
+    L.popup({ maxWidth: 290, minWidth: 250, className: 'fav-popup', autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR })
+      .setLatLng([p.lat, p.lng]).setContent(box).openOn(map);
+    loadReplies(p, ul);
+  }
+  function renderFavList() {
+    var ul = $('favList'); if (!ul) return;
+    ul.textContent = '';
+    $('favStatus').hidden = backend.favShared() || DEMO;
+    $('favStatus').textContent = t('favLocal');
+    $('favPinBtn').disabled = !LIB.isFavOpen(Date.now(), DEMO);
+    if (!favPins.length) { ul.appendChild(el('li', { class: 'hint', text: t('favEmpty') })); return; }
+    favPins.slice(0, 12).forEach(function (p) {
+      ul.appendChild(el('li', { class: 'near-row' }, [el('button', { type: 'button', class: 'near-main fav-row', onclick: function () {
+        if (narrow()) setSheetOpen(false);
+        map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16), { animate: false });
+        favPopup(p);
+      } }, [el('span', { class: 'fr-i', text: LIB.FAV_ICON[p.tag] }), el('span', { class: 'fr-t', text: p.body ? trunc(p.body, 40) : t('ftag_' + p.tag) }),
+        el('b', { class: 'mono-num', text: '👍 ' + (p.likes || 0) + ' ❤️ ' + (p.hearts || 0) })])]));
+    });
+  }
+  function renderFavAll() { renderFavLayer(); if (currentTab === 'fav') renderFavList(); }
+  function favStatusChanged() {
+    applyLayers(); renderPhase(); renderHowto(); renderPrivacy();
+    if (!$('guide').hidden) renderGuide();
+    if (!favOn() && currentTab === 'fav') openTab('board');
+    renderFavAll();
+  }
+  function refreshFav() {
+    if (CFG.favBoard === false || !LIB.favVisible(Date.now(), DEMO)) {
+      var was0 = favReady; favReady = false; favPins = [];
+      if (was0) favStatusChanged(); else renderFavAll();
+      return Promise.resolve();
+    }
+    return backend.favList(DEVICE).then(function (rows) {
+      var was = favReady;
+      favReady = backend.favAvailable() && backend.favConfirmed;
+      favPins = (rows || []).filter(function (p) { return LIB.inLondonBox(p.lat, p.lng) && LIB.FAV_TAGS.indexOf(p.tag) >= 0; });
+      if (was !== favReady) favStatusChanged(); else renderFavAll();
+    }, function () { /* keep last */ });
+  }
+  map.on('zoomend', renderFavLayer);
+  // posting: tap the button, then the street; pick one tag (required) and an optional note
+  $('favPinBtn').addEventListener('click', function () {
+    if (!LIB.isFavOpen(Date.now(), DEMO)) { toast(t('favClosed'), 5000); return; }
+    map.closePopup(); setMode('fav');
+  });
+  function openFavForm(pos) {
+    if (!LIB.inLondonBox(pos[0], pos[1])) { toast(t('err_outside'), 5000); return; }
+    pendingFav = LIB.favSnap(pos[0], pos[1]); favTag = null;
+    renderFavTags();
+    $('favNote').value = ''; updateCount('favNote', 'favCount', 80); showErr('favErr', '');
+    $('favDialog').showModal();
+  }
+  function renderFavTags() {
+    var box = $('favTags'); box.textContent = '';
+    LIB.FAV_TAGS.forEach(function (tag) {
+      box.appendChild(el('button', { type: 'button', class: 'tagbtn tagbtn-fav', role: 'radio', 'aria-checked': String(favTag === tag), 'aria-pressed': String(favTag === tag), 'data-tag': tag,
+        onclick: function () { favTag = tag; renderFavTags(); showErr('favErr', ''); } }, [el('span', { class: 'tg-i', text: LIB.FAV_ICON[tag] }), t('ftag_' + tag)]));
+    });
+  }
+  $('favNote').addEventListener('input', function () { updateCount('favNote', 'favCount', 80); showErr('favErr', ''); });
+  $('favCancel').addEventListener('click', function () { $('favDialog').close(); pendingFav = null; });
+  $('favSend').addEventListener('click', function () {
+    if (!pendingFav) return;
+    if (!favTag) { showErr('favErr', t('favNeedTag')); return; }
+    var chk = LIB.checkFavText($('favNote').value, LIB.FAV_MAX, true);
+    if (!chk.ok) { showErr('favErr', chk.error === 'tooLong' ? t('err_tooLong80') : t('err_' + chk.error)); return; }
+    var token = LIB.randomHex(40), btn = $('favSend'), pos = pendingFav;
+    btn.disabled = true;
+    backend.favCreate({ device: DEVICE, lat: pos[0], lng: pos[1], tag: favTag, body: chk.text || null }, token).then(function (r) {
+      favTokens[r.id] = token; lsSet(STORE.favTokens, favTokens);
+      $('favDialog').close(); pendingFav = null;
+      giftToast(); SFX.play('chime');
+      if (!layerOn.fav) setLayer('fav', true);
+      return refreshFav().then(function () {
+        var p = favPins.filter(function (x) { return x.id === r.id; })[0];
+        if (p) { if (narrow()) setSheetOpen(false); map.setView([p.lat, p.lng], Math.max(map.getZoom(), 16), { animate: false }); favPopup(p); }
+      });
+    }, function (e) { showErr('favErr', favErrText(e, 80)); }).then(function () { btn.disabled = false; });
+  });
+  $('favBoardLink').addEventListener('click', function () { openTab('board'); });
+  $('phaseFav').addEventListener('click', function () { closePhaseCard(); openTab('fav'); });
+
   // ==== board ====
   var board = { which: 'fun', sort: 'top' };
   segInit('boardSeg', function (v) { board.which = v; renderPosts(); });
@@ -1266,7 +1492,7 @@
   var refreshing = null;
   function refreshAll() {
     if (refreshing) return refreshing;
-    refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested(), refreshDecor()]).then(function () { refreshing = null; }, function () { refreshing = null; });
+    refreshing = Promise.all([refreshZones(), refreshPosts(), refreshSuggested(), refreshDecor(), refreshFav()]).then(function () { refreshing = null; }, function () { refreshing = null; });
     return refreshing;
   }
   // Shared server: poll every 30–60 s. Local/demo: re-count every 12 s (and at once when another tab marks).
@@ -1333,20 +1559,35 @@
   function renderPrivacy() {
     var dl = $('privacyList');
     dl.textContent = '';
-    t('privacyItems').forEach(function (it) { dl.appendChild(el('dt', { text: it[0] })); dl.appendChild(el('dd', { text: it[1] })); });
+    var items = t('privacyItems').slice();
+    if (favOn()) items.splice(6, 0, t('privacyFav'));   // v14: after "Decoration marks"
+    items.forEach(function (it) { dl.appendChild(el('dt', { text: it[0] })); dl.appendChild(el('dd', { text: it[1] })); });
   }
   document.querySelectorAll('.privacy-link').forEach(function (b) { b.addEventListener('click', function () { openTab('privacy'); }); });
   function toggleTab(name) { openTab(currentTab === name && $('sheet').dataset.open === 'true' ? null : name); }
   $('safetyBtn').addEventListener('click', function () { toggleTab('safety'); });
+  function renderSoundBtn() {
+    var on = SFX.isOn(), b = $('soundBtn');
+    b.textContent = on ? '🔊' : '🔇';
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', t(on ? 'soundOnAria' : 'soundOffAria')); b.title = t(on ? 'soundOnAria' : 'soundOffAria');
+  }
+  $('soundBtn').addEventListener('click', function () {
+    var on = SFX.toggle();
+    renderSoundBtn();
+    toast(t(on ? 'soundToastOn' : 'soundToastOff'), 1800);
+    if (on) SFX.play('chime');                         // the tap itself is the user action
+  });
   $('helpBtn').addEventListener('click', function () { toggleTab('guide'); });
-  $('boardBtn').addEventListener('click', function () { toggleTab('board'); });
-  $('guideBoard').addEventListener('click', function () { openTab('board'); });
+  // v14: 🏆 opens "Best streets from past years" once the server has it (the parent board is linked from there)
+  $('boardBtn').addEventListener('click', function () { toggleTab(favOn() ? 'fav' : 'board'); });
+  $('guideBoard').addEventListener('click', function () { openTab(favOn() ? 'fav' : 'board'); });
   $('guideSafety').addEventListener('click', function () { openTab('safety'); });
 
   // ==== tabs / sheet / language ====
   var currentTab = null;
-  var PANELS = ['map', 'near', 'decor', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
-  var TAB_OF = { decor: 'mark', near: 'map', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
+  var PANELS = ['map', 'near', 'decor', 'fav', 'route', 'guide', 'board', 'safety', 'privacy', 'feedback'];
+  var TAB_OF = { decor: 'mark', near: 'map', fav: 'guide', board: 'guide', safety: 'guide', privacy: 'guide', feedback: 'guide' };
   function markCurrent() {
     var open = $('sheet').dataset.open === 'true', tab = TAB_OF[currentTab] || currentTab;
     document.querySelectorAll('.tabbar button').forEach(function (b) {
@@ -1366,6 +1607,7 @@
     $('sheet').scrollTop = 0;
     if (name === 'near') renderNear();
     if (name === 'decor') renderDecorList();
+    if (name === 'fav') renderFavList();
     if (name === 'feedback') updateFeedback();
   }
   document.querySelector('.tabbar').addEventListener('click', function (e) {
@@ -1401,6 +1643,7 @@
     $('helpBtn').setAttribute('aria-label', t('helpAria')); $('helpBtn').title = t('helpAria');
     $('boardBtn').setAttribute('aria-label', t('boardAria')); $('boardBtn').title = t('boardAria');
     $('markCardClose').setAttribute('aria-label', t('close'));
+    renderSoundBtn();
     $('tourBtn').setAttribute('aria-label', t('tourAria')); $('tourBtn').title = t('tourAria');
     ['practiceChip', 'offlineChip'].forEach(function (id) {   // "🧪 Practice mode": the words hide on narrow screens, the icon stays
       var s = t(id), i = s.indexOf(' '), b = $(id);
@@ -1424,6 +1667,7 @@
     if (decorLayer) decorLayer.setData(tourZones ? [] : data.decorZones);
     renderDecorBtn();
     if (currentTab === 'decor') renderDecorList();
+    renderFavAll();
     if (!$('guide').hidden) renderGuide();
     if (!$('markCard').hidden) { renderTagRow(); }
     if (currentTab === 'near') renderNear();
@@ -1505,6 +1749,7 @@
     if (n >= LIB.MIN_ZONE) tourZones.push(tourZone(TOUR_SPOT, n, null, true, now));   // 3+ rule applies to the demo too
     if (zoneLayer) zoneLayer.setData(tourZones);
     if (decorLayer) decorLayer.setData([]);
+    favLayer.clearLayers();
     renderPhase();
   }
   function tourReset() {
@@ -1545,7 +1790,7 @@
     map.setView(snap.center, snap.zoom, { animate: false });
     if (zoneLayer) zoneLayer.setData(data.zones);
     if (decorLayer) decorLayer.setData(data.decorZones);
-    renderDecorBtn();
+    renderDecorBtn(); renderFavLayer();
     if (snap.open && snap.tab) openTab(snap.tab); else { currentTab = snap.tab; setSheetOpen(false); }
   }
   function tourRect(step) {                                 // step 4: ring around the demo zone instead of the whole map
@@ -1570,7 +1815,7 @@
       var card = el('section', { class: 'gcard', 'aria-labelledby': 'gcardH' + i }, [
         el('div', { class: 'gnum mono', text: '0' + (i + 1) }),
         el('h2', { id: 'gcardH' + i, text: c[0] }),
-        el('ul', { class: 'glist' }, c[1].map(function (line) { return el('li', { text: line }); }))
+        el('ul', { class: 'glist' }, (i === 0 && favOn() ? c[1].concat(t('guideFavLine')) : i === 3 ? c[1].concat(t('guideSoundLine')) : c[1]).map(function (line) { return el('li', { text: line }); }))
       ]);
       if (i === 0) card.appendChild(el('div', { class: 'gbtn-demo gbtn-decor', 'aria-hidden': 'true' }, [el('span', { text: '🎃 ' + t('decorMain') })]));
       if (i === 1) card.appendChild(el('div', { class: 'glegend' }, [el('b', { text: t('guideLegend') })].concat(['quiet', 'lively', 'hot'].map(function (k) {
@@ -1652,7 +1897,13 @@
   function renderHowto() {
     var box = $('howtoList');
     box.textContent = '';
-    t('howtoSections').forEach(function (sec) {
+    var secs = t('howtoSections').slice();
+    if (favOn()) {                                      // v14 section right after "Best decorations"
+      var di = secs.map(function (x) { return x[0]; }).findIndex(function (h) { return h.indexOf('🎃') === 0; });
+      secs.splice(di + 1, 0, t('howtoFav'));
+    }
+    secs.splice(secs.length - 1, 0, t('howtoSound'));   // v14 sounds, just before Privacy
+    secs.forEach(function (sec) {
       box.appendChild(el('h3', { text: sec[0] }));
       box.appendChild(el('ul', null, sec[1].map(function (line) { return el('li', { text: line }); })));
     });
@@ -1729,6 +1980,7 @@
     if (DEMO && !FLAGS.near && !FLAGS.tour) fitDemoZones();
     if (FLAGS.near) openNear();
     if (FLAGS.decor) openTab('decor');
+    if (FLAGS.fav && favOn()) openTab('fav');
     return langReady;                                   // the tour waits for the language choice
   }).then(function () {
     if (FLAGS.tour) startTour(FLAGS.tourStep ? FLAGS.tourStep - 1 : 0, !!FLAGS.tourStep);
@@ -1748,7 +2000,7 @@
                                                  base: baseLayer ? baseLayer.drawn : 0, baseMs: baseLayer ? baseLayer.lastDrawMs : 0, grid: grid.kind } : null; },
     refresh: refreshAll, refreshZones: refreshZones, setStart: setStart, buildLoop: buildLoop, openTab: openTab, setLayer: setLayer,
     openGuide: openGuide, closeGuide: closeGuide, startMark: startMark, tour: tour, startTour: startTour, appNow: appNow,
-    feedbackMail: feedbackMail, openPhaseCard: openPhaseCard, pauseCard: pauseCard, resumeCard: resumeCard, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
+    feedbackMail: feedbackMail, openPhaseCard: openPhaseCard, pauseCard: pauseCard, resumeCard: resumeCard, pendDecor: pendDecor, sendPendingDecor: sendPendingDecor, refreshFav: refreshFav, favPopup: favPopup, openFavForm: openFavForm, favPins: function () { return favPins; }, renderFavLayer: renderFavLayer, SFX: SFX, refreshDecor: refreshDecor, decorLayer: decorLayer, tourZones: function () { return tourZones; }, doMark: doMark, openNear: openNear, openSuggest: openSuggest,
     state: function () {
       return { lang: lang, mode: backend.mode, markMode: markMode(), marks: backend.local.markCount(), zones: data.zones.map(function (z) {
                  return { cell: z.cell, count: z.count, bucket: z.bucket, isNew: z.isNew, topTag: z.topTag };
@@ -1756,6 +2008,7 @@
                decorZones: data.decorZones.map(function (z) { return { cell: z.cell, count: z.count, topTag: z.topTag }; }),
                decorShared: backend.decorShared(), decorMissing: !!backend.decorMissing, myDecor: decorHist.length,
                phase: LIB.appPhase(phaseNow()), bigIsDecor: bigIsDecor(),
+               favOn: favOn(), favMissing: !!backend.favMissing, favPins: favPins.length, favTonight: favTonightNow(), sound: SFX.isOn(),
                myMarks: markHist.length, celebrations: celebrations, layers: Object.assign({}, layerOn), tab: currentTab };
     }
   };

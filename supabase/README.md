@@ -146,3 +146,14 @@ Details in the main [README](../README.md). 详见主 [README](../README.md)。
   It has **not** been run on a real Supabase project yet.
   `schema.sql` 在 PGlite（WebAssembly 版的真 Postgres 17）上按 Supabase 的角色设置测过：75/75 通过，
   包括连跑两次、以及在旧版 v2 上直接跑。**还没在真 Supabase 项目上跑过。**
+
+## v14 board: "Best streets from past years / 往年最佳街区" (`v14_board.sql`)
+- Run `supabase/v14_board.sql` ONCE in SQL Editor → New query → paste → Run (safe to run again). The last result row
+  should read `v14 board ready | 4 | 7` (4 fav_* tables, 7 RPCs).
+  在 SQL Editor 里新建查询，粘贴 `v14_board.sql` 全文并运行一次（重复运行也安全）。最后一行结果应为 `v14 board ready | 4 | 7`。
+- Until it is run the app hides the board by itself (the server answers PGRST202). `favBoard: false` in config.js turns it off.
+  运行之前 app 会自动隐藏留言板；config.js 里 `favBoard: false` 可以彻底关闭。
+- Pins are snapped to ~50 m on the server, text is filtered (EN + ZH), 3 reports hide, everything is deleted Nov 2, 2026.
+  标记在服务器上挪到约 50 米网格，文字过滤（中英），3 次举报隐藏，2026 年 11 月 2 日全部删除。
+- Tested in PGlite: 150/150 (fresh schema.sql, and old schema + v11 + v14_board.sql). Check afterwards with
+  `node tests/supabase_smoke.mjs` (its one test pin is deleted again; `SMOKE_NO_ROWS=1` skips it).
