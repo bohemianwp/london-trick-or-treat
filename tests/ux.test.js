@@ -191,7 +191,11 @@ test('v15.1 area scores: Halloween orange dots that pass 3:1 on the popup navy',
 test('v15.1 How-to feature cards: where + real button + How + Why + Show me (EN + ZH)', () => {
   assert.match(html, /<div id="howtoCards" class="hcards"><\/div>\s*<details id="howtoMore" class="phasemore"><summary data-i18n="hcMoreLbl">/);
   assert.match(app, /var kinds = bigIsDecor\(\) \? \['decor', 'fav', 'fun', 'like'\] : \['fun', 'fav', 'like', 'decor'\];/);
-  assert.match(app, /function showMe\(kind\)[\s\S]{0,1200}showme-ring[\s\S]{0,400}setTimeout\(function \(\) \{ ring\.remove\(\); \}, 2000\)/, 'Show me rings the real button for 2 s');
+  assert.match(app, /function showMe\(kind\)[\s\S]{0,1200}showme-ring[\s\S]{0,400}showMeT = setTimeout\(clearShowMe, 2000\)/, 'Show me rings the real button for 2 s');
+  // v15.5 (Peng 10:09: "当我移动地图的时候会出现气泡不消失"): the fixed ring and any tip clear when the map moves or on any touch
+  assert.match(app, /map\.on\('movestart zoomstart', clearShowMe\)/);
+  assert.match(app, /document\.addEventListener\('pointerdown', clearShowMe, true\)/);
+  assert.match(app, /map\.on\('movestart zoomstart', function \(\) \{ cancelPress\(\); hideTip\(\); \}\)/);
   assert.match(app, /'data-tip-key': 'tip_showMe'/);
   for (const l of ['en', 'zh']) {
     assert.ok(I[l].hcShowMe && I[l].hcMoreLbl && I[l].tip_showMe && I[l].hcNotNow, l);

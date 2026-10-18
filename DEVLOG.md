@@ -336,3 +336,11 @@ Peng, 9:27 AM: "核实活动今年是否存在，确保100%真实" ("Verify each
 - The full smoke run leaves one test suggestion, which anon can't delete. Remove it with the one-line SQL (`halloween_app/sqlserve/v14_smoke_cleanup.txt`) or `supabase/cleanup.sql`.
 - After the test days (Oct 21), wipe test-day fun-street marks (see `supabase/v7_update.sql`).
 - For Halloween night, consider a keyed tile provider if traffic is high (OSM tile policy).
+
+## v=15.5 — Oct 18, 2026, ~10:30 AM EDT: the "Show me" ring no longer gets left behind
+
+**Peng's request (10:09 AM):** "当我移动地图的时候会出现气泡不消失" ("When I move the map, a bubble appears and doesn't go away"), with a phone photo showing an empty white oval in the middle of the map.
+
+**Why:** the How-to "👀 Show me" ring (v15.1) is drawn at a fixed spot on the screen. When the map is dragged, the bubble it points at moves away but the ring stays put, so it looks like a broken, empty bubble. Press-and-hold tips had the same weakness.
+
+**What changed:** the ring now disappears as soon as the map moves or zooms, or when anything is touched, and it still disappears after 2 s on its own. Tips also hide when the map moves, and any new touch clears an old tip. Tests: 122/122 unit, 192/192 headless.

@@ -2023,6 +2023,11 @@
     });
     return best;
   }
+  // v15.5: the ring is fixed on screen, so it goes as soon as the map moves or the user touches anything (Peng saw it left behind)
+  var showMeRing = null, showMeT = null;
+  function clearShowMe() { clearTimeout(showMeT); showMeT = null; if (showMeRing) { showMeRing.remove(); showMeRing = null; } }
+  map.on('movestart zoomstart', clearShowMe);
+  document.addEventListener('pointerdown', clearShowMe, true);
   function showMe(kind) {
     setSheetOpen(false);
     if (kind === 'like' && favPins.length) {
@@ -2036,8 +2041,8 @@
       var r = tg.getBoundingClientRect(), ring = el('div', { class: 'showme-ring', 'aria-hidden': 'true' });
       ring.style.left = (r.left - 6) + 'px'; ring.style.top = (r.top - 6) + 'px';
       ring.style.width = (r.width + 12) + 'px'; ring.style.height = (r.height + 12) + 'px';
-      document.body.appendChild(ring);
-      setTimeout(function () { ring.remove(); }, 2000);
+      clearShowMe(); document.body.appendChild(ring); showMeRing = ring;
+      showMeT = setTimeout(clearShowMe, 2000);
     }, 350);
   }
   function renderHowto() {
@@ -2098,7 +2103,7 @@
   }
   function cancelPress() { clearTimeout(pressT); pressT = null; pressAt = null; }
   document.addEventListener('pointerdown', function (e) {
-    hideTipHint();
+    hideTipHint(); hideTip();                             // v15.5: any new touch/click clears an old tip
     if (e.pointerType === 'mouse') return;
     var n = tipTarget(e.target); if (!n) return;
     cancelPress(); pressAt = [e.clientX, e.clientY];
@@ -2131,6 +2136,7 @@
   });
   document.addEventListener('focusout', function (e) { if (tipFor && tipFor === tipTarget(e.target)) hideTip(); });
   window.addEventListener('scroll', hideTip, true);
+  map.on('movestart zoomstart', function () { cancelPress(); hideTip(); });   // v15.5: a tip never stays behind when the map moves
   // One-time hint on the first visit (after the welcome cards): "Press and hold any button for a tip".
   var tipHintT = null;
   function hideTipHint() { var h = $('tipHint'); if (h && !h.hidden) { h.hidden = true; clearTimeout(tipHintT); } }
