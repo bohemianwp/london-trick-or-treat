@@ -987,3 +987,8 @@ body.has-favshare .markcard:not(.phasecard) { bottom: 130px; }
   animation: showMe .5s ease-in-out 4 alternate; }
 @keyframes showMe { to { transform: scale(1.06); opacity: .75; } }
 @media (prefers-reduced-motion: reduce) { .hp-target, .showme-ring { animation: none; } }
+
+/* v15.2: the cream sample on welcome card 2 (same look as the real button); the pin prompt's Cancel never wraps */
+.gbtn-demo.gbtn-fav { background: rgba(22,32,51,.96); border: 1.5px solid #fff7e8; color: #fff7e8; }
+#modeText { flex: 1 1 auto; min-width: 0; }
+.mode-banner .btn { flex: none; white-space: nowrap; min-width: 64px; }

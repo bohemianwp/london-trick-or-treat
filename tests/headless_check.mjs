@@ -141,8 +141,8 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('page loads with no JS errors (390×844)', realErrors(p).length === 0, realErrors(p).join(' | '));
   check('first visit: v15 welcome = 3 short cards (Find the fun / Share in one tap / Safe & private)', await p.ev(`!document.getElementById('guide').hidden && document.querySelectorAll('#guideTrack .gcard').length===3`) &&
     /^01Find the fun/.test(await p.ev(`document.querySelector('#guideTrack .gcard').textContent`)));
-  check('card 2 shows both buttons; card 3 has safety, the tip hint and ▶ demo', /Share in one tap/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
-    await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].querySelectorAll('.gbtn-demo').length===2`) &&
+  check('card 2 shows the purple, cream and orange sample buttons; card 3 has safety, the tip hint and ▶ demo', /Share in one tap/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].textContent`)) &&
+    await p.ev(`document.querySelectorAll('#guideTrack .gcard')[1].querySelectorAll('.gbtn-demo').length===3 && !!document.querySelectorAll('#guideTrack .gcard')[1].querySelector('.gbtn-fav')`) &&
     /grown-up[\s\S]*Press and hold any button to see what it does[\s\S]*25-second demo/.test(await p.ev(`document.querySelectorAll('#guideTrack .gcard')[2].textContent`)));
   await p.shot('v3-guide-en.png');
   for (let i = 0; i < 2; i++) { await p.click('#guideNext'); await sleep(350); }
@@ -455,6 +455,9 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
       await send('Target.closeTarget', { targetId: p.targetId }); continue;
     }
     await p.tap(fb.l + fb.w / 2, fb.t + fb.h / 2); await sleep(500);
+    check(`v15.2 (${lang}) pin prompt: Cancel stays on one line at 390 px and the prompt text never runs under it`,
+      await p.ev(`(function(){var b=document.getElementById('modeCancel'),r=b.getBoundingClientRect(),lh=parseFloat(getComputedStyle(b).lineHeight)||20,tx=document.getElementById('modeText').getBoundingClientRect();var rg=document.createRange();rg.selectNodeContents(b);var tops=[...rg.getClientRects()].map(function(q){return Math.round(q.top);}).filter(function(v,i,arr){return arr.indexOf(v)===i;});return getComputedStyle(b).whiteSpace==='nowrap' && tops.length===1 && b.scrollWidth<=b.clientWidth+1 && tx.right<=r.left && r.right<=window.innerWidth;})()`),
+      await p.ev(`JSON.stringify(document.getElementById('modeCancel').getBoundingClientRect())`));
     check(`v15.1 (${lang}) one tap → pin mode with the “tap the street” prompt, Past favourites panel + layer on`,
       await p.ev(`!document.getElementById('modeBanner').hidden && document.getElementById('modeText').textContent===__ltot.t('favTapMap') && !document.getElementById('panel-fav').hidden && __ltot.state().layers.fav`),
       await p.ev(`document.getElementById('modeText').textContent`));

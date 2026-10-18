@@ -1872,6 +1872,7 @@
       }).concat(el('span', null, [el('i', { class: 'lg lg-decor' }), t('legendDecor')]))));
       if (i === 1) card.appendChild(el('div', { class: 'gbtn-pair', 'aria-hidden': 'true' }, [
         el('div', { class: 'gbtn-demo gbtn-decor' }, [el('span', { text: t('decorMain') })]),
+        el('div', { class: 'gbtn-demo gbtn-fav' }, [el('span', { text: t('favShareBtn') })]),   // v15.2: card line 2 names the cream button
         el('div', { class: 'gbtn-demo' }, [el('span', { text: t('markBtn') })])]));
       if (i === 2) card.appendChild(el('button', { id: 'guideTourBtn', class: 'btn btn-primary btn-block', type: 'button', text: t('tourBtn'),
         onclick: function () { closeGuide('done'); startTour(); } }));

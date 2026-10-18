@@ -212,3 +212,10 @@ test('v15.1 numbers explain themselves (Peng: “now 23”, “14 likes” were 
   assert.match(JSON.stringify(I.en.howtoSections), /If 3 different people report a pin or a reply, it is hidden\./);
   assert.match(JSON.stringify(I.zh.howtoSections), /如果有 3 个不同的人举报一个标记或回复，它就会被隐藏。/);
 });
+
+test('v15.2: welcome card 2 shows the cream sample; the pin prompt Cancel never wraps', () => {
+  assert.match(app, /class: 'gbtn-demo gbtn-decor'[\s\S]{0,120}class: 'gbtn-demo gbtn-fav' \}, \[el\('span', \{ text: t\('favShareBtn'\) \}\)\][\s\S]{0,160}class: 'gbtn-demo' \}/);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.gbtn-demo\.gbtn-fav \{[^}]*border: 1\.5px solid #fff7e8; color: #fff7e8; \}/);
+  assert.match(css, /\.mode-banner \.btn \{ flex: none; white-space: nowrap; min-width: 64px; \}/);
+});
