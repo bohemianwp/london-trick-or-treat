@@ -494,7 +494,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     var n=document.getElementById('fbNameIn'); n.value='Sam'; n.dispatchEvent(new Event('input'));})()`);
   const href = await p.ev(`document.getElementById('fbSend').getAttribute('href')`);
   check('Send link: mailto:sisy+halloween@mail.grokbot.com, subject, encoded answers, ≤ 1800 chars', href.startsWith('mailto:sisy+halloween@mail.grokbot.com') &&
-    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D14') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
+    href.includes('subject=Halloween%20map%20feedback') && href.includes('The%20colours%20%26%20NEW%20badge%3F') && href.includes('v%3D14.1') && href.length <= 1800, href.slice(0, 80) + '… ' + href.length);
   await p.click('#fbCopy'); await sleep(500);
   check('Copy text → “Copied! Paste it into an email or WeChat”', /^✅ Copied! Paste it into an email or WeChat/.test(await p.ev(`document.getElementById('fbCopied').textContent`)));
   await p.shot('v6-feedback.png');

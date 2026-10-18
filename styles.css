@@ -865,3 +865,9 @@ textarea:focus, .select:focus, input:focus { border-color: var(--purple-2); box-
 /* banner: no underline; a quiet chevron says "tap for more" */
 .phasebanner .pb-line { text-decoration: none; }
 .phasebanner .pb-line::after { content: " ›"; color: var(--muted); font-weight: var(--fw-b); }
+/* v14.1: board list rows keep 👍/❤️ counts inside the row; tidier popup close button */
+.near-row { min-width: 0; }
+.near-main { min-width: 0; }
+.fav-row b { flex: none; white-space: nowrap; min-width: 0; }
+.leaflet-container a.leaflet-popup-close-button { font-size: 22px; font-weight: var(--fw); width: 40px; height: 40px; line-height: 40px; top: 4px; right: 4px; color: var(--muted); }
+.leaflet-container a.leaflet-popup-close-button:hover { color: var(--text); }
