@@ -79,6 +79,10 @@ Between 3:31 and 3:52 PM the Mac went offline mid-build. The build finished at a
   - **7:25 AM**: "在指南里面的，文字表述，装饰（现在），往年最爱，被举报，45分钟内3个标记就亮， 练习：橙色小按钮，数字：现在23，14赞最近14天，这些表述有些模糊，我是用户，我第一次看到不明白什么意思" ("In the Guide, the wording 'Decorations (now)', 'Past favourites', 'reported', 'lights up with 3 marks in 45 min', 'Practice: small orange button', and numbers like 'now 23' and '14 likes in the last 14 days' is vague. As a first-time user I don't understand them.")
   - **7:26 AM**: "在怎么用里面一定直观的让用户一眼就知道这个功能的入口在哪，怎么使用，使用的目的是什么，简单明了，吸引眼球" ("In How to use, users must see at a glance where each feature's entry is, how to use it, and what it's for. Simple, clear and eye-catching.")
   - See **v=15.1** below.
+- **v15.3, Oct 18 morning (Peng's words, quoted verbatim):**
+  - **8:45 AM**: "被举报三次会被隐藏是什么意思？怎么举报" ("What does 'hidden after 3 reports' mean? How do I report?")
+  - **8:48 AM**: "如果点击更多，在手机上更多的菜单会出屏幕之外，还需要左滑才能看到。这个设计需要修改一下" ("On a phone, tapping More pushes the menu off the screen, and you have to swipe left to see it. Please change this design.")
+  - See **v=15.3** below.
 
 ### Cancelled
 - **Promo QR / video v4:** cancelled before any work. `qr.png` was never touched. Earlier promo video drafts (v1–v3) are kept in `halloween_app/` and were never published.
@@ -259,6 +263,19 @@ Peng: "too complex, too much text, users can't read it all." The user is a paren
 Found while reviewing the v15.1 screenshots myself, under Peng's rule that every detail is checked (not a new request from Peng).
 - **Pin prompt:** the Chinese "取消" (Cancel) button wrapped onto two lines at 390 px. The button no longer shrinks (`white-space: nowrap`, `min-width: 64px`) and the prompt text takes the remaining width. The headless test checks one line of text in EN and ZH.
 - **Welcome card 2:** its middle line names the cream button, but the card only showed purple and orange sample buttons. It now shows the cream "💬 Loved a street in past years? Share it" sample too, in the same order as the lines (purple, cream, orange).
+
+### v=15.3: what reporting means, and More stays on screen (Oct 18, 9:10 AM, COMMIT_LINK)
+Peng, 8:45 AM: "被举报三次会被隐藏是什么意思？怎么举报" ("What does 'hidden after 3 reports' mean? How do I report?")
+- **Every report line now says why, how and what happens.** The past-favourite rules, the board rules and the privacy notes all read: "See something rude, unsafe or personal (like a house number)? Tap ⚑ Report. If 3 different people report it, it is hidden for everyone." (中文：「看到不友善、不安全或涉及个人信息（比如门牌号）的内容？点 ⚑ 举报。3 个不同的人举报后，它会对所有人隐藏。」)
+- **The toast after reporting counts down,** using the count the server returns: "Thanks! If 2 more people report it, it will be hidden for everyone." (1 more person / now hidden). If the count is unknown, it shows the general rule.
+- **Guide → ⚑ Reports** now has its own answer with the how: "Tap the cream bubble, then ⚑ Report at the bottom; for a reply, tap the small ⚑ next to it." Likes & replies is a separate answer (9 answers behind "More answers").
+- **The small ⚑ next to each reply** is labelled "Report this reply / 举报这条回复" (aria-label, title and tooltip). The pin's ⚑ Report has its own tooltip.
+
+Peng, 8:48 AM: "如果点击更多，在手机上更多的菜单会出屏幕之外，还需要左滑才能看到。这个设计需要修改一下" ("On a phone, tapping More pushes the menu off the screen, and you have to swipe left to see it. Please change this design.")
+- **Cause:** the layer bar was one row that scrolled sideways. Opening More added 4 chips (826 px of chips in EN, 619 px in ZH, on a 374 px bar at 390 px wide), so Fun streets / Suggested areas / Events / Near me were off-screen with no hint.
+- **Fix:** the bar wraps instead of scrolling. With More open the extra chips go onto a second row (ZH) or a second and third row (EN), all fully visible. The app measures the bar and moves the zoom buttons, the locate button, the Practice / decorations pill and the pin prompt down by exactly the extra height, so nothing overlaps. Closing More moves them back.
+- **Checked** at 360, 375, 390 and 430 px, EN and ZH, before and on Oct 31. The headless test opens More and checks every chip's box is inside the viewport, the bar's scrollWidth ≤ clientWidth, and no chip overlaps zoom / locate / Practice. It fails on v15.2 in all 16 cases.
+- **Also fixed:** the Guide's Map tools line and tour step 2 used the ⌖ symbol, which many phone fonts can't show (an empty box). They now say "the round crosshair button" / 「带十字准星的圆形按钮」, and the tour uses 📍.
 
 ## Issues and fixes
 - **4:51 PM:** the map said "API key required" → OSM tiles with a dark filter.

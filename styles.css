@@ -992,3 +992,12 @@ body.has-favshare .markcard:not(.phasecard) { bottom: 130px; }
 .gbtn-demo.gbtn-fav { background: rgba(22,32,51,.96); border: 1.5px solid #fff7e8; color: #fff7e8; }
 #modeText { flex: 1 1 auto; min-width: 0; }
 .mode-banner .btn { flex: none; white-space: nowrap; min-width: 64px; }
+
+/* v15.3 (Peng, Oct 18 8:48 AM): "More" used to push chips off-screen (sideways swipe). The bar now wraps onto a
+   second row that is always fully visible; app.js measures the bar and sets --lb-extra so the zoom, locate,
+   Practice / decorations pill and pin prompt slide down by exactly the extra row height. */
+.layerbar { flex-wrap: wrap; overflow: visible; row-gap: 8px; }
+.leaflet-top.leaflet-left { top: calc(52px + var(--lb-extra, 0px)); }
+.fab { top: calc(56px + var(--lb-extra, 0px)); }
+.fab-decor { top: calc(112px + var(--lb-extra, 0px)); }
+.mode-banner { top: calc(56px + var(--lb-extra, 0px)); }

@@ -209,8 +209,8 @@ test('v15.1 numbers explain themselves (Peng: “now 23”, “14 likes” were 
   assert.match(I.en.decorInfo, /liked these decorations \{n\} times in the last 14 days/);   // one like per phone per street per day
   assert.match(I.zh.decorInfo, /最近 14 天里.*\{n\} 次赞/);
   for (const l of ['en', 'zh']) for (const k of ['zoneCount', 'favBubbleNow', 'tip_zone']) assert.doesNotMatch(I[l][k], l === 'en' ? /\bnow\b/ : /现在/, l + ' ' + k);
-  assert.match(JSON.stringify(I.en.howtoSections), /If 3 different people report a pin or a reply, it is hidden\./);
-  assert.match(JSON.stringify(I.zh.howtoSections), /如果有 3 个不同的人举报一个标记或回复，它就会被隐藏。/);
+  assert.match(JSON.stringify(I.en.howtoSections), /Once 3 different people report it, it is hidden for everyone\./);
+  assert.match(JSON.stringify(I.zh.howtoSections), /3 个不同的人举报后，它会对所有人隐藏。/);
 });
 
 test('v15.2: welcome card 2 shows the cream sample; the pin prompt Cancel never wraps', () => {
@@ -218,4 +218,38 @@ test('v15.2: welcome card 2 shows the cream sample; the pin prompt Cancel never 
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.gbtn-demo\.gbtn-fav \{[^}]*border: 1\.5px solid #fff7e8; color: #fff7e8; \}/);
   assert.match(css, /\.mode-banner \.btn \{ flex: none; white-space: nowrap; min-width: 64px; \}/);
+});
+
+// v15.3 (Peng 8:45: "被举报三次会被隐藏是什么意思？怎么举报"): every report line says why, how, and what happens next.
+test('v15.3 reports: why + how + what happens, accurate count-down toast, labelled reply ⚑', () => {
+  const L = require('../lib.js');
+  assert.equal(L.reportLeft(1), 2); assert.equal(L.reportLeft(2), 1); assert.equal(L.reportLeft(3), 0); assert.equal(L.reportLeft(5), 0);
+  assert.equal(L.reportLeft(null), null); assert.equal(L.reportLeft(undefined), null); assert.equal(L.reportLeft(-1), null);
+  for (const l of ['en', 'zh']) {
+    const D = I[l], rude = l === 'en' ? /rude, unsafe or personal/ : /不友善、不安全或涉及个人信息/, three = l === 'en' ? /3 different people/ : /3 个不同的人/;
+    for (const k of ['favRules', 'boardRules']) { assert.match(D[k], rude, l + ' ' + k); assert.match(D[k], /⚑/, l + ' ' + k); assert.match(D[k], three, l + ' ' + k); }
+    for (const k of ['favReported', 'reported']) assert.match(D[k], three, l + ' ' + k);
+    for (const k of ['favRules', 'favReported', 'reported', 'boardRules']) assert.doesNotMatch(D[k], l === 'en' ? /3 reports/ : /被举报 3 次/, l + ' old wording ' + k);
+    assert.doesNotMatch(JSON.stringify(D.privacyItems), l === 'en' ? /3 reports hide/ : /被举报 3 次/, l + ' privacy');
+    assert.match(D.reportedLeft, /\{n\}/); assert.ok(D.reportedLeft1 && D.reportedHidden && D.reportReply && D.tip_reportReply && D.tip_reportPin);
+    const rep = D.howtoSections.find((s) => s[0].startsWith('⚑'));
+    assert.equal(rep[1].length, 3);
+    assert.match(rep[1][1], l === 'en' ? /^How: tap the cream bubble, then ⚑ Report at the bottom; for a reply, tap the small ⚑ next to it\.$/ : /^怎么做：点奶白色气泡，再点底部的 ⚑ 举报；举报回复，点回复旁边的小 ⚑。$/);
+  }
+  assert.equal(I.en.reportReply, 'Report this reply'); assert.equal(I.zh.reportReply, '举报这条回复');
+  assert.match(app, /class: 'fr-x', 'aria-label': t\('reportReply'\), title: t\('reportReply'\), 'data-tip-key': 'tip_reportReply'/);
+  assert.match(app, /toast\(r && r\.already \? t\('favAlreadyReported'\) : reportToast\(r, 'favReported'\)/);
+  assert.match(app, /toast\(r && r\.already \? t\('alreadyReported'\) : reportToast\(r, 'reported'\)/);
+  const be = fs.readFileSync(path.join(root, 'backend.js'), 'utf8');
+  assert.match(be, /report_post'[^\n]*count: n >= 0 \? n : null/, 'Supabase board report passes the count through');
+});
+
+// v15.3 (Peng 8:48: "如果点击更多，在手机上更多的菜单会出屏幕之外，还需要左滑才能看到"): More wraps, never scrolls sideways.
+test('v15.3 layer bar: wraps onto extra rows and the controls below move down by --lb-extra', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.layerbar \{ flex-wrap: wrap; overflow: visible; row-gap: 8px; \}/);
+  for (const [sel, base] of [['.leaflet-top.leaflet-left', 52], ['.fab', 56], ['.fab-decor', 112], ['.mode-banner', 56]])
+    assert.ok(css.includes(sel + ' { top: calc(' + base + 'px + var(--lb-extra, 0px)); }'), sel);
+  assert.match(app, /function syncBarRows\(\)[\s\S]{0,200}setProperty\('--lb-extra'/);
+  assert.match(app, /new ResizeObserver\(function \(\) \{ syncBarRows\(\); \}\)\.observe\(\$\('layerbar'\)\)/);
 });

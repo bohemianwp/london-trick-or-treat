@@ -179,7 +179,7 @@ test('sounds: Web Audio only (no files), each under 1 s, quiet, only right after
   const src = read('sfx.js');
   assert.doesNotMatch(src, /\.(mp3|wav|ogg|m4a)\b|new Audio\(/, 'no audio files');
   const app = read('app.js'), html = read('index.html');
-  assert.match(html, /id="soundBtn"/); assert.match(html, /src="sfx\.js\?v=15\.2"/);
+  assert.match(html, /id="soundBtn"/); assert.match(html, /src="sfx\.js\?v=15\.3"/);
   for (const [n, where] of [['boo', 'fun-street mark'], ['twinkle', 'decor mark'], ['chime', 'like/post/reply'], ['fanfare', 'badge']])
     assert.match(app, new RegExp("SFX\\.play\\('" + n + "'"), where);
   for (const l of ['en', 'zh']) { assert.ok(I[l].soundOnAria && I[l].soundOffAria && I[l].howtoSound[1].length >= 2 && I[l].guideSoundLine, l); }

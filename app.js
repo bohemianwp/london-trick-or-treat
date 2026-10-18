@@ -199,6 +199,14 @@
   // on the night: Fun streets, Past favourites. Fits 390 px in EN and ZH; one primary layer per phase.
   var layerMoreOpen = false;
   function layerMain(k) { return k === 'fav' || (bigIsDecor() ? k === 'decor' : k === 'zones'); }
+  // v15.3: the layer bar wraps instead of scrolling sideways; push the controls below it down by the extra rows
+  function syncBarRows() {
+    var bar = $('layerbar'); if (!bar) return;
+    var extra = Math.max(0, Math.round(bar.offsetHeight - 42));   // 42 = one row of 40px chips + 2px padding
+    document.documentElement.style.setProperty('--lb-extra', extra + 'px');
+  }
+  if (window.ResizeObserver) new ResizeObserver(function () { syncBarRows(); }).observe($('layerbar'));
+  window.addEventListener('resize', function () { syncBarRows(); });
   function renderLayerBar() {
     var bar = $('layerbar'), nearChip = $('nearChip'), more = $('layerMore');   // More and Near me are static (index.html)
     bar.querySelectorAll('[data-layer]').forEach(function (b) { b.remove(); });
@@ -215,6 +223,7 @@
     nearChip.hidden = !layerMoreOpen;
     more.setAttribute('aria-expanded', String(layerMoreOpen));
     more.querySelector('.lm-arrow').textContent = layerMoreOpen ? '▴' : '▾';
+    syncBarRows();
   }
   $('layerMore').addEventListener('click', function () { layerMoreOpen = !layerMoreOpen; renderLayerBar(); });
   $('nearChip').addEventListener('click', function () { openNear(); });
@@ -1327,11 +1336,16 @@
       renderFavLayer(); if (currentTab === 'fav') renderFavList();
     }, function (e) { toast(favErrText(e), 4000); }).then(function () { btn.disabled = false; });
   }
+  // v15.3: say exactly what happens next when the server tells us the new count; otherwise the general rule
+  function reportToast(r, generic) {
+    var left = LIB.reportLeft(r && r.count);
+    return left === null ? t(generic) : left === 0 ? t('reportedHidden') : left === 1 ? t('reportedLeft1') : t('reportedLeft', { n: left });
+  }
   function doFavReport(kind, id, after) {
     if (favReportedMine[id]) { toast(t('favAlreadyReported'), 2500); return; }
     backend.favReport(DEVICE, kind, id).then(function (r) {
       favReportedMine[id] = 1; lsSet(STORE.favReports, favReportedMine);
-      toast(r && r.already ? t('favAlreadyReported') : t('favReported'), 3000);
+      toast(r && r.already ? t('favAlreadyReported') : reportToast(r, 'favReported'), 4000);
       if (after) after();
     }, function (e) { toast(favErrText(e), 4000); });
   }
@@ -1346,7 +1360,7 @@
           el('small', { class: 'mono-num', text: ' · ' + ago(r.createdAt) }),
           mine ? el('button', { type: 'button', class: 'fr-x', 'aria-label': t('del'), text: '✕', onclick: function () {
             backend.favDelete('reply', r.id, favTokens['r:' + r.id]).then(function () { delete favTokens['r:' + r.id]; lsSet(STORE.favTokens, favTokens); p.replies = Math.max(0, p.replies - 1); loadReplies(p, ul); }, function (e) { toast(favErrText(e), 4000); });
-          } }) : el('button', { type: 'button', class: 'fr-x', 'aria-label': t('report'), title: t('report'), text: '⚑', onclick: function () { doFavReport('reply', r.id, function () { loadReplies(p, ul); }); } })
+          } }) : el('button', { type: 'button', class: 'fr-x', 'aria-label': t('reportReply'), title: t('reportReply'), 'data-tip-key': 'tip_reportReply', text: '⚑', onclick: function () { doFavReport('reply', r.id, function () { loadReplies(p, ul); }); } })
         ]));
       });
     }, function () { /* keep */ });
@@ -1388,7 +1402,7 @@
             if (!window.confirm(t('favConfirmDel'))) return;
             backend.favDelete('pin', p.id, favTokens[p.id]).then(function () { delete favTokens[p.id]; lsSet(STORE.favTokens, favTokens); map.closePopup(); refreshFav(); }, function (e) { toast(favErrText(e), 4000); });
           } })
-        : el('button', { type: 'button', class: 'btn btn-small btn-ghost', text: t('favReport'), onclick: function () { doFavReport('pin', p.id, function () { map.closePopup(); refreshFav(); }); } }),
+        : el('button', { type: 'button', class: 'btn btn-small btn-ghost', text: t('favReport'), 'data-tip-key': 'tip_reportPin', onclick: function () { doFavReport('pin', p.id, function () { map.closePopup(); refreshFav(); }); } }),
         LIB.isFavOpen(Date.now(), DEMO) ? el('button', { type: 'button', class: 'btn btn-small btn-fav-share', text: t('favShareYours'), 'data-tip-key': 'tip_favShare', onclick: startFavPin }) : null])   // v15.1
     ]);
     L.popup({ maxWidth: 290, minWidth: 250, className: 'fav-popup', autoPanPaddingTopLeft: POP_TL, autoPanPaddingBottomRight: POP_BR })
@@ -1530,7 +1544,7 @@
   function doReport(p) {
     backend.report(p.id, DEVICE).then(function (r) {
       myReports[p.id] = 1; lsSet(STORE.reports, myReports);
-      toast(r && r.already ? t('alreadyReported') : t('reported'));
+      toast(r && r.already ? t('alreadyReported') : reportToast(r, 'reported'), 4000);
       return refreshPosts();
     }, function (e) { toast(errText(e)); });
   }

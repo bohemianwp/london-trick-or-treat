@@ -358,7 +358,7 @@
       return this.rpc('vote_post', { p_post_id: postId, p_voter: voter }).then(function (n) { return { ok: n >= 0, already: n < 0, count: Math.abs(n) }; });
     },
     report: function (postId, voter) {
-      return this.rpc('report_post', { p_post_id: postId, p_voter: voter }).then(function (n) { return { ok: n >= 0, already: n < 0 }; });
+      return this.rpc('report_post', { p_post_id: postId, p_voter: voter }).then(function (n) { return { ok: n >= 0, already: n < 0, count: n >= 0 ? n : null }; });
     },
     deletePost: function (id, token) { return this.rpc('delete_post', { p_id: id, p_token: token }); },
     sendMark: function (m, token) {

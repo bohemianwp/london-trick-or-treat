@@ -229,6 +229,23 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('v15 layer chips fit at 390 px: main chips + More, secondary hidden', await p.ev(`(function(){var bar=document.getElementById('layerbar');return bar.scrollWidth<=bar.clientWidth && !!document.querySelector('.lchip[data-layer="decor"]:not([hidden])') && document.querySelector('.lchip[data-layer="zones"]').hidden && document.getElementById('nearChip').hidden && document.getElementById('layerMore').getAttribute('aria-expanded')==='false';})()`));
   await p.click('#layerMore'); await sleep(200);
   check('…More ▾ reveals Fun streets, Suggested areas, Events, Near me', await p.ev(`document.getElementById('layerMore').getAttribute('aria-expanded')==='true' && ['zones','areas','events'].every(function(k){return !document.querySelector('.lchip[data-layer="'+k+'"]').hidden;}) && !document.getElementById('nearChip').hidden`));
+  // v15.3 (Peng, 8:48 AM): with More open nothing may sit off-screen (no sideways swipe) or under the zoom / locate / Practice pill
+  const barFits = `(function(){var bar=document.getElementById('layerbar'),W=window.innerWidth;var cs=[].slice.call(bar.querySelectorAll('.lchip')).filter(function(c){return !c.hidden&&c.offsetParent!==null;});
+    var ov=function(a,b){return !(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top);};
+    var ctl=['.leaflet-control-zoom','#locateBtn','#altBtn','#favShareBtn'].map(function(q){return document.querySelector(q);}).filter(function(e){return e&&!e.hidden&&e.offsetParent!==null;});
+    var bad=cs.filter(function(c){var r=c.getBoundingClientRect();return r.left<0||r.right>W||r.top<0||ctl.some(function(e){return ov(r,e.getBoundingClientRect());});}).map(function(c){return c.textContent.trim();});
+    return {n:cs.length,fit:bar.scrollWidth<=bar.clientWidth,bad:bad};})()`;
+  const barAt = async (pg, lbl) => {
+    const res = [];
+    for (const w of [360, 375, 390, 430]) {
+      await pg.s('Emulation.setDeviceMetricsOverride', { width: w, height: 844, deviceScaleFactor: 2, mobile: true }); await sleep(350);
+      const r = await pg.ev(barFits); if (!(r && r.n === 7 && r.fit && !r.bad.length)) res.push(lbl + ' ' + w + ': ' + JSON.stringify(r));
+    }
+    await pg.s('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await sleep(350);
+    return res;
+  };
+  const barBad = await barAt(p, 'EN');
+  check('v15.3 More open: all 7 chips inside the viewport, bar scrollWidth ≤ clientWidth, no overlap with zoom / locate / Practice (EN, 360/375/390/430)', barBad.length === 0, barBad.join('; '));
   let layerOk = true;
   for (const k of ['zones', 'areas', 'events']) {
     await p.click(`.lchip[data-layer="${k}"]`); await sleep(150);
@@ -239,6 +256,14 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('layer chips Fun streets / Suggested areas / Events toggle off and on (+ Near me chip)', layerOk && await p.ev(`!!document.getElementById('nearChip')`) && realErrors(p).length === 0);
   await p.click('#layerMore'); await sleep(150);
 
+  {
+    const pz = await openPage('?lang=zh', { wait: 3500 });
+    await pz.click('#layerMore'); await sleep(250);
+    const zb = await barAt(pz, 'ZH');
+    check('v15.3 More open in 中文: every chip on screen, no sideways scroll, no overlap (360/375/390/430)', zb.length === 0 && realErrors(pz).length === 0, zb.join('; '));
+    await send('Target.closeTarget', { targetId: pz.targetId });
+  }
+
   // tabs
   let tabsOk = true;
   for (const tab of ['map', 'route', 'guide']) {
@@ -246,7 +271,7 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
     if (!(await p.ev(`!document.getElementById('panel-${tab}').hidden && document.getElementById('sheet').dataset.open==='true'`))) tabsOk = false;
   }
   check('Map / Route / Guide tabs open their panel', tabsOk);
-  check('Guide tab = feature cards + 8 one-sentence answers behind “More answers” + one primary ▶ demo, no Board/Safety duplicates', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 8 &&
+  check('Guide tab = feature cards + 9 one-sentence answers behind “More answers” + one primary ▶ demo, no Board/Safety duplicates', (await p.ev('document.querySelectorAll("#howtoList h3").length')) === 9 &&
     await p.ev(`!document.getElementById('howtoMore').open && !document.getElementById('guideBoard') && !document.getElementById('guideSafety') && document.querySelectorAll('#panel-guide .btn-primary').length===1`));
   // v15.1 (Peng): one card per feature = where (mini phone, target ringed) + the real button + How + Why + Show me
   const hc = await p.ev(`[...document.querySelectorAll('#howtoCards .hcard')].map(function(c){return {k:c.dataset.kind, ok:!!(c.querySelector('.hc-phone .hp-target')&&c.querySelector('.hc-rep')&&/^How: /.test(c.querySelector('.hc-how').textContent)&&/^Why: /.test(c.querySelector('.hc-why').textContent)&&c.querySelector('.hc-show'))};})`);
@@ -410,6 +435,12 @@ await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissio
   check('reply filter: phone numbers refused', /Phone numbers are not allowed/.test(await p.ev(`document.querySelector('.pop-fav .err').textContent`)));
   await p.ev(`(function(){var i=document.querySelector('.fav-reply-in'); i.value='So much fun!'; document.querySelector('.fav-replyrow .btn').click();})()`); await sleep(700);
   check('short reply posts and shows', /So much fun!/.test(await p.ev(`document.querySelector('.fav-replies').textContent`)));
+  // v15.3: the reply ⚑ says what it does; reporting tells you exactly how many more reports hide it
+  check('v15.3 reply ⚑ is labelled “Report this reply” (aria-label, title, tooltip key)', await p.ev(`(function(){var b=document.querySelector('.fav-replies .fr-x[data-tip-key="tip_reportReply"]');return !!b && b.getAttribute('aria-label')==='Report this reply' && b.title==='Report this reply';})()`));
+  await p.click('.fav-replies .fr-x[data-tip-key="tip_reportReply"]'); await sleep(600);
+  const rtoast = await p.ev(`document.getElementById('toast').textContent`);
+  check('v15.3 report toast counts down: “Thanks! If 2 more people report it, it will be hidden for everyone.”', /^Thanks! If 2 more people report it, it will be hidden for everyone\.$/.test(rtoast), rtoast);
+  check('v15.3 pin ⚑ Report has a tooltip key', await p.ev(`!!document.querySelector('.pop-fav [data-tip-key="tip_reportPin"]')`));
   await p.ev(`__ltot.map.closePopup(); __ltot.openTab('fav')`); await sleep(400);
   check('💬 panel: Past favourites + Most loved list, no gift line in the panel (v15)', await p.ev(`!document.getElementById('panel-fav').hidden && document.querySelectorAll('#favList .fav-row').length===6 && /Past favourites/.test(document.querySelector('#panel-fav h2').textContent) && !document.querySelector('#panel-fav .mc-gift')`));
   await p.ev(`__ltot.openFavForm([42.9601, -81.2410])`); await sleep(300);

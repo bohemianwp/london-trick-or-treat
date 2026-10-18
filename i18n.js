@@ -93,7 +93,7 @@
     ftag_walking: 'Easy walking',
     favNoteLabel: 'A few words (optional)',
     favNotePh: 'e.g. The whole street goes all out every year',
-    favRules: 'Street level only. No names or addresses. 3 reports hide a pin. Deleted Nov 2.',
+    favRules: 'Pin the street, never a house, and leave out names and addresses. See something rude, unsafe or personal (like a house number)? Tap ⚑ Report; if 3 different people report it, it is hidden for everyone. Everything is deleted on Nov 2.',
     favPost: 'Post',
     favNeedTag: 'Pick one: what made it great?',
     err_tooLong60: 'Too long. 60 characters max.',
@@ -102,7 +102,13 @@
     favReplies: 'Replies ({n})',
     favNoReplies: 'No replies yet. Say thanks!',
     favReport: '⚑ Report',
-    favReported: 'Thanks, reported. 3 reports hide it.',
+    favReported: 'Thanks for reporting. If 3 different people report it, it is hidden for everyone.',
+    reportedLeft: 'Thanks! If {n} more people report it, it will be hidden for everyone.',
+    reportedLeft1: 'Thanks! If 1 more person reports it, it will be hidden for everyone.',
+    reportedHidden: 'Thanks! It is now hidden for everyone.',
+    reportReply: 'Report this reply',
+    tip_reportReply: 'Report this reply',
+    tip_reportPin: 'Report something rude, unsafe or personal',
     favAlreadyReported: 'You already reported this.',
     favConfirmDel: 'Delete your pin?',
     favMine: 'yours',
@@ -131,7 +137,7 @@
     guideFavLine: '💬 Loved a street in past years? Tap 💬 under the big button.',
     privacyFav: [
       'Past-years board',
-      'Only if you pin a street: the spot moved to a ~50 m street grid (never a house), one preset tag, an optional note (80 characters) and short replies (60). No names, photos or accounts. Text with phone numbers, emails, links, addresses or house numbers is refused. Your phone’s random ID is stored only as a one-way hash so it can like once and keep to the limits. 3 reports hide a pin. “Families who remember” is a total only, shown from 3. Everything is deleted on Nov 2, 2026.'
+      'Only if you pin a street: the spot moved to a ~50 m street grid (never a house), one preset tag, an optional note (80 characters) and short replies (60). No names, photos or accounts. Text with phone numbers, emails, links, addresses or house numbers is refused. Your phone’s random ID is stored only as a one-way hash so it can like once and keep to the limits. If 3 different people report a pin or a reply, it is hidden. “Families who remember” is a total only, shown from 3. Everything is deleted on Nov 2, 2026.'
     ],
     phasePre: '🎃 Now: decorations · 🔥 Oct 31: fun streets',
     phaseOn: '🔥 Share fun streets until 11 PM',
@@ -309,7 +315,7 @@
     voted: 'Voted',
     alreadyVoted: 'You already voted for this one.',
     report: 'Report',
-    reported: 'Reported. Thanks! Posts with 3 reports are hidden.',
+    reported: 'Thanks for reporting. If 3 different people report a post, it is hidden for everyone.',
     alreadyReported: 'You already reported this one.',
     noPosts: 'No posts yet. Be the first!',
     mine: 'Your post',
@@ -320,7 +326,7 @@
     agoMin: '{n} min ago',
     agoH: '{n} h ago',
     agoD: '{n} d ago',
-    boardRules: 'Grown-ups only. Be kind. No names, house numbers, links or phone numbers. Posts are public; there are no replies or private messages. 3 reports hide a post.',
+    boardRules: 'Grown-ups only, and please be kind: no names, house numbers, links or phone numbers. Posts are public, with no replies or private messages. See something rude, unsafe or personal? Tap ⚑ Report; if 3 different people report a post, it is hidden for everyone.',
     localModeNote: 'Local mode: everything is saved in this browser only. Open a second tab with ?demo=1 to see sharing work.',
     err_empty: 'Please write something first.',
     err_tooLong: 'Too long. 140 characters max.',
@@ -359,7 +365,7 @@
     tourAria: 'How to use: play a 25-second demo',
     tourDemo: 'DEMO DATA',
     tour1: 'Orange streets show where kids are having fun right now. Deeper orange = busier.',
-    tour2: '⌖ Show where you are, then find fun streets nearby.',
+    tour2: '📍 Show where you are, then find fun streets nearby.',
     tour3: 'Fun street? Tap the big button once to share it.',
     tour4: 'Each tap adds a mark. At 3 marks a street lights up with NEW.',
     tour5: '🚶 Route plans a walking loop that ends back at your car or home.',
@@ -484,14 +490,21 @@
       [
         '⚑ Reports',
         [
-          'If 3 different people report a pin or a reply, it is hidden.',
+          'Report anything rude, unsafe or personal, like a house number.',
+          'How: tap the cream bubble, then ⚑ Report at the bottom; for a reply, tap the small ⚑ next to it.',
+          'Once 3 different people report it, it is hidden for everyone.'
+        ]
+      ],
+      [
+        '👍 Likes & replies',
+        [
           'Each phone can 👍 and ❤️ once, and replies are up to 60 characters.'
         ]
       ],
       [
         '🗺️ Map tools',
         [
-          'The round ⌖ button on the right shows where you are.',
+          'The round crosshair button on the right shows where you are.',
           'More ▾ shows suggested areas, events and streets near you.'
         ]
       ],
@@ -543,7 +556,7 @@
       ],
       [
         'Board posts',
-        'Only if you post: the text (140 characters max), the board, an optional neighbourhood, and an optional rough location (about 100 m). 3 reports hide a post.'
+        'Only if you post: the text (140 characters max), the board, an optional neighbourhood, and an optional rough location (about 100 m). If 3 different people report a post, it is hidden.'
       ],
       [
         'Your location',
@@ -717,7 +730,7 @@
     ftag_walking: '好走',
     favNoteLabel: '写两句（可选）',
     favNotePh: '例如：整条街每年都装饰得超用心',
-    favRules: '只写街区，不写名字或地址。被举报 3 次会隐藏。11月2日删除。',
+    favRules: '只标记街道，不标记某一户，也不要写名字或地址。看到不友善、不安全或涉及个人信息（比如门牌号）的内容？点 ⚑ 举报；3 个不同的人举报后，它会对所有人隐藏。所有内容 11月2日删除。',
     favPost: '发布',
     favNeedTag: '请选一个：好在哪里？',
     err_tooLong60: '太长了，最多 60 个字。',
@@ -726,7 +739,13 @@
     favReplies: '回复（{n}）',
     favNoReplies: '还没有回复，说声谢谢吧！',
     favReport: '⚑ 举报',
-    favReported: '已举报，谢谢！被举报 3 次会隐藏。',
+    favReported: '谢谢你的举报。3 个不同的人举报后，它会对所有人隐藏。',
+    reportedLeft: '谢谢！再有 {n} 个人举报，它就会对所有人隐藏。',
+    reportedLeft1: '谢谢！再有 1 个人举报，它就会对所有人隐藏。',
+    reportedHidden: '谢谢！它现在已经对所有人隐藏了。',
+    reportReply: '举报这条回复',
+    tip_reportReply: '举报这条回复',
+    tip_reportPin: '举报不友善、不安全或涉及个人信息的内容',
     favAlreadyReported: '你已经举报过了。',
     favConfirmDel: '删除你的标记吗？',
     favMine: '我的',
@@ -755,7 +774,7 @@
     guideFavLine: '💬 往年喜欢哪条街？点大按钮下面的 💬。',
     privacyFav: [
       '往年最佳街区留言板',
-      '只有你标记街道时才会保存：挪到约 50 米街道网格上的位置（不会落在某一户）、一个预设标签、可选的一句话（80 字）和简短回复（60 字）。不要名字、照片或账号。含电话、邮箱、链接、地址或门牌号的文字会被拒绝。你手机的随机 ID 只以单向哈希保存，用来保证只能赞一次和限制次数。被举报 3 次会隐藏。「记得这里的家庭数」只是总数，满 3 才显示。所有内容 2026 年 11 月 2 日删除。'
+      '只有你标记街道时才会保存：挪到约 50 米街道网格上的位置（不会落在某一户）、一个预设标签、可选的一句话（80 字）和简短回复（60 字）。不要名字、照片或账号。含电话、邮箱、链接、地址或门牌号的文字会被拒绝。你手机的随机 ID 只以单向哈希保存，用来保证只能赞一次和限制次数。3 个不同的人举报后，标记或回复会被隐藏。「记得这里的家庭数」只是总数，满 3 才显示。所有内容 2026 年 11 月 2 日删除。'
     ],
     phasePre: '🎃 现在：装饰 · 🔥 10月31日：好玩的街',
     phaseOn: '🔥 分享好玩的街，到晚上11点',
@@ -933,7 +952,7 @@
     voted: '已点赞',
     alreadyVoted: '你已经给这条点过赞了。',
     report: '举报',
-    reported: '已举报，谢谢！被举报 3 次的帖子会被隐藏。',
+    reported: '谢谢你的举报。3 个不同的人举报后，这条帖子会对所有人隐藏。',
     alreadyReported: '你已经举报过这条了。',
     noPosts: '还没有帖子，来发第一条吧！',
     mine: '你的帖子',
@@ -944,7 +963,7 @@
     agoMin: '{n} 分钟前',
     agoH: '{n} 小时前',
     agoD: '{n} 天前',
-    boardRules: '仅限大人使用。请友善。不写名字、门牌号、链接或电话。帖子是公开的，没有回复和私信功能。被举报 3 次会被隐藏。',
+    boardRules: '仅限大人使用，请友善：不写名字、门牌号、链接或电话。帖子是公开的，没有回复和私信功能。看到不友善、不安全或涉及个人信息的内容？点 ⚑ 举报；3 个不同的人举报后，这条帖子会对所有人隐藏。',
     localModeNote: '本地模式：所有内容只存在这个浏览器里。用 ?demo=1 再开一个标签页，就能看到共享效果。',
     err_empty: '请先写点内容。',
     err_tooLong: '太长了，最多 140 个字。',
@@ -983,7 +1002,7 @@
     tourAria: '怎么用：播放 25 秒演示',
     tourDemo: '演示数据',
     tour1: '橙色的街就是孩子们正在玩的地方，颜色越深越热闹。',
-    tour2: '⌖ 显示你在哪里，再找附近好玩的街。',
+    tour2: '📍 显示你在哪里，再找附近好玩的街。',
     tour3: '这条街好玩？点一下大按钮就能分享。',
     tour4: '每点一次多一个标记。满 3 个，这条街就亮起并显示「新发现」。',
     tour5: '🚶「路线」帮你规划一条步行环线，最后回到车或家。',
@@ -1108,14 +1127,21 @@
       [
         '⚑ 举报',
         [
-          '如果有 3 个不同的人举报一个标记或回复，它就会被隐藏。',
+          '看到不友善、不安全或涉及个人信息（比如门牌号）的内容，可以举报。',
+          '怎么做：点奶白色气泡，再点底部的 ⚑ 举报；举报回复，点回复旁边的小 ⚑。',
+          '3 个不同的人举报后，它会对所有人隐藏。'
+        ]
+      ],
+      [
+        '👍 点赞和回复',
+        [
           '每台手机 👍 和 ❤️ 各能点一次，回复最多 60 字。'
         ]
       ],
       [
         '🗺️ 地图工具',
         [
-          '右边的圆形 ⌖ 按钮会显示你在哪里。',
+          '右边带十字准星的圆形按钮会显示你在哪里。',
           '「更多 ▾」会显示推荐区、活动和你附近的街。'
         ]
       ],
@@ -1153,7 +1179,7 @@
         '只有你点「这里装饰很棒！」时才会产生。和标记一样模糊大约 50 米，只记录街区六边形、可选标签（吓人、搞笑俏皮、灯光、必看）和日期。不要照片，不要地址，不要文字。你的手机编号会先和日期混在一起再保存，所以不同日子的标记无法关联。一条街要有 3 个或更多标记才会显示。只统计最近 14 天，所有装饰标记在 2026 年 11 月 2 日之后删除。'
       ],
       ['推荐区域', '只有你推荐时才会保存：那个六边形（大约 800 米宽）和一句可选的理由（80 字以内，不能有链接或电话）。万圣节后删除。'],
-      ['投票板帖子', '只有你发帖时才会保存：内容（最多 140 字）、哪个投票板、可选的社区，以及可选的大概位置（约 100 米）。被举报 3 次会被隐藏。'],
+      ['投票板帖子', '只有你发帖时才会保存：内容（最多 140 字）、哪个投票板、可选的社区，以及可选的大概位置（约 100 米）。3 个不同的人举报后，帖子会被隐藏。'],
       ['你的位置', '只有你点定位按钮并允许后才会用。蓝点和路线规划只在你的手机上使用。不开定位也能用：直接点地图就行。'],
       ['不追踪', '没有 Cookie、没有统计分析、没有广告、没有追踪器。设置只存在这个浏览器的本地存储里。'],
       [

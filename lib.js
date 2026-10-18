@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=15.2';                      // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=15.3';                      // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
@@ -456,6 +456,8 @@
   var FAV_TAGS = ['festive', 'candy', 'littlekids', 'walking'];
   var FAV_ICON = { festive: '🏆', candy: '🍬', littlekids: '👨‍👩‍👧', walking: '🚶' };
   var FAV_LAT_STEP = 0.00045, FAV_LNG_STEP = 0.0006, FAV_MAX = 80, FAV_REPLY_MAX = 60, FAV_MAX_DAY = 5, FAV_REPLY_MAX_DAY = 20, FAV_HIDE_AT = 3, FAV_FAMILIES_MIN = 3;
+  // v15.3: after my report, how many more different people must report before it is hidden (null = count unknown)
+  function reportLeft(count) { var n = Number(count); return count == null || !isFinite(n) || n < 1 ? null : Math.max(0, FAV_HIDE_AT - n); }
   function isFavOpen(nowMs, demo) { return isDecorOpen(nowMs, demo); }
   function favVisible(nowMs, demo) { return decorVisible(nowMs, demo); }
   // Same as the server's _ltot_fav_snap: round to the grid, 5 decimals.
@@ -716,7 +718,7 @@
     torontoDay: torontoDay, cleanDecorTags: cleanDecorTags, decorTagsValid: decorTagsValid, decorRate: decorRate, decorTopTag: decorTopTag,
     aggregateDecor: aggregateDecor, decorateDecor: decorateDecor, initialLang: initialLang,
     FAV_TAGS: FAV_TAGS, FAV_ICON: FAV_ICON, FAV_LAT_STEP: FAV_LAT_STEP, FAV_LNG_STEP: FAV_LNG_STEP, FAV_MAX: FAV_MAX, FAV_REPLY_MAX: FAV_REPLY_MAX,
-    FAV_MAX_DAY: FAV_MAX_DAY, FAV_REPLY_MAX_DAY: FAV_REPLY_MAX_DAY, FAV_HIDE_AT: FAV_HIDE_AT, FAV_FAMILIES_MIN: FAV_FAMILIES_MIN,
+    FAV_MAX_DAY: FAV_MAX_DAY, FAV_REPLY_MAX_DAY: FAV_REPLY_MAX_DAY, FAV_HIDE_AT: FAV_HIDE_AT, reportLeft: reportLeft, FAV_FAMILIES_MIN: FAV_FAMILIES_MIN,
     isFavOpen: isFavOpen, favVisible: favVisible, favSnap: favSnap, checkFavText: checkFavText, favScale: favScale, clusterFav: clusterFav,
     favFamilies: favFamilies, favTonight: favTonight, favRateOk: favRateOk
   };

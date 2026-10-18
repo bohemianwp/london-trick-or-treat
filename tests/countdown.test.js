@@ -253,6 +253,6 @@ test('app version matches every ?v= in index.html', () => {
   const own = [...html.matchAll(/(?:src|href)="((?!https?:)[^"]+\.(?:js|css))\?([^"]+)"/g)];
   assert.ok(own.length >= 9);
   own.forEach((m) => assert.equal(m[2], L.APP_VERSION, m[1]));
-  assert.match(html, /src="tour\.js\?v=15\.2"/);
+  assert.match(html, /src="tour\.js\?v=15\.3"/);
   assert.doesNotMatch(html, /id="tourBtn"/, 'v15: the demo lives in the Guide tab only');
 });
