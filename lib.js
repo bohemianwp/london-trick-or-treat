@@ -14,7 +14,7 @@
   var M_PER_DEG_LNG = 111320 * Math.cos(LAT0 * Math.PI / 180);
   var BOARDS = ['fun', 'decor'];
   var DEFAULT_WINDOW = { date: '2026-10-31', start: '15:00', end: '23:00', tz: TZ };
-  var APP_VERSION = 'v=15.5';                      // must match every ?v= in index.html (tests check this)
+  var APP_VERSION = 'v=15.5.1';                      // must match every ?v= in index.html (tests check this)
 
   // ==== time zones ====
   // Offset (minutes, local - UTC) of `tz` at instant `ms`. Uses Intl, so DST is handled by the browser/Node tz data.
