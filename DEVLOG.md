@@ -277,7 +277,7 @@ Peng, 8:48 AM: "如果点击更多，在手机上更多的菜单会出屏幕之�
 - **Checked** at 360, 375, 390 and 430 px, EN and ZH, before and on Oct 31. The headless test opens More and checks every chip's box is inside the viewport, the bar's scrollWidth ≤ clientWidth, and no chip overlaps zoom / locate / Practice. It fails on v15.2 in all 16 cases.
 - **Also fixed:** the Guide's Map tools line and tour step 2 used the ⌖ symbol, which many phone fonts can't show (an empty box). They now say "the round crosshair button" / 「带十字准星的圆形按钮」, and the tour uses 📍.
 
-### v=15.4: only the most popular nearby events, each checked on the organizer's own page (Oct 18, 9:45 AM, commit link below)
+### v=15.4: only the most popular nearby events, each checked on the organizer's own page (Oct 18, 9:45 AM, [fd2bc55](https://github.com/bohemianwp/london-trick-or-treat/commit/fd2bc55))
 Peng, 8:49 AM: "在深入探究搜索一下伦敦50km以内是否有更多的活动，可以列在这个上面" ("Do a deeper search for more events within 50 km of London that can be listed on the map.")
 Peng, 9:25 AM: "不要添加完，要添加评价最好的，最popular的" ("Don't add all of them. Add the best-rated, most popular ones.")
 Peng, 9:27 AM: "核实活动今年是否存在，确保100%真实" ("Verify each event really exists this year, 100% real.")
