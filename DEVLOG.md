@@ -394,6 +394,23 @@ Peng, 10:10 AM: "把文案文字一起发给我" ("Send me the copy text too.")
 - **QA:** the QR is the plain URL (`https://bohemianwp.github.io/london-trick-or-treat/`, no `?lang`), decoded with OpenCV from both posters and the video's end frames. Every caption was checked against the live app strings. All 235 characters have glyphs (no tofu). 6+ frames were extracted and reviewed. Both posters have no overflow, and the smallest text is 20 px.
 - **Copy for Peng:** `halloween_app/promo/copy_v154.md` has every video caption in order, all poster text, and ready-to-paste posts (WeChat group, RedNote, X, LinkedIn).
 
+### v=16 test-day wipe: test marks cleared after the test days · 测试日结束，清掉测试数据 (Oct 21, 10:26 AM)
+Peng's request: "10-21 测试日结束后，要把测试标记清掉" ("After the test days end on Oct 21, clear the test marks"). Peng approved the run on Oct 21.
+
+**What ran · 运行了什么:** `supabase/v16_test_wipe.sql`, pasted into the Supabase SQL Editor at about 10:26 AM (Toronto). It deletes fun-street marks and board posts made before Oct 21 (votes and reports go with their posts) and the smoke-test suggestion, and keeps decorations, past favourites and real suggestions. It changes no tables, functions or grants.
+在 Supabase SQL 编辑器中运行了 `supabase/v16_test_wipe.sql`（多伦多时间约上午 10:26）。它删除 10 月 21 日之前的趣味街道标记和留言板帖子（帖子的投票和举报一并删除）以及冒烟测试留下的建议；保留装饰、往年最爱和真实建议。不改动任何表、函数或权限。
+
+**Result · 结果:** status `v16 test wipe done · 测试数据已清除` (Chinese arrived intact). Deleted: marks 0, smoke suggestion 0, posts 0, votes 0, reports 0. Kept: suggestions 1, decorations 6, past favourites 2. Nothing needed deleting: the test-day marks had already expired after 2 hours, and there were no test-day board posts.
+结果：状态行 `v16 test wipe done · 测试数据已清除`（中文完好）。删除：标记 0、冒烟建议 0、帖子 0、投票 0、举报 0。保留：建议 1、装饰 6、往年最爱 2。没有需要删除的数据：测试日标记已在 2 小时后自动过期，也没有测试日的留言板帖子。
+
+**Read-only check · 只读检查:** a read-only query showed the one remaining suggestion is a real one shared during the test days, not a smoke test. So the smoke-test suggestion had already been removed earlier.
+只读查询显示，剩下的唯一一条建议是测试期间用户分享的真实建议，不是冒烟测试。所以冒烟测试建议之前已经被删除了。
+
+**Filter fix · 过滤条件修正:** each smoke run uses a new random device (`smoke-test-<random>` in `tests/supabase_smoke.mjs`), but the smoke-suggestion delete in v16 (and in the older `v14_smoke_cleanup`) also required one fixed device hash, so it could only ever match one specific run. `v16_test_wipe.sql` now deletes suggestions with `reason = 'Smoke test'` only. The served paste copies (`halloween_app/sqlserve/v16_test_wipe.{txt,html}`) were updated to match. This changes nothing live: the fixed file has not been run.
+每次冒烟测试都使用新的随机设备 ID（`tests/supabase_smoke.mjs` 中的 `smoke-test-<random>`），但 v16（以及旧的 `v14_smoke_cleanup`）删除冒烟建议时还要求匹配一个固定的设备哈希，因此只能匹配某一次运行。现在 `v16_test_wipe.sql` 只按 `reason = 'Smoke test'` 删除。粘贴页副本（`halloween_app/sqlserve/v16_test_wipe.{txt,html}`）也已同步更新。线上没有任何变化：修正后的文件尚未运行。
+- Tests · 测试: `tests/sql_wipe_pglite_check.mjs` now seeds smoke suggestions from two different random devices and expects both deleted; PGlite 4/4 (counts, Chinese status, what remains, second run deletes nothing).
+  `tests/sql_wipe_pglite_check.mjs` 现在放入两个不同随机设备的冒烟建议，并要求都被删除；PGlite 4/4 通过（计数、中文状态行、剩余数据、第二次运行不删除任何数据）。
+
 ## Issues and fixes
 - **4:51 PM:** the map said "API key required" → OSM tiles with a dark filter.
 - **Mac offline mid-build (3:31–3:52 PM):** the build was resumed after it came back. Later builds ran on the box.
@@ -426,8 +443,8 @@ Peng, 10:10 AM: "把文案文字一起发给我" ("Send me the copy text too.")
 ## Open items
 - Posters (sent at about 10:00 PM) show the v14 screen; re-render them from `halloween_app/poster/build.py` if the v15 look should be on them.
 - `~/Desktop/万圣节讨糖App` on Peng's Mac needs a `git pull`.
-- The full smoke run leaves one test suggestion, which anon can't delete. Remove it with the one-line SQL (`halloween_app/sqlserve/v14_smoke_cleanup.txt`) or `supabase/cleanup.sql`.
-- After the test days (Oct 21), wipe test-day fun-street marks (see `supabase/v7_update.sql`).
+- ~~The full smoke run leaves one test suggestion, which anon can't delete.~~ **Done (Oct 21):** it was already gone; `supabase/v16_test_wipe.sql` now removes any smoke-test suggestion by reason. · 已完成：冒烟测试建议已不存在；v16 现在按 reason 删除。
+- ~~After the test days (Oct 21), wipe test-day fun-street marks.~~ **Done (Oct 21, 10:26 AM):** `supabase/v16_test_wipe.sql` ran; 0 deleted, decorations, past favourites and the real suggestion kept. · 已完成：测试日清理已运行。
 - For Halloween night, consider a keyed tile provider if traffic is high (OSM tile policy).
 
 ## v=15.5 — Oct 18, 2026, ~10:30 AM EDT: the "Show me" ring no longer gets left behind
